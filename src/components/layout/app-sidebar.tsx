@@ -18,6 +18,8 @@ import {
   LogOut,
   Building2,
   UserPlus,
+  FileText,
+  ScrollText,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import {
@@ -61,6 +63,8 @@ const GROUPS: {
       { module: "tasks", href: "/tasks", label: "Tasks", icon: CheckSquare },
       { module: "time", href: "/time", label: "Time Tracking", icon: Clock },
       { module: "finance", href: "/finance", label: "Finance", icon: Wallet },
+      { module: "finance", href: "/finance/invoice-maker", label: "Invoice Maker", icon: FileText },
+      { module: "finance", href: "/finance/quotation-maker", label: "Quotation Maker", icon: ScrollText },
       { module: "content", href: "/content", label: "Content Calendar", icon: CalendarDays },
     ],
   },

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requirePermission, logAudit } from "@/lib/access";
-import { proposalSchema, type ActionResult } from "@/lib/validations";
+import { proposalSchema, fullQuotationSchema, type ActionResult } from "@/lib/validations";
 
 export async function createProposal(
   _prev: ActionResult,
@@ -93,3 +93,56 @@ export async function updateProposalStatus(
     return { ok: false, error: e instanceof Error ? e.message : "Failed to update proposal" };
   }
 }
+
+export async function createFullQuotation(data: {
+  clientId: string;
+  title: string;
+  templateKey?: string;
+  validUntil?: string;
+  discount?: number;
+  notes?: string;
+  lineItems: { description: string; hours?: number; rate: number; amount: number }[];
+}): Promise<ActionResult> {
+  try {
+    const user = await requirePermission("finance", "create");
+    const parsed = fullQuotationSchema.safeParse(data);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid data" };
+    }
+
+    const d = parsed.data;
+    const discount = d.discount ?? 0;
+    const subtotal = d.lineItems.reduce((sum, item) => sum + item.amount, 0);
+    const total = Math.max(0, subtotal - discount);
+
+    const proposal = await prisma.proposal.create({
+      data: {
+        clientId: d.clientId,
+        title: d.title,
+        templateKey: d.templateKey || "custom",
+        status: "DRAFT",
+        subtotal,
+        discount,
+        total,
+        validUntil: d.validUntil ? new Date(d.validUntil) : null,
+        lineItems: {
+          create: d.lineItems.map((item, idx) => ({
+            description: item.description,
+            hours: item.hours ?? null,
+            rate: item.rate,
+            amount: item.amount,
+            sortOrder: idx,
+          })),
+        },
+      },
+    });
+
+    await logAudit(user.id, "CREATE", "Proposal", proposal.id);
+    revalidatePath("/finance");
+    revalidatePath("/finance/quotation-maker");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Failed to create quotation" };
+  }
+}
+

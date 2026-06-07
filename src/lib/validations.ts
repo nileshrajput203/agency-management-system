@@ -99,6 +99,41 @@ export const invoiceSchema = z.object({
   dueDate: z.string().optional(),
 });
 
+export const fullInvoiceLineSchema = z.object({
+  description: z.string().min(1, "Description is required"),
+  quantity: z.coerce.number().min(0.01),
+  rate: z.coerce.number().min(0),
+  gstRate: z.coerce.number().min(0).max(100),
+});
+
+export const fullInvoiceSchema = z.object({
+  clientId: z.string().min(1, "Client is required"),
+  projectId: z.string().optional(),
+  currency: z.enum(["INR", "USD", "AED", "GBP"]),
+  gstRate: z.coerce.number().min(0).max(100),
+  dueDate: z.string().optional(),
+  notes: z.string().optional(),
+  discount: z.coerce.number().min(0).optional(),
+  lineItems: z.array(fullInvoiceLineSchema).min(1, "At least one line item is required"),
+});
+
+export const fullQuotationLineSchema = z.object({
+  description: z.string().min(1, "Description is required"),
+  hours: z.coerce.number().min(0).optional(),
+  rate: z.coerce.number().min(0),
+  amount: z.coerce.number().min(0),
+});
+
+export const fullQuotationSchema = z.object({
+  clientId: z.string().min(1, "Client is required"),
+  title: z.string().min(2, "Title is required"),
+  templateKey: z.string().optional(),
+  validUntil: z.string().optional(),
+  discount: z.coerce.number().min(0).optional(),
+  notes: z.string().optional(),
+  lineItems: z.array(fullQuotationLineSchema).min(1, "At least one line item is required"),
+});
+
 export const contentPostSchema = z.object({
   clientId: z.string().min(1),
   title: z.string().min(2),
