@@ -1,0 +1,518 @@
+{
+  "MASTER_SYSTEM_PROMPT": {
+    "title": "AgencyOS — Complete Agency Intelligence Platform",
+    "version": "3.0.0",
+    "instruction": "You are a world-class full-stack engineer and UI/UX designer. Build this platform with pixel-perfect precision, zero broken links, zero missing logic, and production-grade code. Use your deepest knowledge of modern SaaS design, agency workflows, AI integration, and social media APIs to build the best possible version of each module. Every module must be fully functional, interconnected, and visually excellent. Do not cut corners. Reference the best SaaS platforms (Notion, Linear, HubSpot, Monday.com, Hootsuite, Buffer, FreshBooks, DocuSign) for UX inspiration and exceed their standard.",
+
+    "tech_stack": {
+      "frontend": "Next.js 14 (App Router) + TypeScript + TailwindCSS + ShadCN UI + Framer Motion",
+      "backend": "Node.js + Express / Next.js API Routes",
+      "database": "PostgreSQL (primary) + Redis (cache/sessions) + LocalStorage (offline-first client docs)",
+      "ai": "Anthropic Claude API (claude-sonnet-4-20250514) for proposals, suggestions, task AI",
+      "file_storage": "Local filesystem + AWS S3 compatible (minio for self-hosted)",
+      "social_apis": "Meta Graph API (Instagram + Facebook), YouTube Data API v3, TikTok API",
+      "maps": "Google Maps JavaScript API + Places API",
+      "auth": "NextAuth.js with role-based access control (RBAC)",
+      "realtime": "Socket.io for live notifications and collaboration",
+      "pdf_generation": "Puppeteer + custom HTML templates",
+      "email": "Nodemailer + SendGrid",
+      "styling_philosophy": "Clean, minimal, professional — inspired by Linear.app and Vercel dashboard. Dark mode first. Micro-animations on all interactions. No clutter. Every pixel must earn its place."
+    },
+
+    "global_design_system": {
+      "instruction": "Apply these rules to EVERY screen across the entire platform. No exceptions.",
+      "color_palette": {
+        "primary": "#6366F1 (Indigo)",
+        "secondary": "#0EA5E9 (Sky Blue)",
+        "success": "#10B981 (Emerald)",
+        "warning": "#F59E0B (Amber)",
+        "danger": "#EF4444 (Red)",
+        "neutral": "#1E293B (Slate Dark)",
+        "surface": "#F8FAFC (Slate 50)",
+        "dark_bg": "#0F172A",
+        "dark_surface": "#1E293B",
+        "gradient_hero": "linear-gradient(135deg, #6366F1 0%, #0EA5E9 100%)"
+      },
+      "typography": {
+        "font_family": "Inter (UI) + Geist Mono (code/numbers)",
+        "scale": "12 / 13 / 14 / 16 / 18 / 20 / 24 / 30 / 36 / 48px",
+        "weights": "400 regular / 500 medium / 600 semibold / 700 bold",
+        "rule": "Headings always semibold. Body always 400. Numbers/stats always 700 tabular-nums."
+      },
+      "spacing": "4px base unit. Use 4 / 8 / 12 / 16 / 24 / 32 / 48 / 64px throughout.",
+      "border_radius": "sm: 4px / md: 8px / lg: 12px / xl: 16px / pill: 9999px",
+      "shadows": "xs: 0 1px 2px rgba(0,0,0,0.05) / sm: 0 2px 8px rgba(0,0,0,0.08) / md: 0 4px 16px rgba(0,0,0,0.12) / lg: 0 8px 32px rgba(0,0,0,0.16)",
+      "animations": {
+        "page_transition": "fadeUp 200ms ease-out",
+        "card_hover": "translateY(-2px) + shadow-md — 150ms ease",
+        "button_press": "scale(0.97) — 100ms",
+        "sidebar_expand": "width 250ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "skeleton_loading": "shimmer pulse 1.5s infinite",
+        "toast_notification": "slideIn from right 300ms ease",
+        "modal_open": "scaleUp from 95% + fade 200ms ease",
+        "number_counter": "countUp animation for all metric cards on mount",
+        "chart_draw": "stroke-dasharray animate on all charts on first render"
+      },
+      "components": {
+        "sidebar": "Collapsible left sidebar (240px expanded / 64px icon-only). Logo at top. Navigation groups with icons. User profile + role badge at bottom. Active item has indigo accent bar.",
+        "topbar": "Fixed. Global search (Cmd+K). Notification bell with badge. Client context switcher. User avatar dropdown.",
+        "cards": "White bg. 1px border slate-200. border-radius-lg. hover: shadow-md + border-primary. Padding 20px.",
+        "tables": "Sticky header. Row hover highlight. Bulk selection checkboxes. Sort indicators. Inline action icons appear on row hover.",
+        "modals": "Centered overlay. Max-width 640px (form) / 900px (preview). Close on ESC + backdrop click. Slide-up on mobile.",
+        "forms": "Floating labels. Real-time validation. Error states with shake animation. Success states with checkmark.",
+        "buttons": {
+          "primary": "Indigo bg. White text. Hover: darken 5%. Active: scale 0.97.",
+          "secondary": "Transparent. Indigo border + text. Hover: indigo-50 bg.",
+          "danger": "Red bg for destructive actions with confirmation dialog.",
+          "icon_btn": "32px circle. Ghost style. Tooltip on hover."
+        },
+        "empty_states": "Centered illustration (SVG) + headline + CTA button. Never show blank white screens.",
+        "loading_states": "Skeleton screens that match the exact layout of loaded content. No spinners on full pages.",
+        "mobile_responsive": "Full responsive down to 375px. Bottom navigation bar on mobile. Swipe gestures on cards. Touch-optimized tap targets (min 44px)."
+      }
+    },
+
+    "modules": {
+
+      "01_authentication_and_rbac": {
+        "description": "Secure multi-user login system with role-based access",
+        "features": [
+          "Email + password login with JWT tokens",
+          "Role definitions: Admin / Manager / Social Media Manager / Designer / Sales / Client (read-only portal)",
+          "Each user has unique email + password",
+          "On login: redirect to role-specific dashboard view",
+          "Admin sees everything. Client sees only their portal.",
+          "Session management with auto-logout after inactivity",
+          "Password reset via email OTP",
+          "Activity log: track who did what and when"
+        ],
+        "ui": "Clean centered login card. Logo at top. 'Welcome back' heading. Email + password fields. Animated background gradient. Error states inline."
+      },
+
+      "02_dashboard": {
+        "description": "Central command center — the first screen after login",
+        "features": [
+          "KPI metric cards: Total Clients / Active Projects / Revenue This Month / Pending Invoices / Tasks Due Today / Contracts Expiring Soon",
+          "Revenue chart: line chart with monthly comparison (current vs previous year)",
+          "Client activity timeline: recent actions across all clients",
+          "Quick action buttons: Add Client / Create Invoice / New Project / Upload Content",
+          "Top performing clients by revenue (ranked list)",
+          "Upcoming deadlines widget (next 7 days)",
+          "Team activity feed (who is working on what right now)",
+          "Weather widget (based on user location) — subtle, top-right corner",
+          "AI daily briefing: one paragraph summarising what needs attention today"
+        ],
+        "ui": "Dark header hero section with stats. White card grid below. Sidebar navigation. All numbers animate countUp on page load."
+      },
+
+      "03_client_management": {
+        "description": "Full CRM for managing every client with their own isolated data space",
+        "client_creation_flow": {
+          "step_1_basic_info": {
+            "fields": ["Full Name / Business Name", "Contact Person", "Email", "Phone", "WhatsApp Number", "Business Type (dropdown: Agency / Brand / Individual / Startup / Enterprise)", "Industry (dropdown with 50+ options)", "Country / City", "Address"],
+            "ui": "Stepper form. Step 1 of 5. Progress bar at top."
+          },
+          "step_2_digital_presence": {
+            "fields": ["Website URL (with live preview thumbnail)", "Instagram Handle", "Facebook Page URL", "YouTube Channel URL", "LinkedIn URL", "Twitter/X Handle", "TikTok Handle", "Google Business Profile URL"],
+            "features": ["Auto-fetch follower counts on paste", "Show platform icons with live status indicators", "Validate URL format in real-time"],
+            "ui": "Card per platform. Toggle on/off which platforms are managed."
+          },
+          "step_3_media_assets": {
+            "fields": ["Company Logo (PNG/SVG — stored locally)", "Brand Colors (color picker, store hex codes)", "Brand Fonts (upload or select)", "Brand Guidelines PDF", "Profile Photos / Team Photos", "Product Images / Catalog", "Video Assets"],
+            "storage": "All files stored in /storage/clients/{client_id}/assets/ on local filesystem. Indexed in database with file paths.",
+            "ui": "Drag-and-drop upload zones per category. Thumbnail previews. File size + type validation. Progress bars on upload."
+          },
+          "step_4_service_configuration": {
+            "fields": ["Services Subscribed (multi-select: Social Media Management / SEO / Google Ads / Website / Branding / Video Production / etc.)", "Contract Start Date", "Contract End Date", "Contract Duration (auto-calculated in months)", "Monthly Retainer Amount", "Currency", "Billing Cycle (Monthly / Quarterly / Yearly)", "Payment Terms (Net 7 / Net 15 / Net 30)"],
+            "social_media_deliverables": {
+              "description": "Configure monthly deliverables per platform",
+              "fields": ["Platform (Instagram / Facebook / YouTube / LinkedIn / TikTok)", "Posts per month (number input)", "Reels/Videos per month", "Stories per month", "Carousels per month", "Post frequency pattern (e.g., alternate: Post > Reel > Post > Reel)", "Caption writing: Yes/No", "Hashtag research: Yes/No", "Scheduling: Yes/No"],
+              "logic": "If contract is 6 months: auto-generate 6 monthly content quotas. Each month must match the configured deliverable count. System tracks completion % per month.",
+              "ui": "Visual content quota builder. Drag to set alternating patterns (P-R-P-R). Monthly calendar preview showing distribution."
+            }
+          },
+          "step_5_review_and_save": {
+            "features": ["Summary of all entered data", "Preview client card", "Auto-create client folder in local storage", "Auto-create client database record", "Generate welcome email draft", "Option to add first project immediately"],
+            "local_storage": "Create isolated client workspace: /clients/{client_id}/ with subfolders: /assets, /invoices, /contracts, /proposals, /content, /reports"
+          }
+        },
+        "client_profile_page": {
+          "layout": "Left sidebar: client info + quick stats. Main area: tabbed sections (Overview / Projects / Content / Invoices / Documents / Analytics / Notes)",
+          "overview_tab": ["Client health score (0-100 AI calculated)", "Contract status badge", "Days until contract renewal", "Revenue summary", "Last activity timestamp", "Quick notes field"],
+          "features": ["Edit all client info inline", "Archive / Deactivate client", "Clone client (copy settings to new client)", "Export client data as PDF report", "Share client portal link"]
+        }
+      },
+
+      "04_sales_funnel": {
+        "description": "Visual pipeline to track every prospect from lead to closed deal",
+        "pipeline_stages": ["New Lead", "Contacted", "Proposal Sent", "Negotiation", "Contract Sent", "Closed Won", "Closed Lost"],
+        "features": {
+          "kanban_board": "Drag-and-drop cards between stages. Column totals show deal value. Card shows: name, value, probability %, days in stage, assigned sales person.",
+          "google_maps_integration": {
+            "description": "Geographical view of all leads and clients",
+            "features": ["Pin every lead/client on Google Map", "Color-coded pins: Blue=Lead / Green=Client / Red=Lost", "Click pin to see mini profile card", "Heatmap view showing concentration of clients by area", "Filter map by industry, deal value, stage", "Radius search: find all leads within X km of an address", "Street view link per client location"]
+          },
+          "lead_intelligence": {
+            "ai_research": "When adding a lead — enter company name. AI searches the web and auto-fills: industry, size, recent news, social media stats, tech stack, competitors, funding status.",
+            "news_feed": "Per-lead news section pulling latest articles about that company from Google News API.",
+            "opportunity_score": "AI scores each lead 1-100 based on: engagement level, company size, budget signals, time in pipeline, response rate.",
+            "competitor_analysis": "For each lead, AI generates: 'They currently work with [competitor]. Here is why you should win this deal...' based on web research."
+          },
+          "activities": ["Log calls, emails, meetings per lead", "Set follow-up reminders", "Email sequences (automated follow-up templates)", "WhatsApp message log"],
+          "contract_creation_from_funnel": "When deal moves to 'Contract Sent' stage — one click to auto-generate contract pre-filled with all lead details.",
+          "revenue_forecast": "Chart showing projected revenue based on pipeline deals × probability %. Compare forecasted vs actual each month.",
+          "sales_reports": ["Win/Loss analysis", "Average deal cycle time", "Best performing salesperson", "Top industries by revenue", "Monthly pipeline growth chart"]
+        },
+        "ui": "Full-width kanban. Collapsible detail drawer on card click. Map toggle button in top bar. Dark header with pipeline summary stats."
+      },
+
+      "05_projects": {
+        "description": "Project management for all client work — no time tracking",
+        "features": {
+          "project_creation": {
+            "fields": ["Project Name", "Client (linked)", "Project Type (Social Media / Website / Branding / Campaign / Video / Other)", "Start Date", "End Date", "Budget", "Team Members (multi-assign)", "Priority (Low / Medium / High / Critical)", "Description", "Tags"],
+            "removal": "TIME TRACKING IS COMPLETELY REMOVED from this module"
+          },
+          "views": ["Kanban Board (To Do / In Progress / Review / Approved / Done)", "List view with filters", "Calendar view (deadlines on calendar)", "Gantt chart (project timeline)", "Card view (visual project cards with cover images)"],
+          "task_management": {
+            "features": ["Nested subtasks (unlimited depth)", "Assign to team member", "Due date + priority", "Attach files", "Comment thread per task", "Mention teammates with @", "Task templates for recurring projects", "Bulk task import via CSV"],
+            "ui": "Click task to open side drawer. Keyboard shortcuts (N=new task, Space=complete). Confetti animation on task completion."
+          },
+          "milestones": "Define key project milestones. Track % completion. Alert when milestone is at risk (past due date with incomplete tasks).",
+          "client_approval_workflow": "Mark deliverables as 'Pending Client Approval'. Share approval link with client. Client can Approve / Request Changes with comments. No login required for client.",
+          "project_templates": "Save any project as a template. On new project creation, apply template to pre-fill tasks, milestones, and checklist.",
+          "reporting": ["Project health dashboard", "Deliverables completion %", "Budget vs actual spend", "Team workload view"]
+        },
+        "ui": "Clean project header with cover image, status badge, progress bar. Sticky task toolbar. Team avatars showing who is assigned."
+      },
+
+      "06_content_calendar": {
+        "description": "Per-client content planning, scheduling, and delivery system",
+        "features": {
+          "per_client_isolation": "Every client has their own dedicated content calendar. No cross-client visibility. Switch clients via dropdown.",
+          "calendar_views": ["Monthly grid (default)", "Weekly view with time slots", "List view (upcoming posts)", "Platform-filtered view (Instagram only, etc.)"],
+          "content_creation": {
+            "fields": ["Post Date + Time", "Platform (multi-select)", "Content Type (Post / Reel / Story / Carousel / Video / Blog / Ad)", "Caption", "Hashtags (with suggestion AI)", "Media Attachments (images/videos)", "Link in Bio reference", "Campaign Tag", "Notes for designer"],
+            "quota_tracking": {
+              "description": "Based on deliverables set in client creation",
+              "logic": "If client has 6 posts + 6 reels per month: show progress bar '3/6 Posts' + '2/6 Reels'. Color turns green when quota met. Red alert if month end approaching with incomplete quota.",
+              "alternating_pattern": "Visual pattern enforcer: shows required sequence (Post > Reel > Post > Reel). Warns if pattern breaks.",
+              "multi_month": "For 6-month contract: show all 6 months. Each month has its own quota tracker. Mark month as 'Delivered' once all content is approved."
+            }
+          },
+          "content_status_flow": ["Draft → In Review → Approved → Scheduled → Published → Reported"],
+          "client_sharing": {
+            "description": "Share content calendar directly with client",
+            "features": ["Generate unique shareable link per client", "Client sees read-only beautiful calendar view", "Client can leave feedback/comments on each post", "Client can approve/reject content", "No login required for client — link-based access", "Expiry date on share link (optional)", "PDF export of monthly content plan"]
+          },
+          "content_bank": "Drag approved content from calendar to content bank for reuse. Tag by type, mood, campaign.",
+          "caption_ai": "Select post type + platform → AI generates 3 caption options with hashtags. One click to use.",
+          "best_time_to_post": "AI recommends optimal posting times per platform based on audience data.",
+          "ui": "Full-width calendar. Color-coded by platform. Drag to reschedule. Click to open post editor. Progress bars visible in month header."
+        }
+      },
+
+      "07_content_publisher": {
+        "description": "One-click content upload to all social media platforms simultaneously",
+        "features": {
+          "upload_interface": {
+            "layout": "Central upload zone. Drag or click to upload video/image. Preview panel on right.",
+            "fields": ["Media file (video/image)", "Caption (with character counter per platform)", "Hashtags", "Thumbnail (for YouTube/videos)", "Schedule: Now or specific date/time", "Platforms selector: toggle Instagram / Facebook / YouTube / LinkedIn / TikTok / Twitter"],
+            "platform_specific_settings": {
+              "instagram": ["Post type: Feed / Reel / Story", "Collaborator tag", "Product tag", "Location tag"],
+              "facebook": ["Post to Page / Group", "Boost post option", "Audience selector"],
+              "youtube": ["Video title (separate from caption)", "Description", "Category", "Tags", "Playlist", "Made for kids: Yes/No", "Visibility: Public / Unlisted / Private"],
+              "tiktok": ["Duet/Stitch permissions", "Comment permissions"],
+              "linkedin": ["Post type: Post / Article / Document"]
+            }
+          },
+          "one_click_publish": "Green 'Publish to All' button. Shows publishing progress per platform with real-time status (Uploading / Processing / Live / Failed). Retry failed platforms individually.",
+          "approval_workflow": "Social media manager uploads content → Admin gets notification → Admin previews → One click Approve → Auto-publishes at scheduled time. Client can also be in approval chain (optional per client).",
+          "content_library": "All uploaded content stored in library. Filter by client, platform, date, type. Re-post from library.",
+          "scheduling_queue": "Visual queue showing upcoming scheduled posts across all clients. Conflict detector (two posts same time same platform).",
+          "oauth_connections": "Secure OAuth2 connection to each platform account per client. Color-coded connection status badges. Auto-refresh tokens. Alert when token expires.",
+          "platform_preview": "Before publishing — show realistic platform-specific preview of how post will look on Instagram, Facebook, YouTube.",
+          "ui": "Dark mode publisher interface. Splitscreen: upload left / preview right. Platform icons with connected/disconnected status. Live character count per platform."
+        }
+      },
+
+      "08_social_analytics": {
+        "description": "Unified analytics dashboard — all platforms, all clients, one place",
+        "features": {
+          "per_client_view": "Each client has their own analytics dashboard. Admin sees all clients. Client portal shows only their own data.",
+          "metrics_tracked": {
+            "instagram": ["Followers (+ growth %)", "Reach", "Impressions", "Engagement Rate", "Profile Visits", "Story Views", "Reel plays", "Best performing post"],
+            "facebook": ["Page Likes", "Post Reach", "Engagement", "Video views", "Link clicks", "Page impressions"],
+            "youtube": ["Subscribers", "Total Views", "Watch time (hours)", "Average view duration", "CTR", "Top performing video", "Revenue (if monetized)"],
+            "tiktok": ["Followers", "Video Views", "Likes", "Shares", "Comments", "Profile views"],
+            "cross_platform": ["Total reach (combined)", "Total engagements", "Best platform this month", "Growth trend chart"]
+          },
+          "report_generation": {
+            "description": "Generate beautiful PDF reports for clients",
+            "features": ["Monthly performance report per client", "Custom date range", "Include/exclude specific metrics", "Brand the report with agency logo + client logo", "AI-written summary paragraph: 'This month your Instagram grew by X%...'", "Send report directly to client via email", "Share report link (web version)"],
+            "template": "Professional multi-page PDF. Cover page with client logo. Charts. AI insights. Competitor comparison (if data available). Recommendations for next month."
+          },
+          "competitor_benchmarking": "Track competitor social accounts alongside client. Show side-by-side comparison.",
+          "content_performance": "Which posts performed best? Table ranked by engagement. Filter by platform, type, month.",
+          "ai_insights": "AI analyses data and writes: 'Your Reels are getting 3x more reach than posts. Recommend increasing Reel frequency next month.'",
+          "ui": "Dark analytics dashboard. Animated charts (Chart.js / Recharts). Platform logo color-coded cards. Date range picker. PDF export button always visible."
+        }
+      },
+
+      "09_invoice_and_quotation": {
+        "description": "Professional invoice and quotation maker with full financial management",
+        "invoice_maker": {
+          "fields": ["Invoice Number (auto-generated: INV-2025-001)", "Invoice Date", "Due Date", "Bill To (auto-filled from client)", "Bill From (agency details)", "Line Items: Description / Quantity / Unit Price / Tax % / Discount / Total", "Add unlimited line items", "Sub-total / Tax / Discount / Grand Total (auto-calculated)", "Notes", "Payment Instructions", "Bank Details"],
+          "features": ["Multiple tax rates (GST, VAT, etc.)", "Multi-currency support", "Discount: percentage or fixed amount", "Recurring invoice setup", "Invoice status: Draft / Sent / Viewed / Partially Paid / Paid / Overdue", "Track when client viewed invoice (email read receipt)", "Send via email directly from platform", "Payment reminder automation (7 days, 3 days, 1 day before due)", "Mark as paid with payment date and method", "Partial payment recording"]
+        },
+        "quotation_maker": {
+          "fields": ["Quote Number (auto: QT-2025-001)", "Valid Until date", "Same line item structure as invoice", "Acceptance status"],
+          "features": ["Convert approved quotation to invoice in one click", "Send quote for client e-signature", "Quote acceptance notification", "Track quote open rate"]
+        },
+        "terms_and_conditions": {
+          "description": "Comprehensive pre-written T&C library",
+          "built_in_templates": [
+            "Late payment penalty clause (1.5% per month)",
+            "Project cancellation policy (50% kill fee)",
+            "Intellectual property ownership clause",
+            "Revision policy (2 rounds included, additional charged at X/hour)",
+            "Confidentiality / NDA clause",
+            "Refund policy",
+            "Force majeure clause",
+            "Dispute resolution clause",
+            "Governing law clause",
+            "Liability limitation clause",
+            "Content approval responsibility clause",
+            "Social media account access policy",
+            "Deliverable approval deadline (client must respond within 5 business days)"
+          ],
+          "customization": "Select which clauses to include per invoice/quote. Edit any clause. Save custom clauses as templates.",
+          "ui": "Checkbox list of T&C sections. Preview renders in real-time on document."
+        },
+        "financial_dashboard": ["Revenue chart (monthly)", "Outstanding invoices total", "Overdue invoices with aging report", "Revenue by client (pie chart)", "Revenue by service type", "Payment method breakdown"],
+        "ui": "Professional document-style editor. Live PDF preview on right. Send button. Download button. Status badge. Payment history timeline."
+      },
+
+      "10_proposal_maker": {
+        "description": "AI-powered proposal generator that researches the client and creates custom proposals",
+        "ai_research_flow": {
+          "step_1": "User inputs: Client name / website / industry / service being proposed",
+          "step_2": "AI engine (Claude) performs deep research: scrapes client website, analyses social media presence, checks recent news, identifies pain points, researches competitors, analyses market trends in their industry",
+          "step_3": "AI generates comprehensive proposal including: Executive Summary, Client Analysis, Current Digital Presence Audit, Competitor Landscape, Proposed Strategy, Deliverables Table, Timeline, Investment (pricing), Why Us section, Case Studies (from agency portfolio), Next Steps",
+          "step_4": "User reviews and edits AI-generated content in rich text editor",
+          "step_5": "Apply professional template + agency branding",
+          "step_6": "Export as PDF or share as web link"
+        },
+        "proposal_sections": [
+          "Cover Page (client logo + agency logo + date)",
+          "Table of Contents (auto-generated)",
+          "Executive Summary (AI written, 2 paragraphs)",
+          "About Our Agency (from agency profile template)",
+          "Client Profile (AI researched)",
+          "Current Digital Presence Audit (AI analysed with actual data)",
+          "Challenges and Opportunities (AI identified)",
+          "Proposed Strategy (service-specific, AI generated)",
+          "Deliverables and Scope of Work (from service configuration)",
+          "Content Strategy Overview",
+          "Timeline and Milestones (visual Gantt)",
+          "Investment and Pricing (from quotation module)",
+          "Terms Overview (summary of T&C)",
+          "Why Choose Us (AI personalised based on client industry)",
+          "Portfolio / Case Studies",
+          "Testimonials",
+          "Next Steps and CTA",
+          "Contact Information"
+        ],
+        "features": ["Rich text editor for all sections", "Drag to reorder sections", "AI regenerate button per section", "Multiple design templates (Minimal / Bold / Creative / Corporate)", "Client e-signature field", "Track when proposal is opened and for how long", "Follow-up reminder if not opened in 3 days", "Version history (v1, v2, v3 with diff view)"],
+        "ai_prompt_per_section": "Each section has a dedicated AI prompt that uses: agency profile + client data + web research + industry trends to generate relevant, accurate, personalised content.",
+        "ui": "Two-pane editor: controls left / live PDF preview right. AI sparks icon on each section. Template switcher in toolbar. Progress indicator showing section completion."
+      },
+
+      "11_agreement_maker": {
+        "description": "Dynamic contract and agreement generator based on client contract details",
+        "agreement_types": ["Social Media Management Agreement", "Digital Marketing Retainer Agreement", "Website Development Agreement", "Branding and Design Agreement", "Content Creation Agreement", "Advertising Management Agreement", "Consulting Agreement", "NDA (Non-Disclosure Agreement)", "Influencer Partnership Agreement"],
+        "auto_fill_logic": "Pull all details from client profile: name, address, services, pricing, contract duration, deliverables, start/end dates — auto-populate entire agreement without manual entry.",
+        "dynamic_clauses": {
+          "contract_duration": "System detects if contract is 1 month / 3 months / 6 months / 1 year and auto-adjusts: payment schedule, deliverable tables, renewal terms, cancellation notice period.",
+          "services": "Based on selected services, relevant service-specific clauses are auto-inserted (e.g., if SEO selected: ranking disclaimer clause; if ads selected: ad spend management clause).",
+          "deliverables_table": "Auto-generated table: Month 1 through Month N with exact post counts, reel counts, and other deliverables per platform."
+        },
+        "key_agreement_sections": [
+          "Parties involved (Agency + Client with full legal details)",
+          "Scope of Services (detailed, service-specific)",
+          "Monthly Deliverables Table (auto-generated from content config)",
+          "Term and Duration (with exact start and end dates)",
+          "Payment Terms and Schedule (all monthly amounts listed)",
+          "Late Payment Consequences",
+          "Revision Policy",
+          "Approval Process (client response deadline)",
+          "Content Ownership and IP Rights",
+          "Confidentiality Obligations",
+          "Account Access and Credentials",
+          "Performance Standards (KPIs expected)",
+          "Termination Conditions (by either party)",
+          "Notice Period for Termination",
+          "Penalty Clauses",
+          "Force Majeure",
+          "Governing Law and Jurisdiction",
+          "Dispute Resolution Process",
+          "Signature Block (Agency + Client + Date + Witness)",
+          "Amendment Procedure"
+        ],
+        "e_signature": "Integrated e-signature. Client receives email link. Signs digitally. Both parties get signed PDF copy automatically.",
+        "agreement_status": ["Draft", "Sent for Signature", "Partially Signed", "Fully Executed", "Expired", "Terminated"],
+        "renewal_automation": "30 days before contract end: auto-generate renewal agreement + notify admin.",
+        "ui": "Professional legal document layout. Section navigation sidebar. Highlight mode for client to see what changed from previous version. Print-optimised CSS."
+      },
+
+      "12_attendance_and_hr": {
+        "description": "Complete HR module for managing the entire team",
+        "hr_dashboard": {
+          "overview_cards": ["Total Staff", "Present Today", "Absent Today", "On Leave", "Late Arrivals", "This Month Payroll Estimate"]
+        },
+        "staff_directory": {
+          "fields": ["Full Name", "Profile Photo", "Employee ID (auto-generated)", "Email (login credential)", "Phone", "Department", "Role / Designation", "Reporting Manager", "Date of Joining", "Employment Type (Full-time / Part-time / Freelancer / Intern)", "Salary / Day Rate", "Skills and Tools", "Social media handles (for team page)", "Emergency Contact", "Documents (ID proof, contract, etc.)"],
+          "ui": "Grid view of staff cards with avatar, name, role badge, department color. Click to open full profile. Filter by department, role, status."
+        },
+        "teams_and_roles": {
+          "teams": "Create teams: Design Team / Social Media Team / Development Team / Sales Team / Management",
+          "roles_permissions_matrix": {
+            "Admin": "Full access to everything. Can manage users, billing, all clients.",
+            "Manager": "Access to all clients assigned. Can approve content and tasks. Cannot manage billing.",
+            "Social_Media_Manager": "Access only to content calendar, publisher, analytics of assigned clients.",
+            "Designer": "Access to projects and content calendar (upload only). No financial data.",
+            "Sales": "Access to sales funnel only. Cannot see existing client financial data.",
+            "HR_Manager": "Access to attendance and HR module only.",
+            "Client": "Read-only portal: their analytics, content calendar, invoices, proposals only."
+          }
+        },
+        "attendance_tracking": {
+          "check_in_method": "Staff opens platform on their device → Dashboard shows 'Check In' button → Click to log attendance with timestamp + IP address",
+          "features": ["Check in / Check out with timestamps", "Late arrival detection (configurable threshold e.g. 9:30 AM)", "Work hours auto-calculated per day", "Monthly attendance report per employee", "Leave request system (Sick / Casual / Earned / Unpaid)", "Leave approval workflow (Manager → Admin)", "Leave balance tracker", "Holiday calendar (configure company holidays)", "Overtime tracking (hours beyond standard work day)"],
+          "attendance_dashboard": "Calendar heatmap per employee. Green=present, Red=absent, Yellow=half-day, Blue=leave. Monthly summary table. Export to Excel."
+        },
+        "payroll": {
+          "features": ["Monthly payroll calculation (salary + overtime - deductions)", "Generate payslip PDF per employee", "Track advances and deductions", "Bank transfer reference tracking"],
+          "ui": "Table view. Approve payroll button per employee. Send payslip via email."
+        }
+      },
+
+      "13_task_management": {
+        "description": "Personal and team task system — daily work planner with AI assistance",
+        "features": {
+          "daily_task_planner": {
+            "description": "Each team member has their own daily task view",
+            "fields": ["Task title", "Client link (optional)", "Project link (optional)", "Priority (P1 Critical / P2 High / P3 Medium / P4 Low)", "Estimated duration", "Deadline", "Notes"],
+            "ai_task_suggestion": "Based on: overdue tasks, upcoming client deliverables, project deadlines, and their role — AI suggests: 'Based on your schedule, here are the 3 most important things you should focus on today.' Shown as cards they can add to today's list.",
+            "daily_standup_prompt": "On login: modal asks '1. What did you work on yesterday? 2. What are you working on today? 3. Any blockers?' Answers stored as daily log."
+          },
+          "admin_task_overview": {
+            "description": "Admin sees ALL tasks from ALL team members",
+            "views": ["By person: see each person's task list and completion rate", "By client: see all tasks across all team members for a specific client", "By project: see all project tasks", "Workload heatmap: visual grid showing who has too many / too few tasks this week"],
+            "features": ["Reassign tasks from admin view", "Add tasks to anyone's list", "Priority override", "Comment on any task", "Mark blocked tasks and notify team"]
+          },
+          "task_notifications": ["Assigned new task", "Task due in 24 hours", "Task overdue", "Task commented on", "Task status changed"],
+          "recurring_tasks": "Set tasks to repeat: Daily / Weekly / Monthly / Custom",
+          "productivity_report": "Per person: tasks completed this week / month. Completion rate %. Streak tracker.",
+          "ui": "Personal task view: clean to-do list with drag to reorder. Today section highlighted. Completed tasks strike-through with satisfying animation. Admin view: team grid with task counts."
+        }
+      },
+
+      "14_documents_and_billing": {
+        "description": "Centralised document management for all generated documents",
+        "features": ["All invoices, quotes, proposals, agreements stored per client", "Search across all documents", "Version history per document", "Document status timeline", "Bulk export as ZIP", "Document expiry alerts (proposals expire, agreements expire)", "E-signature tracking", "Document categories: Invoice / Quote / Proposal / Agreement / Report / Contract / NDA", "Folder structure mirrored on local filesystem"],
+        "ui": "File manager style interface. List view with sort. Preview pane on right. Status badges. Quick action buttons per document."
+      },
+
+      "15_client_portal": {
+        "description": "Dedicated read-only view for clients to see their data",
+        "access": "Unique URL per client. Link-based access (no password required, or optional PIN). Agency branded.",
+        "sections_visible_to_client": ["Their content calendar (read-only + approve/feedback)", "Their social media analytics", "Their invoices and payment status", "Their active proposals (for signing)", "Their agreements (view signed copy)", "Project progress (tasks marked as client-visible)", "Monthly reports (shared by agency)"],
+        "features": ["Agency logo + brand colours on portal", "Mobile responsive", "Client can download their invoices", "Client can approve content directly", "Comment on content items"],
+        "ui": "Clean, minimal, professional. Client's brand colors used as accent. No sidebar clutter — just their content."
+      }
+
+    },
+
+    "ai_enhancement_layer": {
+      "description": "AI capabilities woven throughout the entire platform",
+      "capabilities": [
+        "Dashboard: AI daily briefing — what needs urgent attention today",
+        "Client creation: AI auto-fills company details from website URL",
+        "Sales funnel: AI opportunity scoring, competitor analysis, lead research",
+        "Content calendar: AI caption generation, hashtag suggestions, best posting times",
+        "Proposal maker: full AI research + generation pipeline",
+        "Analytics: AI insight generation — written summaries of data trends",
+        "Task management: AI daily task priority suggestions per user",
+        "Agreement: AI detects contract type from client config and selects right template",
+        "Invoice: AI flags unusual amounts or potential errors before sending",
+        "Content publisher: AI suggests optimal caption length and CTA per platform"
+      ],
+      "ai_model": "claude-sonnet-4-20250514",
+      "ai_ux_rule": "AI features always show a loading state with animated sparkle icon. Results stream token by token (never wait for full response). User can always edit AI output. Never show raw API errors to users — show friendly messages instead."
+    },
+
+    "notifications_system": {
+      "types": ["In-app (bell icon)", "Email", "WhatsApp (optional via Twilio)"],
+      "triggers": ["Invoice overdue", "Content quota behind schedule", "Contract expiring in 30/15/7 days", "Task overdue", "Client approved/rejected content", "New lead added", "Deal stage changed", "Staff absent", "Social media token expired", "Proposal opened by client"],
+      "notification_center": "Slide-in panel from right. Group by type. Mark all read. Click to navigate to relevant page.",
+      "ui": "Red badge on bell with count. Smooth slide-in drawer. Each notification has icon, title, timestamp, action button."
+    },
+
+    "search_system": {
+      "global_search": "Cmd+K anywhere opens search modal. Searches: clients, invoices, projects, tasks, documents, staff. Results grouped by category. Navigate with arrow keys. Open with Enter.",
+      "ui": "Dark overlay modal. Instant results as you type. Keyboard navigable. Recent searches shown by default."
+    },
+
+    "ui_ux_excellence_directives": {
+      "instruction": "These are non-negotiable UI/UX standards. Apply to every screen.",
+      "rules": [
+        "EMPTY STATES: Never show a blank page. Every empty state has an illustration, friendly message, and a clear CTA action button.",
+        "LOADING STATES: Use skeleton screens that exactly match the shape of loaded content. No spinners on large content areas.",
+        "ERROR STATES: Inline validation on all forms. Toast notifications for system errors. Never show raw error codes.",
+        "ONBOARDING: First-time user sees guided onboarding checklist: Add your agency details / Connect first social account / Add first client / Create first invoice. Progress bar. Dismissible.",
+        "KEYBOARD SHORTCUTS: Implement Cmd+K search, N for new item, Esc to close modal, Tab to navigate forms, Enter to submit.",
+        "ANIMATIONS: Every interaction has a micro-animation. Button presses scale down. Cards lift on hover. Page transitions fade-up. Data loads with stagger animation. Completion triggers confetti.",
+        "DARK MODE: Full dark mode support. Toggle in user settings. Respect system preference on first visit. All components designed dark-first.",
+        "MOBILE FIRST: Every screen must be fully functional on mobile. Bottom navigation bar on mobile replacing sidebar. Swipe to delete/complete on lists. Pull to refresh.",
+        "ACCESSIBILITY: WCAG AA compliance. Focus rings on all interactive elements. ARIA labels. Sufficient color contrast. Screen reader compatible.",
+        "PERFORMANCE: Lazy load all images. Paginate long lists (20 items per page). Debounce search inputs. Cache API responses in React Query. Optimistic UI updates.",
+        "CONSISTENCY: Same pattern for same action everywhere. Delete is always red. Approve is always green. Edit is always indigo. Primary action is always top-right of each page.",
+        "FEEDBACK: Every action has immediate feedback. Saving shows spinner then checkmark. Deleted items have undo option (5 second grace period). Published posts show success animation.",
+        "DATA VISUALISATION: All charts animated on entry. Hoverable tooltips on all data points. Consistent color palette across all charts. Always show 'no data' state gracefully.",
+        "TYPOGRAPHY HIERARCHY: Clear visual hierarchy on every screen. One H1 per page. Sub-sections use H2/H3. Data uses monospace numbers. All body text 16px minimum.",
+        "RESPONSIVE TABLES: On mobile, tables convert to card stacks. No horizontal scroll on tables that contain primary actions.",
+        "CONFIRMATION DIALOGS: Destructive actions (delete, terminate contract, remove client) always require typed confirmation (type DELETE to confirm).",
+        "CONTEXTUAL HELP: Every complex feature has a (?) icon that opens a contextual help panel with explanation and video link.",
+        "PRINT STYLES: Invoices, agreements, proposals all have print-optimised CSS. Page breaks in correct places. No navigation elements in print.",
+        "REAL-TIME SYNC: When two users have same page open, changes sync in real-time (Socket.io). Show 'User X is also viewing this' indicator.",
+        "BREADCRUMBS: Every deep page has breadcrumb navigation. Always show user where they are.",
+        "UNDO EVERYTHING: Soft-delete everything. 30-day recycle bin. Users can restore anything accidentally deleted.",
+        "SMART DEFAULTS: All forms pre-fill intelligently from context. If creating invoice for a client, pre-fill all client details. If creating content for Instagram, pre-fill Instagram-specific defaults."
+      ]
+    },
+
+    "development_quality_rules": {
+      "instruction": "These must be followed during implementation. No exceptions.",
+      "rules": [
+        "Zero broken links or missing routes in the final build",
+        "Every navigation item must lead to a working page",
+        "Every form must validate and submit correctly",
+        "Every API call must have loading, success, and error states",
+        "All data must persist correctly to database",
+        "Role-based access must be enforced on every route (both frontend guard + backend middleware)",
+        "All file uploads must validate type, size, and store correctly",
+        "All PDF exports must render correctly on download",
+        "All email sends must have confirmation + retry on failure",
+        "Social media OAuth connections must handle token refresh automatically",
+        "All AI API calls must have rate limiting and graceful fallback if API is down",
+        "Database queries must be optimised with proper indexes",
+        "All sensitive data (API keys, tokens, passwords) must be encrypted at rest",
+        "Complete audit log for all admin actions",
+        "Automated backups of all client data configured"
+      ]
+    },
+
+    "final_enhancement_directive": "You have deep knowledge of the best SaaS products ever built. Use it fully. Reference how Notion handles nested content, how Linear handles issue tracking, how HubSpot handles CRM, how Hootsuite handles scheduling, how FreshBooks handles invoicing, how DocuSign handles e-signatures, how Stripe handles billing, how Intercom handles client communication. Take the best patterns from each and apply them here. This is not a prototype — this is a production platform for a real agency. Every feature must work perfectly. The UI must be beautiful, intuitive, and fast. The code must be clean, scalable, and maintainable. Build as if a thousand agencies are going to use this every day. Make it extraordinary."
+  }
+}
