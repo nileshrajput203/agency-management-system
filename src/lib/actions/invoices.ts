@@ -137,8 +137,8 @@ export async function createFullInvoice(data: {
     });
 
     await logAudit(user.id, "CREATE", "Invoice", number);
-    revalidatePath("/finance");
-    revalidatePath("/finance/invoice-maker");
+    revalidatePath("/build-doc");
+    revalidatePath("/build-doc/invoice-maker");
     revalidatePath("/dashboard");
     return { ok: true };
   } catch (e) {

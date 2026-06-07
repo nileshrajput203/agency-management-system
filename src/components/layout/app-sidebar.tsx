@@ -62,10 +62,14 @@ const GROUPS: {
       { module: "projects", href: "/projects", label: "Projects", icon: FolderKanban },
       { module: "tasks", href: "/tasks", label: "Tasks", icon: CheckSquare },
       { module: "time", href: "/time", label: "Time Tracking", icon: Clock },
-      { module: "finance", href: "/finance", label: "Finance", icon: Wallet },
-      { module: "finance", href: "/finance/invoice-maker", label: "Invoice Maker", icon: FileText },
-      { module: "finance", href: "/finance/quotation-maker", label: "Quotation Maker", icon: ScrollText },
       { module: "content", href: "/content", label: "Content Calendar", icon: CalendarDays },
+    ],
+  },
+  {
+    title: "Build Doc",
+    items: [
+      { module: "finance", href: "/build-doc/invoice-maker", label: "Invoice Maker", icon: FileText },
+      { module: "finance", href: "/build-doc/quotation-maker", label: "Quotation Maker", icon: ScrollText },
     ],
   },
   {
@@ -89,7 +93,6 @@ const GROUPS: {
 const BADGES: Record<string, { count: number; color: string }> = {
   "/sales": { count: 3, color: "bg-amber-500/10 text-amber-500 border border-amber-500/25" },
   "/tasks": { count: 5, color: "bg-red-500/10 text-red-500 border border-red-500/25" },
-  "/finance": { count: 2, color: "bg-emerald-500/10 text-emerald-500 border border-emerald-500/25" },
   "/content": { count: 1, color: "bg-indigo-500/10 text-indigo-500 border border-indigo-500/25" },
   "/attendance": { count: 2, color: "bg-sky-500/10 text-sky-500 border border-sky-500/25" },
 };

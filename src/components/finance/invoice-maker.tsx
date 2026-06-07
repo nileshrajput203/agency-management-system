@@ -275,7 +275,7 @@ export function InvoiceMaker({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/finance">
+          <Link href="/dashboard">
             <Button variant="outline" size="sm" className="h-9 gap-1.5">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>

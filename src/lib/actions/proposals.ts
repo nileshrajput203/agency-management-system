@@ -138,8 +138,8 @@ export async function createFullQuotation(data: {
     });
 
     await logAudit(user.id, "CREATE", "Proposal", proposal.id);
-    revalidatePath("/finance");
-    revalidatePath("/finance/quotation-maker");
+    revalidatePath("/build-doc");
+    revalidatePath("/build-doc/quotation-maker");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Failed to create quotation" };
