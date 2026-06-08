@@ -1,6 +1,15 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "agencyos-dev-secret-change-in-prod-2026";
+function getSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error(
+      "JWT_SECRET environment variable is required. Set it in Replit Secrets."
+    );
+  }
+  return secret;
+}
+
 const EXPIRY_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 function base64url(input: string): string {
@@ -18,23 +27,25 @@ interface JwtPayload {
 }
 
 export function signToken(userId: string): string {
+  const secret = getSecret();
   const header = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
   const now = Math.floor(Date.now() / 1000);
   const payload = base64url(
     JSON.stringify({ sub: userId, iat: now, exp: now + EXPIRY_SECONDS })
   );
-  const signature = createHmac("sha256", JWT_SECRET)
+  const signature = createHmac("sha256", secret)
     .update(`${header}.${payload}`)
     .digest("base64url");
   return `${header}.${payload}.${signature}`;
 }
 
 export function verifyToken(token: string): JwtPayload {
+  const secret = getSecret();
   const parts = token.split(".");
   if (parts.length !== 3) throw new Error("Invalid token structure");
 
   const [header, payload, signature] = parts as [string, string, string];
-  const expected = createHmac("sha256", JWT_SECRET)
+  const expected = createHmac("sha256", secret)
     .update(`${header}.${payload}`)
     .digest("base64url");
 
