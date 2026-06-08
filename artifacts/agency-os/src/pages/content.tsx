@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { useForm, Controller } from "react-hook-form";
 import {
   Plus, ChevronLeft, ChevronRight, Trash2, Calendar,
-  Instagram, Youtube, Facebook, Linkedin, Link2, Check,
+  Instagram, Youtube, Facebook, Linkedin, Link2, Check, ExternalLink,
 } from "lucide-react";
 import { format, addMonths, subMonths, getDaysInMonth, startOfMonth, getDay } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -45,6 +45,32 @@ const PLATFORM_ICON: Record<string, React.ReactNode> = {
 };
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function detectPlatformFromUrl(url: string): string | null {
+  if (!url) return null;
+  if (url.includes("instagram.com")) return "INSTAGRAM";
+  if (url.includes("youtube.com") || url.includes("youtu.be")) return "YOUTUBE";
+  if (url.includes("facebook.com") || url.includes("fb.com")) return "FACEBOOK";
+  if (url.includes("linkedin.com")) return "LINKEDIN";
+  return null;
+}
+
+function ReferenceLink({ url }: { url: string }) {
+  const platform = detectPlatformFromUrl(url);
+  const icon = platform ? PLATFORM_ICON[platform] : <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline mt-1.5 max-w-xs truncate"
+    >
+      {icon}
+      <span className="truncate">{url.replace(/^https?:\/\//, "").slice(0, 45)}{url.length > 45 ? "…" : ""}</span>
+      <ExternalLink className="h-3 w-3 shrink-0" />
+    </a>
+  );
+}
 
 function CopyLinkButton({ clientId, clientName }: { clientId: string; clientName: string }) {
   const [copied, setCopied] = useState(false);
@@ -98,9 +124,11 @@ export default function ContentPage() {
     },
   });
 
-  const { register, handleSubmit, control, reset } = useForm<ContentPostInput>({
+  const { register, handleSubmit, control, reset, watch, setValue } = useForm<ContentPostInput>({
     defaultValues: { platform: "INSTAGRAM", contentType: "POST", status: "IDEA", clientId: selectedClientId },
   });
+
+  const watchedRefUrl = watch("referenceUrl" as keyof ContentPostInput);
 
   const openAdd = () => {
     reset({ platform: "INSTAGRAM", contentType: "POST", status: "IDEA", clientId: selectedClientId });
@@ -124,6 +152,14 @@ export default function ContentPage() {
   });
 
   const selectedClient = (clients ?? []).find((c) => c.id === selectedClientId);
+
+  const handleRefUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    const detected = detectPlatformFromUrl(url);
+    if (detected) {
+      setValue("platform", detected as ContentPostInput["platform"]);
+    }
+  };
 
   return (
     <div className="p-6 animated-fade-in space-y-5">
@@ -160,13 +196,11 @@ export default function ContentPage() {
           </SelectContent>
         </Select>
 
-        {/* Per-client shareable link */}
         {selectedClient && (
           <CopyLinkButton clientId={selectedClient.id} clientName={selectedClient.companyName} />
         )}
       </div>
 
-      {/* Shareable link info banner */}
       {selectedClient && (
         <div className="flex items-center gap-3 rounded-lg bg-primary/5 border border-primary/15 px-4 py-2.5 animated-fade-in">
           <Link2 className="h-4 w-4 text-primary shrink-0" />
@@ -193,6 +227,7 @@ export default function ContentPage() {
           ) : (
             (posts ?? []).map((post) => {
               const sc = STATUS_CONFIG[post.status ?? "IDEA"];
+              const postWithRef = post as typeof post & { referenceUrl?: string; description?: string };
               return (
                 <Card key={post.id} className="scale-hover">
                   <CardContent className="p-4">
@@ -206,7 +241,13 @@ export default function ContentPage() {
                             {post.scheduledAt && <span className="text-xs text-muted-foreground">{format(new Date(post.scheduledAt), "dd MMM, EEE")}</span>}
                             {post.clientName && <span className="text-xs text-muted-foreground">· {post.clientName}</span>}
                           </div>
-                          {post.caption && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{post.caption}</p>}
+                          {post.caption && <p className="text-sm font-medium mt-1">{post.caption}</p>}
+                          {postWithRef.description && (
+                            <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">{postWithRef.description}</p>
+                          )}
+                          {postWithRef.referenceUrl && (
+                            <ReferenceLink url={postWithRef.referenceUrl} />
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -261,11 +302,13 @@ export default function ContentPage() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>New Content Post</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Plan Content Post</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+
+            {/* Client */}
             <div className="space-y-1.5">
-              <Label>Client</Label>
+              <Label>Client *</Label>
               <Controller control={control} name="clientId" render={({ field }) => (
                 <Select value={field.value ?? ""} onValueChange={field.onChange}>
                   <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
@@ -275,6 +318,57 @@ export default function ContentPage() {
                 </Select>
               )} />
             </div>
+
+            {/* Reference URL — auto-detects platform */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                Reference Link
+                <span className="text-xs text-muted-foreground font-normal">(Instagram / YouTube / Facebook / LinkedIn)</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  {...register("referenceUrl" as keyof ContentPostInput)}
+                  placeholder="https://www.instagram.com/p/... or https://youtu.be/..."
+                  onChange={(e) => {
+                    register("referenceUrl" as keyof ContentPostInput).onChange(e);
+                    handleRefUrlChange(e);
+                  }}
+                />
+                {watchedRefUrl && (() => {
+                  const detected = detectPlatformFromUrl(String(watchedRefUrl));
+                  if (!detected) return null;
+                  return (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      {PLATFORM_ICON[detected]}
+                    </div>
+                  );
+                })()}
+              </div>
+              {watchedRefUrl && detectPlatformFromUrl(String(watchedRefUrl)) && (
+                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <Check className="h-3 w-3" /> Platform auto-detected: {detectPlatformFromUrl(String(watchedRefUrl))?.toLowerCase()}
+                </p>
+              )}
+            </div>
+
+            {/* Caption (post title) */}
+            <div className="space-y-1.5">
+              <Label>Post Title / Caption</Label>
+              <Input {...register("caption")} placeholder="e.g. Summer Sale Reel" data-testid="caption-input" />
+            </div>
+
+            {/* Content description */}
+            <div className="space-y-1.5">
+              <Label>Content Description</Label>
+              <Textarea
+                {...register("description" as keyof ContentPostInput)}
+                rows={3}
+                placeholder="Describe the content idea, key message, what to show, hashtags to use..."
+              />
+            </div>
+
+            {/* Platform + Type */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Platform</Label>
@@ -282,10 +376,18 @@ export default function ContentPage() {
                   <Select value={field.value ?? "INSTAGRAM"} onValueChange={field.onChange}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="INSTAGRAM">Instagram</SelectItem>
-                      <SelectItem value="FACEBOOK">Facebook</SelectItem>
-                      <SelectItem value="YOUTUBE">YouTube</SelectItem>
-                      <SelectItem value="LINKEDIN">LinkedIn</SelectItem>
+                      <SelectItem value="INSTAGRAM">
+                        <span className="flex items-center gap-2"><Instagram className="h-3.5 w-3.5 text-pink-500" /> Instagram</span>
+                      </SelectItem>
+                      <SelectItem value="YOUTUBE">
+                        <span className="flex items-center gap-2"><Youtube className="h-3.5 w-3.5 text-red-500" /> YouTube</span>
+                      </SelectItem>
+                      <SelectItem value="FACEBOOK">
+                        <span className="flex items-center gap-2"><Facebook className="h-3.5 w-3.5 text-blue-500" /> Facebook</span>
+                      </SelectItem>
+                      <SelectItem value="LINKEDIN">
+                        <span className="flex items-center gap-2"><Linkedin className="h-3.5 w-3.5 text-blue-600" /> LinkedIn</span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 )} />
@@ -300,11 +402,15 @@ export default function ContentPage() {
                       <SelectItem value="REEL">Reel</SelectItem>
                       <SelectItem value="STORY">Story</SelectItem>
                       <SelectItem value="CAROUSEL">Carousel</SelectItem>
+                      <SelectItem value="VIDEO">Video</SelectItem>
+                      <SelectItem value="SHORT">Short</SelectItem>
                     </SelectContent>
                   </Select>
                 )} />
               </div>
             </div>
+
+            {/* Status + Date */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Status</Label>
@@ -322,13 +428,12 @@ export default function ContentPage() {
                 <Input {...register("scheduledAt")} type="date" />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Caption</Label>
-              <Textarea {...register("caption")} rows={4} placeholder="Post caption..." data-testid="caption-input" />
-            </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending} data-testid="save-post-btn">Create Post</Button>
+              <Button type="submit" disabled={createMutation.isPending} data-testid="save-post-btn">
+                {createMutation.isPending ? "Saving…" : "Create Post"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

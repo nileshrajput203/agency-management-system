@@ -11,6 +11,8 @@ export const contentPostsTable = pgTable("content_posts", {
   caption: text("caption"),
   scheduledAt: text("scheduled_at"),
   clientId: text("client_id").references(() => clientsTable.id, { onDelete: "cascade" }),
+  referenceUrl: text("reference_url"),
+  description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

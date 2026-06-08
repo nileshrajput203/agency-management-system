@@ -15,6 +15,8 @@ router.get("/", async (req, res) => {
         contentType: contentPostsTable.contentType,
         status: contentPostsTable.status,
         caption: contentPostsTable.caption,
+        description: contentPostsTable.description,
+        referenceUrl: contentPostsTable.referenceUrl,
         scheduledAt: contentPostsTable.scheduledAt,
         clientId: contentPostsTable.clientId,
         clientName: clientsTable.companyName,
@@ -36,6 +38,8 @@ router.post("/", async (req, res) => {
   try {
     const body = { ...req.body };
     if (!body.clientId) delete body.clientId;
+    if (!body.referenceUrl) delete body.referenceUrl;
+    if (!body.description) delete body.description;
     const [row] = await db.insert(contentPostsTable).values(body).returning();
     return res.status(201).json(row);
   } catch {
