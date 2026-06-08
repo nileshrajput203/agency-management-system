@@ -32,4 +32,18 @@ export interface ClientInput {
   contentFrequency?: string | null;
   /** @nullable */
   targetAudience?: string | null;
+  /** @nullable */
+  platforms?: string | null;
+  /** @nullable */
+  socialGoals?: string | null;
+  /** @nullable */
+  contentTypes?: string | null;
+  /** @nullable */
+  websiteType?: string | null;
+  /** @nullable */
+  websiteFeatures?: string | null;
+  /** @nullable */
+  cmsPreference?: string | null;
+  /** @nullable */
+  budgetRange?: string | null;
 }

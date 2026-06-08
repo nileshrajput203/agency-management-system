@@ -51,19 +51,35 @@ export async function bootstrapDatabase(): Promise<void> {
         email TEXT,
         phone TEXT,
         website TEXT,
-        category TEXT DEFAULT 'OTHER',
-        service_categories TEXT,
-        status TEXT DEFAULT 'ACTIVE',
+        category TEXT DEFAULT 'RETAINER',
         health TEXT DEFAULT 'GREEN',
-        monthly_retainer NUMERIC,
-        instagram_handle TEXT,
-        youtube_handle TEXT,
-        facebook_handle TEXT,
-        linkedin_handle TEXT,
         notes TEXT,
+        service_type TEXT,
+        service_details TEXT,
+        social_handles TEXT,
+        website_url TEXT,
+        content_frequency TEXT,
+        target_audience TEXT,
+        platforms TEXT,
+        social_goals TEXT,
+        content_types TEXT,
+        website_type TEXT,
+        website_features TEXT,
+        cms_preference TEXT,
+        budget_range TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+
+    for (const col of [
+      "service_type TEXT", "service_details TEXT", "social_handles TEXT",
+      "website_url TEXT", "content_frequency TEXT", "target_audience TEXT",
+      "platforms TEXT", "social_goals TEXT", "content_types TEXT",
+      "website_type TEXT", "website_features TEXT", "cms_preference TEXT", "budget_range TEXT",
+    ]) {
+      const [colName] = col.split(" ");
+      await db.execute(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
+    }
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS leads (

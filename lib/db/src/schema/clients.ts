@@ -17,6 +17,13 @@ export const clientsTable = pgTable("clients", {
   websiteUrl: text("website_url"),
   contentFrequency: text("content_frequency"),
   targetAudience: text("target_audience"),
+  platforms: text("platforms"),
+  socialGoals: text("social_goals"),
+  contentTypes: text("content_types"),
+  websiteType: text("website_type"),
+  websiteFeatures: text("website_features"),
+  cmsPreference: text("cms_preference"),
+  budgetRange: text("budget_range"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

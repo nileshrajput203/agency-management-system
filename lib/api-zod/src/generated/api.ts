@@ -79,7 +79,14 @@ export const CreateClientBody = zod.object({
   "socialHandles": zod.string().nullish(),
   "websiteUrl": zod.string().nullish(),
   "contentFrequency": zod.string().nullish(),
-  "targetAudience": zod.string().nullish()
+  "targetAudience": zod.string().nullish(),
+  "platforms": zod.string().nullish(),
+  "socialGoals": zod.string().nullish(),
+  "contentTypes": zod.string().nullish(),
+  "websiteType": zod.string().nullish(),
+  "websiteFeatures": zod.string().nullish(),
+  "cmsPreference": zod.string().nullish(),
+  "budgetRange": zod.string().nullish()
 })
 
 
@@ -128,7 +135,14 @@ export const UpdateClientBody = zod.object({
   "socialHandles": zod.string().nullish(),
   "websiteUrl": zod.string().nullish(),
   "contentFrequency": zod.string().nullish(),
-  "targetAudience": zod.string().nullish()
+  "targetAudience": zod.string().nullish(),
+  "platforms": zod.string().nullish(),
+  "socialGoals": zod.string().nullish(),
+  "contentTypes": zod.string().nullish(),
+  "websiteType": zod.string().nullish(),
+  "websiteFeatures": zod.string().nullish(),
+  "cmsPreference": zod.string().nullish(),
+  "budgetRange": zod.string().nullish()
 })
 
 export const UpdateClientResponse = zod.object({
