@@ -104,11 +104,13 @@ export default function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-5 rounded-lg bg-muted/60 border border-border/50 p-3 text-xs text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground">Demo credentials</p>
-              <p>Email: <span className="font-mono text-foreground">admin@agencyos.com</span></p>
-              <p>Password: <span className="font-mono text-foreground">Admin@123</span></p>
-            </div>
+            {import.meta.env.DEV && (
+              <div className="mt-5 rounded-lg bg-muted/60 border border-border/50 p-3 text-xs text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground">Dev credentials</p>
+                <p>Email: <span className="font-mono text-foreground">admin@agencyos.com</span></p>
+                <p>Password: <span className="font-mono text-foreground">Admin@123</span></p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

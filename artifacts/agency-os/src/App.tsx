@@ -62,8 +62,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Theme Context ──────────────────────────────────────────────
-type ThemeContextType = { theme: "light" | "dark"; toggleTheme: () => void };
-export const ThemeContext = createContext<ThemeContextType>({ theme: "light", toggleTheme: () => {} });
+type ThemeContextType = { theme: "light" | "dark"; toggleTheme: () => void; setTheme: (t: "light" | "dark") => void };
+export const ThemeContext = createContext<ThemeContextType>({ theme: "light", toggleTheme: () => {}, setTheme: () => {} });
 export const useTheme = () => useContext(ThemeContext);
 
 function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -77,7 +77,7 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [theme]);
 
   const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"));
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>{children}</ThemeContext.Provider>;
 }
 
 // ─── API Client setup ───────────────────────────────────────────

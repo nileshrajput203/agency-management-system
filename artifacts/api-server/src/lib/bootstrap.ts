@@ -1,12 +1,33 @@
 import { hash } from "bcryptjs";
+import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "admin@agencyos.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "Admin@123";
-const ADMIN_NAME = process.env.ADMIN_NAME ?? "Admin";
+function requireAdminConfig(): { email: string; password: string; name: string } {
+  const email = process.env.ADMIN_EMAIL;
+  const password = process.env.ADMIN_PASSWORD;
+  const name = process.env.ADMIN_NAME ?? "Admin";
+
+  if (process.env.NODE_ENV === "production" && (!email || !password)) {
+    throw new Error(
+      "ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required in production."
+    );
+  }
+
+  const resolvedEmail = email ?? "admin@agencyos.com";
+  const resolvedPassword = password ?? randomBytes(16).toString("hex");
+
+  if (!password && process.env.NODE_ENV !== "production") {
+    logger.warn(
+      { email: resolvedEmail },
+      `Bootstrap: ADMIN_PASSWORD not set — generated a one-time password. Set ADMIN_PASSWORD env var to use a fixed password.`
+    );
+  }
+
+  return { email: resolvedEmail, password: resolvedPassword, name };
+}
 
 export async function bootstrapDatabase(): Promise<void> {
   try {
@@ -150,19 +171,23 @@ export async function bootstrapDatabase(): Promise<void> {
       )
     `);
 
-    const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, ADMIN_EMAIL));
+    const { email, password, name } = requireAdminConfig();
+    const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email));
     if (!existing) {
-      const passwordHash = await hash(ADMIN_PASSWORD, 12);
+      const passwordHash = await hash(password, 12);
       await db.insert(usersTable).values({
-        name: ADMIN_NAME,
-        email: ADMIN_EMAIL,
+        name,
+        email,
         password: passwordHash,
         role: "SUPER_ADMIN",
         isActive: true,
       });
-      logger.info({ email: ADMIN_EMAIL }, "Bootstrap: admin user created");
+      logger.info({ email }, "Bootstrap: admin user created");
+      if (!process.env.ADMIN_PASSWORD) {
+        logger.info({ email, generatedPassword: password }, "Bootstrap: one-time generated password — save this now");
+      }
     } else {
-      logger.info({ email: ADMIN_EMAIL }, "Bootstrap: admin user already exists");
+      logger.info({ email }, "Bootstrap: admin user already exists");
     }
   } catch (err) {
     logger.error({ err }, "Bootstrap failed");
