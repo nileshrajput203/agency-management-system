@@ -145,7 +145,7 @@ export default function SettingsPage() {
               <p className="text-sm font-medium">Currency</p>
               <p className="text-xs text-muted-foreground">Used in invoices and pipeline</p>
             </div>
-            <Select value={currency} onValueChange={setCurrency}>
+            <Select value={currency} onValueChange={(v) => setCurrency(v ?? "")}>
               <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="INR">₹ INR</SelectItem>
@@ -160,7 +160,7 @@ export default function SettingsPage() {
               <p className="text-sm font-medium">Date Format</p>
               <p className="text-xs text-muted-foreground">How dates are displayed</p>
             </div>
-            <Select value={dateFormat} onValueChange={setDateFormat}>
+            <Select value={dateFormat} onValueChange={(v) => setDateFormat(v ?? "")}>
               <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
@@ -220,7 +220,7 @@ export default function SettingsPage() {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Role</span>
-            <span className="font-medium">{user?.role?.replace("_", " ")}</span>
+            <span className="font-medium">{user?.systemRole?.replace("_", " ")}</span>
           </div>
           <Separator />
           <div className="flex justify-end">

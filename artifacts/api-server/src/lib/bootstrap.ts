@@ -38,6 +38,8 @@ export async function bootstrapDatabase(): Promise<void> {
         email TEXT NOT NULL UNIQUE,
         password TEXT,
         role TEXT NOT NULL DEFAULT 'MANAGER',
+        system_role TEXT NOT NULL DEFAULT 'ACCOUNT_MANAGER',
+        department TEXT,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT NOW()
       )
@@ -79,6 +81,12 @@ export async function bootstrapDatabase(): Promise<void> {
     ]) {
       const [colName] = col.split(" ");
       await db.execute(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
+    }
+
+    for (const col of [
+      "system_role TEXT NOT NULL DEFAULT 'ACCOUNT_MANAGER'", "department TEXT",
+    ]) {
+      await db.execute(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
     }
 
     await db.execute(`
@@ -196,6 +204,7 @@ export async function bootstrapDatabase(): Promise<void> {
         email,
         password: passwordHash,
         role: "SUPER_ADMIN",
+        systemRole: "SUPER_ADMIN",
         isActive: true,
       });
       logger.info({ email }, "Bootstrap: admin user created");

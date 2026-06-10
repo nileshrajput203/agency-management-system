@@ -114,6 +114,7 @@ import LeavesPage from "@/pages/leaves";
 import ProposalsPage from "@/pages/proposals";
 import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
+import PublicCalendarPage from "@/pages/public-calendar";
 
 // ─── Protected route wrapper ────────────────────────────────────
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -142,6 +143,7 @@ function AppRouter() {
 
   return (
     <Switch>
+      <Route path="/share/calendar/:shareToken" component={PublicCalendarPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/dashboard">
         {() => (

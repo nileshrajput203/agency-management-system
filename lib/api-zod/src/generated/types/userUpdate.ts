@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface UserInput {
-  name: string;
-  email: string;
-  systemRole: string;
+export interface UserUpdate {
+  name?: string;
+  email?: string;
+  systemRole?: string;
   /** @nullable */
   password?: string | null;
   /** @nullable */

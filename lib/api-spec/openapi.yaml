@@ -436,7 +436,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/ContentPost"
 
+  /content-posts/shares:
+    post:
+      operationId: createCalendarShare
+      tags: [content]
+      summary: Create a calendar share link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientCalendarShareInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClientCalendarShare"
+    get:
+      operationId: listCalendarShares
+      tags: [content]
+      summary: List calendar shares
+      parameters:
+        - in: query
+          name: clientId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of shares
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClientCalendarShare"
+
   /content-posts/{id}:
+    get:
+      operationId: getContentPost
+      tags: [content]
+      summary: Get content post by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentPost"
     patch:
       operationId: updateContentPost
       tags: [content]
@@ -452,7 +506,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ContentPostInput"
+              $ref: "#/components/schemas/ContentPostUpdate"
       responses:
         "200":
           description: Updated
@@ -764,7 +818,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UserInput"
+              $ref: "#/components/schemas/UserUpdate"
       responses:
         "200":
           description: Updated
@@ -856,9 +910,57 @@ components:
         user:
           $ref: "#/components/schemas/User"
 
+    ReferenceLink:
+      type: object
+      required:
+        - label
+        - url
+      properties:
+        label:
+          type: string
+        url:
+          type: string
+
+    ClientCalendarShareInput:
+      type: object
+      required: [clientId]
+      properties:
+        clientId:
+          type: string
+        label:
+          type: string
+
+    ClientCalendarShare:
+      type: object
+      required:
+        - id
+        - clientId
+        - shareToken
+        - createdAt
+      properties:
+        id:
+          type: string
+        clientId:
+          type: string
+        shareToken:
+          type: string
+        label:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: ["string", "null"]
+          format: date-time
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+
+    # ─── User ─────────────────────────────────────────────
     User:
       type: object
-      required: [id, name, email, role]
+      required: [id, name, email, systemRole]
       properties:
         id:
           type: string
@@ -866,22 +968,42 @@ components:
           type: string
         email:
           type: string
-        role:
+        systemRole:
           type: string
+        department:
+          type: ["string", "null"]
         isActive:
           type: ["boolean", "null"]
 
     UserInput:
       type: object
-      required: [name, email, role]
+      required: [name, email, systemRole]
       properties:
         name:
           type: string
         email:
           type: string
-        role:
+        systemRole:
           type: string
         password:
+          type: ["string", "null"]
+        department:
+          type: ["string", "null"]
+        isActive:
+          type: ["boolean", "null"]
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        systemRole:
+          type: string
+        password:
+          type: ["string", "null"]
+        department:
           type: ["string", "null"]
         isActive:
           type: ["boolean", "null"]
@@ -1136,8 +1258,61 @@ components:
           type: ["string", "null"]
         clientName:
           type: ["string", "null"]
+        assigneeName:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        script:
+          type: ["string", "null"]
+        ideation:
+          type: ["string", "null"]
+        referenceLinks:
+          type: ["array", "null"]
+          items:
+            $ref: '#/components/schemas/ReferenceLink'
+        referenceUrl:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        createdAt:
+          type: string
 
     ContentPostInput:
+      type: object
+      required: [clientId, platform, contentType]
+      properties:
+        clientId:
+          type: string
+        platform:
+          type: string
+        contentType:
+          type: string
+        caption:
+          type: string
+        hashtags:
+          type: string
+        status:
+          type: string
+        scheduledAt:
+          type: string
+        assigneeId:
+          type: string
+        notes:
+          type: string
+        script:
+          type: string
+        ideation:
+          type: string
+        referenceLinks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReferenceLink'
+        referenceUrl:
+          type: string
+        description:
+          type: string
+
+    ContentPostUpdate:
       type: object
       properties:
         platform:
@@ -1151,6 +1326,22 @@ components:
         scheduledAt:
           type: ["string", "null"]
         clientId:
+          type: ["string", "null"]
+        assigneeId:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        script:
+          type: ["string", "null"]
+        ideation:
+          type: ["string", "null"]
+        referenceLinks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReferenceLink'
+        referenceUrl:
+          type: ["string", "null"]
+        description:
           type: ["string", "null"]
 
     Invoice:
@@ -1341,12 +1532,16 @@ components:
     DashboardStats:
       type: object
       properties:
-        clientCount:
+        totalClients:
           type: ["integer", "null"]
         activeProjects:
           type: ["integer", "null"]
         openLeads:
           type: ["integer", "null"]
+        revenuePaid:
+          type: ["number", "null"]
+        outstanding:
+          type: ["number", "null"]
         monthlyRevenue:
           type: ["number", "null"]
         tasksDue:

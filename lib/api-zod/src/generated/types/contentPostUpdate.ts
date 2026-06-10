@@ -7,8 +7,7 @@
  */
 import type { ReferenceLink } from './referenceLink';
 
-export interface ContentPost {
-  id: string;
+export interface ContentPostUpdate {
   /** @nullable */
   platform?: string | null;
   /** @nullable */
@@ -22,20 +21,16 @@ export interface ContentPost {
   /** @nullable */
   clientId?: string | null;
   /** @nullable */
-  clientName?: string | null;
-  /** @nullable */
-  assigneeName?: string | null;
+  assigneeId?: string | null;
   /** @nullable */
   notes?: string | null;
   /** @nullable */
   script?: string | null;
   /** @nullable */
   ideation?: string | null;
-  /** @nullable */
-  referenceLinks?: ReferenceLink[] | null;
+  referenceLinks?: ReferenceLink[];
   /** @nullable */
   referenceUrl?: string | null;
   /** @nullable */
   description?: string | null;
-  createdAt?: string;
 }

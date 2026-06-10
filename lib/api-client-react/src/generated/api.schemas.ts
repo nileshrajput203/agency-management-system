@@ -18,7 +18,9 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  systemRole: string;
+  /** @nullable */
+  department?: string | null;
   /** @nullable */
   isActive?: boolean | null;
 }
@@ -28,12 +30,49 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface ReferenceLink {
+  label: string;
+  url: string;
+}
+
+export interface ClientCalendarShareInput {
+  clientId: string;
+  label?: string;
+}
+
+export interface ClientCalendarShare {
+  id: string;
+  clientId: string;
+  shareToken: string;
+  /** @nullable */
+  label?: string | null;
+  createdAt: string;
+  /** @nullable */
+  expiresAt?: string | null;
+  token?: string;
+  user?: User;
+}
+
 export interface UserInput {
   name: string;
   email: string;
-  role: string;
+  systemRole: string;
   /** @nullable */
   password?: string | null;
+  /** @nullable */
+  department?: string | null;
+  /** @nullable */
+  isActive?: boolean | null;
+}
+
+export interface UserUpdate {
+  name?: string;
+  email?: string;
+  systemRole?: string;
+  /** @nullable */
+  password?: string | null;
+  /** @nullable */
+  department?: string | null;
   /** @nullable */
   isActive?: boolean | null;
 }
@@ -249,9 +288,41 @@ export interface ContentPost {
   clientId?: string | null;
   /** @nullable */
   clientName?: string | null;
+  /** @nullable */
+  assigneeName?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  script?: string | null;
+  /** @nullable */
+  ideation?: string | null;
+  /** @nullable */
+  referenceLinks?: ReferenceLink[] | null;
+  /** @nullable */
+  referenceUrl?: string | null;
+  /** @nullable */
+  description?: string | null;
+  createdAt?: string;
 }
 
 export interface ContentPostInput {
+  clientId: string;
+  platform: string;
+  contentType: string;
+  caption?: string;
+  hashtags?: string;
+  status?: string;
+  scheduledAt?: string;
+  assigneeId?: string;
+  notes?: string;
+  script?: string;
+  ideation?: string;
+  referenceLinks?: ReferenceLink[];
+  referenceUrl?: string;
+  description?: string;
+}
+
+export interface ContentPostUpdate {
   /** @nullable */
   platform?: string | null;
   /** @nullable */
@@ -264,6 +335,19 @@ export interface ContentPostInput {
   scheduledAt?: string | null;
   /** @nullable */
   clientId?: string | null;
+  /** @nullable */
+  assigneeId?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  script?: string | null;
+  /** @nullable */
+  ideation?: string | null;
+  referenceLinks?: ReferenceLink[];
+  /** @nullable */
+  referenceUrl?: string | null;
+  /** @nullable */
+  description?: string | null;
 }
 
 export interface LineItem {
@@ -427,11 +511,15 @@ export interface ProposalInput {
 
 export interface DashboardStats {
   /** @nullable */
-  clientCount?: number | null;
+  totalClients?: number | null;
   /** @nullable */
   activeProjects?: number | null;
   /** @nullable */
   openLeads?: number | null;
+  /** @nullable */
+  revenuePaid?: number | null;
+  /** @nullable */
+  outstanding?: number | null;
   /** @nullable */
   monthlyRevenue?: number | null;
   /** @nullable */
@@ -458,5 +546,9 @@ category?: string;
 export type ListContentPostsParams = {
 clientId?: string;
 month?: string;
+};
+
+export type ListCalendarSharesParams = {
+clientId?: string;
 };
 

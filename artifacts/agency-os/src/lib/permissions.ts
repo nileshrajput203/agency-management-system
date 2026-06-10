@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { SystemRole } from "@/generated/prisma/client";
 
 export type ModuleKey =

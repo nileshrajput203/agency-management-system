@@ -175,13 +175,13 @@ export default function DashboardPage() {
                 <div key={item.id} className="flex gap-2.5 items-start">
                   <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                     <span className="text-[10px] font-bold text-primary uppercase">
-                      {item.userName?.[0] ?? "S"}
+                      {(item.type?.[0] ?? "S").toUpperCase()}
                     </span>
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs text-foreground leading-snug line-clamp-2">{item.message}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                      {item.createdAt ? formatDistanceToNow(new Date(item.createdAt), { addSuffix: true }) : ""}
                     </p>
                   </div>
                 </div>

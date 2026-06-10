@@ -8,11 +8,15 @@
 
 export interface DashboardStats {
   /** @nullable */
-  clientCount?: number | null;
+  totalClients?: number | null;
   /** @nullable */
   activeProjects?: number | null;
   /** @nullable */
   openLeads?: number | null;
+  /** @nullable */
+  revenuePaid?: number | null;
+  /** @nullable */
+  outstanding?: number | null;
   /** @nullable */
   monthlyRevenue?: number | null;
   /** @nullable */

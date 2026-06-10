@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { clientsTable } from "./clients";
@@ -13,9 +13,28 @@ export const contentPostsTable = pgTable("content_posts", {
   clientId: text("client_id").references(() => clientsTable.id, { onDelete: "cascade" }),
   referenceUrl: text("reference_url"),
   description: text("description"),
+  script: text("script"),
+  ideation: text("ideation"),
+  referenceLinks: json("reference_links").$type<{ label: string; url: string }[]>(),
+  title: text("title"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertContentPostSchema = createInsertSchema(contentPostsTable).omit({ id: true, createdAt: true });
 export type InsertContentPost = z.infer<typeof insertContentPostSchema>;
 export type ContentPost = typeof contentPostsTable.$inferSelect;
+
+export const clientCalendarSharesTable = pgTable("client_calendar_shares", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clientsTable.id, { onDelete: "cascade" }),
+  shareToken: text("share_token").notNull().unique(),
+  label: text("label"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"),
+});
+
+export const insertClientCalendarShareSchema = createInsertSchema(clientCalendarSharesTable).omit({ id: true, createdAt: true });
+export type InsertClientCalendarShare = z.infer<typeof insertClientCalendarShareSchema>;
+export type ClientCalendarShare = typeof clientCalendarSharesTable.$inferSelect;

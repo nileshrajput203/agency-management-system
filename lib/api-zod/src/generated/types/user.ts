@@ -10,7 +10,9 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: string;
+  systemRole: string;
+  /** @nullable */
+  department?: string | null;
   /** @nullable */
   isActive?: boolean | null;
 }

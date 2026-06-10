@@ -5,6 +5,7 @@
  * AgencyOS API
  * OpenAPI spec version: 0.1.0
  */
+import type { ReferenceLink } from './referenceLink';
 
 export interface ContentPostUpdate {
   platform?: string;
@@ -15,4 +16,7 @@ export interface ContentPostUpdate {
   scheduledAt?: string;
   assigneeId?: string;
   notes?: string;
+  script?: string;
+  ideation?: string;
+  referenceLinks?: ReferenceLink[];
 }

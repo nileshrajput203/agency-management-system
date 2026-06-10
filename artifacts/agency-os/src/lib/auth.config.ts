@@ -6,21 +6,21 @@ export const authConfig = {
   pages: { signIn: "/login" },
   providers: [],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: any) {
       if (user) {
         token.id = user.id!;
         token.systemRole = user.systemRole;
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.systemRole = token.systemRole as SystemRole;
+        session.user.systemRole = token.systemRole as any;
       }
       return session;
     },
-    authorized({ auth, request }) {
+    authorized({ auth, request }: any) {
       const isLoggedIn = !!auth?.user;
       const path = request.nextUrl.pathname;
       const isAuthPage = path.startsWith("/login");

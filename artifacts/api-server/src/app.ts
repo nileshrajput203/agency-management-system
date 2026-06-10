@@ -1,8 +1,10 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import path from "path";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import publicRouter from "./routes/publicCalendar";
 
 const app: Express = express();
 
@@ -29,6 +31,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/public", publicRouter);
 app.use("/api", router);
+
+if (process.env.SERVE_STATIC === "true") {
+  const publicDir = path.resolve(__dirname, "../../agency-os/dist/public");
+  app.use(express.static(publicDir));
+  app.get("*all", (req, res) => {
+    res.sendFile(path.resolve(publicDir, "index.html"));
+  });
+}
 
 export default app;

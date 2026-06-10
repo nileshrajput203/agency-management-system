@@ -17,12 +17,12 @@ router.post("/auth/login", async (req, res) => {
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
-    const valid = await compare(password, user.password);
+    const valid = await compare(password, user.password || "");
     if (!valid) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
     const token = signToken(user.id);
-    return res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    return res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, systemRole: user.systemRole } });
   } catch {
     return res.status(500).json({ error: "Internal error" });
   }

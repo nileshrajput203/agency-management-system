@@ -23,9 +23,12 @@ import type {
   ActivityItem,
   AuthResponse,
   Client,
+  ClientCalendarShare,
+  ClientCalendarShareInput,
   ClientInput,
   ContentPost,
   ContentPostInput,
+  ContentPostUpdate,
   Contract,
   DashboardStats,
   FinancialSummary,
@@ -34,6 +37,7 @@ import type {
   InvoiceInput,
   Lead,
   LeadInput,
+  ListCalendarSharesParams,
   ListClientsParams,
   ListContentPostsParams,
   LoginInput,
@@ -48,7 +52,8 @@ import type {
   Task,
   TaskInput,
   User,
-  UserInput
+  UserInput,
+  UserUpdate
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1764,6 +1769,238 @@ export const useCreateContentPost = <TError = ErrorType<unknown>,
       return useMutation(getCreateContentPostMutationOptions(options));
     }
 
+export const getCreateCalendarShareUrl = () => {
+
+
+
+
+  return `/api/content-posts/shares`
+}
+
+/**
+ * @summary Create a calendar share link
+ */
+export const createCalendarShare = async (clientCalendarShareInput: ClientCalendarShareInput, options?: RequestInit): Promise<ClientCalendarShare> => {
+
+  return customFetch<ClientCalendarShare>(getCreateCalendarShareUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      clientCalendarShareInput,)
+  }
+);}
+
+
+
+
+export const getCreateCalendarShareMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCalendarShare>>, TError,{data: BodyType<ClientCalendarShareInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCalendarShare>>, TError,{data: BodyType<ClientCalendarShareInput>}, TContext> => {
+
+const mutationKey = ['createCalendarShare'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCalendarShare>>, {data: BodyType<ClientCalendarShareInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCalendarShare(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCalendarShareMutationResult = NonNullable<Awaited<ReturnType<typeof createCalendarShare>>>
+    export type CreateCalendarShareMutationBody = BodyType<ClientCalendarShareInput>
+    export type CreateCalendarShareMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a calendar share link
+ */
+export const useCreateCalendarShare = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCalendarShare>>, TError,{data: BodyType<ClientCalendarShareInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCalendarShare>>,
+        TError,
+        {data: BodyType<ClientCalendarShareInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCalendarShareMutationOptions(options));
+    }
+
+export const getListCalendarSharesUrl = (params?: ListCalendarSharesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/content-posts/shares?${stringifiedParams}` : `/api/content-posts/shares`
+}
+
+/**
+ * @summary List calendar shares
+ */
+export const listCalendarShares = async (params?: ListCalendarSharesParams, options?: RequestInit): Promise<ClientCalendarShare[]> => {
+
+  return customFetch<ClientCalendarShare[]>(getListCalendarSharesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCalendarSharesQueryKey = (params?: ListCalendarSharesParams,) => {
+    return [
+    `/api/content-posts/shares`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListCalendarSharesQueryOptions = <TData = Awaited<ReturnType<typeof listCalendarShares>>, TError = ErrorType<unknown>>(params?: ListCalendarSharesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCalendarShares>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCalendarSharesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCalendarShares>>> = ({ signal }) => listCalendarShares(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCalendarShares>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCalendarSharesQueryResult = NonNullable<Awaited<ReturnType<typeof listCalendarShares>>>
+export type ListCalendarSharesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List calendar shares
+ */
+
+export function useListCalendarShares<TData = Awaited<ReturnType<typeof listCalendarShares>>, TError = ErrorType<unknown>>(
+ params?: ListCalendarSharesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCalendarShares>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCalendarSharesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetContentPostUrl = (id: string,) => {
+
+
+
+
+  return `/api/content-posts/${id}`
+}
+
+/**
+ * @summary Get content post by ID
+ */
+export const getContentPost = async (id: string, options?: RequestInit): Promise<ContentPost> => {
+
+  return customFetch<ContentPost>(getGetContentPostUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetContentPostQueryKey = (id: string,) => {
+    return [
+    `/api/content-posts/${id}`
+    ] as const;
+    }
+
+
+export const getGetContentPostQueryOptions = <TData = Awaited<ReturnType<typeof getContentPost>>, TError = ErrorType<unknown>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getContentPost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetContentPostQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getContentPost>>> = ({ signal }) => getContentPost(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(id), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getContentPost>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetContentPostQueryResult = NonNullable<Awaited<ReturnType<typeof getContentPost>>>
+export type GetContentPostQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get content post by ID
+ */
+
+export function useGetContentPost<TData = Awaited<ReturnType<typeof getContentPost>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getContentPost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetContentPostQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getUpdateContentPostUrl = (id: string,) => {
 
 
@@ -1776,7 +2013,7 @@ export const getUpdateContentPostUrl = (id: string,) => {
  * @summary Update content post
  */
 export const updateContentPost = async (id: string,
-    contentPostInput: ContentPostInput, options?: RequestInit): Promise<ContentPost> => {
+    contentPostUpdate: ContentPostUpdate, options?: RequestInit): Promise<ContentPost> => {
 
   return customFetch<ContentPost>(getUpdateContentPostUrl(id),
   {
@@ -1784,7 +2021,7 @@ export const updateContentPost = async (id: string,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      contentPostInput,)
+      contentPostUpdate,)
   }
 );}
 
@@ -1792,8 +2029,8 @@ export const updateContentPost = async (id: string,
 
 
 export const getUpdateContentPostMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateContentPost>>, TError,{id: string;data: BodyType<ContentPostInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateContentPost>>, TError,{id: string;data: BodyType<ContentPostInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateContentPost>>, TError,{id: string;data: BodyType<ContentPostUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateContentPost>>, TError,{id: string;data: BodyType<ContentPostUpdate>}, TContext> => {
 
 const mutationKey = ['updateContentPost'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1805,7 +2042,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateContentPost>>, {id: string;data: BodyType<ContentPostInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateContentPost>>, {id: string;data: BodyType<ContentPostUpdate>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  updateContentPost(id,data,requestOptions)
@@ -1819,18 +2056,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type UpdateContentPostMutationResult = NonNullable<Awaited<ReturnType<typeof updateContentPost>>>
-    export type UpdateContentPostMutationBody = BodyType<ContentPostInput>
+    export type UpdateContentPostMutationBody = BodyType<ContentPostUpdate>
     export type UpdateContentPostMutationError = ErrorType<unknown>
 
     /**
  * @summary Update content post
  */
 export const useUpdateContentPost = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateContentPost>>, TError,{id: string;data: BodyType<ContentPostInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateContentPost>>, TError,{id: string;data: BodyType<ContentPostUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateContentPost>>,
         TError,
-        {id: string;data: BodyType<ContentPostInput>},
+        {id: string;data: BodyType<ContentPostUpdate>},
         TContext
       > => {
       return useMutation(getUpdateContentPostMutationOptions(options));
@@ -3083,7 +3320,7 @@ export const getUpdateUserUrl = (id: string,) => {
  * @summary Update user
  */
 export const updateUser = async (id: string,
-    userInput: UserInput, options?: RequestInit): Promise<User> => {
+    userUpdate: UserUpdate, options?: RequestInit): Promise<User> => {
 
   return customFetch<User>(getUpdateUserUrl(id),
   {
@@ -3091,7 +3328,7 @@ export const updateUser = async (id: string,
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     body: JSON.stringify(
-      userInput,)
+      userUpdate,)
   }
 );}
 
@@ -3099,8 +3336,8 @@ export const updateUser = async (id: string,
 
 
 export const getUpdateUserMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: string;data: BodyType<UserInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: string;data: BodyType<UserInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: string;data: BodyType<UserUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: string;data: BodyType<UserUpdate>}, TContext> => {
 
 const mutationKey = ['updateUser'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -3112,7 +3349,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateUser>>, {id: string;data: BodyType<UserInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateUser>>, {id: string;data: BodyType<UserUpdate>}> = (props) => {
           const {id,data} = props ?? {};
 
           return  updateUser(id,data,requestOptions)
@@ -3126,18 +3363,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type UpdateUserMutationResult = NonNullable<Awaited<ReturnType<typeof updateUser>>>
-    export type UpdateUserMutationBody = BodyType<UserInput>
+    export type UpdateUserMutationBody = BodyType<UserUpdate>
     export type UpdateUserMutationError = ErrorType<unknown>
 
     /**
  * @summary Update user
  */
 export const useUpdateUser = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: string;data: BodyType<UserInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateUser>>, TError,{id: string;data: BodyType<UserUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateUser>>,
         TError,
-        {id: string;data: BodyType<UserInput>},
+        {id: string;data: BodyType<UserUpdate>},
         TContext
       > => {
       return useMutation(getUpdateUserMutationOptions(options));

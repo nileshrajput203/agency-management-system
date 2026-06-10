@@ -30,7 +30,8 @@ export const LoginResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "email": zod.string(),
-  "role": zod.string(),
+  "systemRole": zod.string(),
+  "department": zod.string().nullish(),
   "isActive": zod.boolean().nullish()
 })
 })
@@ -421,7 +422,18 @@ export const ListContentPostsResponseItem = zod.object({
   "caption": zod.string().nullish(),
   "scheduledAt": zod.string().nullish(),
   "clientId": zod.string().nullish(),
-  "clientName": zod.string().nullish()
+  "clientName": zod.string().nullish(),
+  "assigneeName": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "script": zod.string().nullish(),
+  "ideation": zod.string().nullish(),
+  "referenceLinks": zod.array(zod.object({
+  "label": zod.string(),
+  "url": zod.string()
+})).nullish(),
+  "referenceUrl": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "createdAt": zod.string().optional()
 })
 export const ListContentPostsResponse = zod.array(ListContentPostsResponseItem)
 
@@ -430,12 +442,89 @@ export const ListContentPostsResponse = zod.array(ListContentPostsResponseItem)
  * @summary Create content post
  */
 export const CreateContentPostBody = zod.object({
+  "clientId": zod.string(),
+  "platform": zod.string(),
+  "contentType": zod.string(),
+  "caption": zod.string().optional(),
+  "hashtags": zod.string().optional(),
+  "status": zod.string().optional(),
+  "scheduledAt": zod.string().optional(),
+  "assigneeId": zod.string().optional(),
+  "notes": zod.string().optional(),
+  "script": zod.string().optional(),
+  "ideation": zod.string().optional(),
+  "referenceLinks": zod.array(zod.object({
+  "label": zod.string(),
+  "url": zod.string()
+})).optional(),
+  "referenceUrl": zod.string().optional(),
+  "description": zod.string().optional()
+})
+
+
+/**
+ * @summary Create a calendar share link
+ */
+export const CreateCalendarShareBody = zod.object({
+  "clientId": zod.string(),
+  "label": zod.string().optional()
+})
+
+
+/**
+ * @summary List calendar shares
+ */
+export const ListCalendarSharesQueryParams = zod.object({
+  "clientId": zod.coerce.string().optional()
+})
+
+export const ListCalendarSharesResponseItem = zod.object({
+  "id": zod.string(),
+  "clientId": zod.string(),
+  "shareToken": zod.string(),
+  "label": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date().nullish(),
+  "token": zod.string().optional(),
+  "user": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "systemRole": zod.string(),
+  "department": zod.string().nullish(),
+  "isActive": zod.boolean().nullish()
+}).optional()
+})
+export const ListCalendarSharesResponse = zod.array(ListCalendarSharesResponseItem)
+
+
+/**
+ * @summary Get content post by ID
+ */
+export const GetContentPostParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetContentPostResponse = zod.object({
+  "id": zod.string(),
   "platform": zod.string().nullish(),
   "contentType": zod.string().nullish(),
   "status": zod.string().nullish(),
   "caption": zod.string().nullish(),
   "scheduledAt": zod.string().nullish(),
-  "clientId": zod.string().nullish()
+  "clientId": zod.string().nullish(),
+  "clientName": zod.string().nullish(),
+  "assigneeName": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "script": zod.string().nullish(),
+  "ideation": zod.string().nullish(),
+  "referenceLinks": zod.array(zod.object({
+  "label": zod.string(),
+  "url": zod.string()
+})).nullish(),
+  "referenceUrl": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "createdAt": zod.string().optional()
 })
 
 
@@ -452,7 +541,17 @@ export const UpdateContentPostBody = zod.object({
   "status": zod.string().nullish(),
   "caption": zod.string().nullish(),
   "scheduledAt": zod.string().nullish(),
-  "clientId": zod.string().nullish()
+  "clientId": zod.string().nullish(),
+  "assigneeId": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "script": zod.string().nullish(),
+  "ideation": zod.string().nullish(),
+  "referenceLinks": zod.array(zod.object({
+  "label": zod.string(),
+  "url": zod.string()
+})).optional(),
+  "referenceUrl": zod.string().nullish(),
+  "description": zod.string().nullish()
 })
 
 export const UpdateContentPostResponse = zod.object({
@@ -463,7 +562,18 @@ export const UpdateContentPostResponse = zod.object({
   "caption": zod.string().nullish(),
   "scheduledAt": zod.string().nullish(),
   "clientId": zod.string().nullish(),
-  "clientName": zod.string().nullish()
+  "clientName": zod.string().nullish(),
+  "assigneeName": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "script": zod.string().nullish(),
+  "ideation": zod.string().nullish(),
+  "referenceLinks": zod.array(zod.object({
+  "label": zod.string(),
+  "url": zod.string()
+})).nullish(),
+  "referenceUrl": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "createdAt": zod.string().optional()
 })
 
 
@@ -777,7 +887,8 @@ export const ListUsersResponseItem = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "email": zod.string(),
-  "role": zod.string(),
+  "systemRole": zod.string(),
+  "department": zod.string().nullish(),
   "isActive": zod.boolean().nullish()
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
@@ -789,8 +900,9 @@ export const ListUsersResponse = zod.array(ListUsersResponseItem)
 export const CreateUserBody = zod.object({
   "name": zod.string(),
   "email": zod.string(),
-  "role": zod.string(),
+  "systemRole": zod.string(),
   "password": zod.string().nullish(),
+  "department": zod.string().nullish(),
   "isActive": zod.boolean().nullish()
 })
 
@@ -803,10 +915,11 @@ export const UpdateUserParams = zod.object({
 })
 
 export const UpdateUserBody = zod.object({
-  "name": zod.string(),
-  "email": zod.string(),
-  "role": zod.string(),
+  "name": zod.string().optional(),
+  "email": zod.string().optional(),
+  "systemRole": zod.string().optional(),
   "password": zod.string().nullish(),
+  "department": zod.string().nullish(),
   "isActive": zod.boolean().nullish()
 })
 
@@ -814,7 +927,8 @@ export const UpdateUserResponse = zod.object({
   "id": zod.string(),
   "name": zod.string(),
   "email": zod.string(),
-  "role": zod.string(),
+  "systemRole": zod.string(),
+  "department": zod.string().nullish(),
   "isActive": zod.boolean().nullish()
 })
 
@@ -831,9 +945,11 @@ export const DeleteUserParams = zod.object({
  * @summary Dashboard stats
  */
 export const GetDashboardStatsResponse = zod.object({
-  "clientCount": zod.number().nullish(),
+  "totalClients": zod.number().nullish(),
   "activeProjects": zod.number().nullish(),
   "openLeads": zod.number().nullish(),
+  "revenuePaid": zod.number().nullish(),
+  "outstanding": zod.number().nullish(),
   "monthlyRevenue": zod.number().nullish(),
   "tasksDue": zod.number().nullish()
 })
