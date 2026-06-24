@@ -88,6 +88,7 @@ export async function bootstrapDatabase(): Promise<void> {
       "department TEXT",
       "role TEXT NOT NULL DEFAULT 'MANAGER'",
       "password TEXT",
+      "allowed_modules TEXT",
     ]) {
       await db.execute(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
     }

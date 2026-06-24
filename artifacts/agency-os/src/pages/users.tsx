@@ -21,6 +21,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useForm, Controller } from "react-hook-form";
 import { Plus, Trash2, UserCog, Mail, Pencil } from "lucide-react";
+import { useAuth } from "@/App";
 
 const ROLE_CONFIG: Record<string, { label: string; className: string }> = {
   SUPER_ADMIN: { label: "Super Admin", className: "bg-violet-100 text-violet-700" },
@@ -33,8 +34,28 @@ const ROLE_CONFIG: Record<string, { label: string; className: string }> = {
   HR: { label: "HR", className: "bg-orange-100 text-orange-700" },
 };
 
+const AVAILABLE_MODULES = [
+  { id: "clients", label: "Clients & Leads" },
+  { id: "sales", label: "Sales & Pipelines" },
+  { id: "projects", label: "Projects" },
+  { id: "tasks", label: "Tasks" },
+  { id: "content", label: "Content Ideation" },
+  { id: "invoices", label: "Invoices" },
+  { id: "quotations", label: "Quotations" },
+  { id: "proformaInvoices", label: "Proforma Invoices" },
+  { id: "purchaseOrders", label: "Purchase Orders" },
+  { id: "deliveryChallans", label: "Delivery Challans" },
+  { id: "proposals", label: "Proposals" },
+  { id: "attendance", label: "Attendance" },
+  { id: "leaves", label: "Leaves Management" },
+  { id: "team", label: "Team & Roles" },
+  { id: "settings", label: "Configuration Settings" },
+];
+
 export default function UsersPage() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const isAdmin = user?.systemRole === "SUPER_ADMIN";
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
 
@@ -77,18 +98,24 @@ export default function UsersPage() {
   };
 
   const { register, handleSubmit, control, reset, formState: { errors } } = useForm<UserInput>({
-    defaultValues: { name: "", email: "", password: "", systemRole: "ACCOUNT_MANAGER" },
+    defaultValues: { name: "", email: "", password: "", systemRole: "ACCOUNT_MANAGER", allowedModules: [] },
   });
 
   const openAdd = () => {
-    reset({ name: "", email: "", password: "", systemRole: "ACCOUNT_MANAGER" });
+    reset({ name: "", email: "", password: "", systemRole: "ACCOUNT_MANAGER", allowedModules: [] });
     setEditId(null);
     setDialogOpen(true);
   };
 
-  const openEdit = (u: NonNullable<typeof users>[number]) => {
+  const openEdit = (u: any) => {
     setEditId(u.id);
-    reset({ name: u.name, email: u.email, systemRole: u.systemRole ?? "ACCOUNT_MANAGER", department: u.department ?? "" });
+    reset({
+      name: u.name,
+      email: u.email,
+      systemRole: u.systemRole ?? "ACCOUNT_MANAGER",
+      department: u.department ?? "",
+      allowedModules: u.allowedModules ?? []
+    });
     setDialogOpen(true);
   };
 
@@ -107,9 +134,11 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold font-heading">Team & Roles</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{users?.length ?? 0} team members</p>
         </div>
-        <Button onClick={openAdd} className="gap-2 btn-micro-anim" data-testid="add-user-btn">
-          <Plus className="h-4 w-4" /> Add Member
-        </Button>
+        {isAdmin && (
+          <Button onClick={openAdd} className="gap-2 btn-micro-anim" data-testid="add-user-btn">
+            <Plus className="h-4 w-4" /> Add Member
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -142,17 +171,19 @@ export default function UsersPage() {
                         <p className="text-xs text-muted-foreground">{u.department ?? "—"}</p>
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={() => deleteMutation.mutate({ id: u.id })}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(u)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => deleteMutation.mutate({ id: u.id })}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <Badge variant="secondary" className={rc?.className + " text-[11px] mb-3"}>
@@ -169,6 +200,7 @@ export default function UsersPage() {
                     <Switch
                       checked={u.isActive ?? true}
                       onCheckedChange={(v) => toggleActive(u.id, v)}
+                      disabled={!isAdmin}
                       data-testid={`toggle-user-${u.id}`}
                     />
                   </div>
@@ -220,6 +252,41 @@ export default function UsersPage() {
                 <Label>Department</Label>
                 <Input {...register("department")} placeholder="Design, Sales..." />
               </div>
+            </div>
+
+            <div className="space-y-2 border-t pt-3 mt-3">
+              <Label className="text-sm font-semibold">Access Permissions</Label>
+              <p className="text-xs text-muted-foreground">Select which modules this team member can access</p>
+              <Controller
+                control={control}
+                name="allowedModules"
+                render={({ field }) => {
+                  const currentModules = field.value || [];
+                  const handleToggle = (moduleId: string) => {
+                    const next = currentModules.includes(moduleId)
+                      ? currentModules.filter((id: string) => id !== moduleId)
+                      : [...currentModules, moduleId];
+                    field.onChange(next);
+                  };
+
+                  return (
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-2 pt-1 max-h-48 overflow-y-auto pr-1">
+                      {AVAILABLE_MODULES.map((m) => (
+                        <div key={m.id} className="flex items-center justify-between border rounded-lg p-2 bg-card hover:bg-accent/40 transition-colors">
+                          <Label className="text-xs font-medium cursor-pointer" htmlFor={`permission-${m.id}`}>
+                            {m.label}
+                          </Label>
+                          <Switch
+                            id={`permission-${m.id}`}
+                            checked={currentModules.includes(m.id)}
+                            onCheckedChange={() => handleToggle(m.id)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }}
+              />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>

@@ -1,4 +1,3 @@
-import { useLogin } from "@workspace/api-client-react";
 import { useAuth } from "@/App";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
@@ -9,36 +8,44 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Briefcase, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+import { useRegister } from "@workspace/api-client-react";
 
-interface LoginForm {
+interface RegisterForm {
+  name: string;
   email: string;
   password: string;
+  confirmPassword: string;
 }
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const { login } = useAuth();
   const [, navigate] = useLocation();
   const [showPass, setShowPass] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
-    defaultValues: { email: "", password: "" },
+  const { register, handleSubmit, formState: { errors }, watch } = useForm<RegisterForm>({
+    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
   });
 
-  const loginMutation = useLogin({
+  const password = watch("password");
+
+  const registerMutation = useRegister({
     mutation: {
-      onSuccess: (data) => {
-        login(data.token, data.user);
-        toast.success(`Welcome back, ${data.user.name}!`);
-        navigate("/dashboard");
+      onSuccess: (data: any) => {
+        toast.success(data?.message || "Registration successful! Please wait for admin approval before logging in.");
+        navigate("/login");
       },
-      onError: () => {
-        toast.error("Invalid email or password.");
+      onError: (error: any) => {
+        const message = error?.response?.data?.error || error?.message || "Registration failed. Please try again.";
+        toast.error(message);
       },
     },
   });
 
-  const onSubmit = (values: LoginForm) => {
-    loginMutation.mutate({ data: values });
+  const onSubmit = (values: RegisterForm) => {
+    registerMutation.mutate({
+      data: { name: values.name, email: values.email, password: values.password },
+    });
   };
 
   return (
@@ -56,11 +63,23 @@ export default function LoginPage() {
 
         <Card className="border-border/60 shadow-xl">
           <CardHeader className="pb-4">
-            <CardTitle className="text-xl">Sign in</CardTitle>
-            <CardDescription>Enter your credentials to access the platform</CardDescription>
+            <CardTitle className="text-xl">Create account</CardTitle>
+            <CardDescription>Sign up to get started with the platform</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="John Doe"
+                  data-testid="name-input"
+                  {...register("name", { required: "Full name is required" })}
+                />
+                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+              </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -81,7 +100,10 @@ export default function LoginPage() {
                     type={showPass ? "text" : "password"}
                     placeholder="••••••••"
                     data-testid="password-input"
-                    {...register("password", { required: "Password is required" })}
+                    {...register("password", {
+                      required: "Password is required",
+                      minLength: { value: 6, message: "Password must be at least 6 characters" },
+                    })}
                   />
                   <button
                     type="button"
@@ -94,24 +116,48 @@ export default function LoginPage() {
                 {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
               </div>
 
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirm ? "text" : "password"}
+                    placeholder="••••••••"
+                    data-testid="confirm-password-input"
+                    {...register("confirmPassword", {
+                      required: "Please confirm your password",
+                      validate: (value) => value === password || "Passwords do not match",
+                    })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm((s) => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
+              </div>
+
               <Button
                 type="submit"
                 className="w-full btn-micro-anim"
-                data-testid="login-button"
-                disabled={loginMutation.isPending}
+                data-testid="register-button"
+                disabled={registerMutation.isPending}
               >
-                {loginMutation.isPending ? "Signing in..." : "Sign in"}
+                {registerMutation.isPending ? "Creating account..." : "Create account"}
               </Button>
             </form>
 
             <div className="mt-4 text-center text-sm text-muted-foreground">
-              Don't have an account?{" "}
+              Already have an account?{" "}
               <button
                 type="button"
-                onClick={() => navigate("/register")}
+                onClick={() => navigate("/login")}
                 className="font-medium text-primary hover:underline"
               >
-                Create account
+                Sign in
               </button>
             </div>
           </CardContent>

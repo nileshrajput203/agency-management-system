@@ -14,6 +14,12 @@ export interface LoginInput {
   password: string;
 }
 
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -23,6 +29,7 @@ export interface User {
   department?: string | null;
   /** @nullable */
   isActive?: boolean | null;
+  allowedModules?: string[] | null;
 }
 
 export interface AuthResponse {
@@ -63,6 +70,7 @@ export interface UserInput {
   department?: string | null;
   /** @nullable */
   isActive?: boolean | null;
+  allowedModules?: string[] | null;
 }
 
 export interface UserUpdate {
@@ -75,6 +83,7 @@ export interface UserUpdate {
   department?: string | null;
   /** @nullable */
   isActive?: boolean | null;
+  allowedModules?: string[] | null;
 }
 
 export interface Client {

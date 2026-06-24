@@ -6,11 +6,12 @@ export const usersTable = pgTable("users", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
-  password: text("password"),
+  password: text("password_hash"),
   role: text("role").notNull().default("MANAGER"),
   systemRole: text("system_role").notNull().default("ACCOUNT_MANAGER"),
   department: text("department"),
   isActive: boolean("is_active").default(true),
+  allowedModules: text("allowed_modules"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

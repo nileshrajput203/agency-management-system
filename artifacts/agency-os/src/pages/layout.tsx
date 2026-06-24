@@ -87,6 +87,44 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
 
+  const isAdmin = user?.systemRole === "SUPER_ADMIN";
+  const userAllowedModules = user?.allowedModules ?? [];
+
+  const filteredNavGroups = navGroups.map(group => {
+    const filteredItems = group.items.filter(item => {
+      if (item.href === "/dashboard") return true;
+      if (isAdmin) return true;
+
+      const pathMap: Record<string, string> = {
+        "/clients": "clients",
+        "/sales": "sales",
+        "/projects": "projects",
+        "/tasks": "tasks",
+        "/content": "content",
+        "/hawan": "hawan",
+        "/invoices": "invoices",
+        "/quotations": "quotations",
+        "/proforma-invoices": "proformaInvoices",
+        "/purchase-orders": "purchaseOrders",
+        "/delivery-challans": "deliveryChallans",
+        "/proposals": "proposals",
+        "/attendance": "attendance",
+        "/leaves": "leaves",
+        "/users": "team",
+        "/settings": "settings",
+      };
+
+      const moduleKey = pathMap[item.href];
+      if (!moduleKey) return false;
+      return userAllowedModules.includes(moduleKey);
+    });
+
+    return {
+      ...group,
+      items: filteredItems,
+    };
+  }).filter(group => group.items.length > 0);
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar */}
@@ -104,7 +142,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Nav */}
         <nav className="flex-1 py-3 px-2 space-y-5">
-          {navGroups.map((group) => (
+          {filteredNavGroups.map((group) => (
             <div key={group.label}>
               <p className="px-2 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/70">
                 {group.label}

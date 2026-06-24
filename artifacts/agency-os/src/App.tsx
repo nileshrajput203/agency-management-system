@@ -98,6 +98,7 @@ const queryClient = new QueryClient({
 
 // ─── Page imports (lazy) ────────────────────────────────────────
 import LoginPage from "@/pages/login";
+import RegisterPage from "@/pages/register";
 import DashboardLayout from "@/pages/layout";
 import DashboardPage from "@/pages/dashboard";
 import ClientsPage from "@/pages/clients";
@@ -150,6 +151,7 @@ function AppRouter() {
     <Switch>
       <Route path="/share/calendar/:shareToken" component={PublicCalendarPage} />
       <Route path="/login" component={LoginPage} />
+      <Route path="/register" component={RegisterPage} />
       <Route path="/portal/:clientId">
         {({ clientId }) => <ClientPortalPage clientId={clientId!} />}
       </Route>
