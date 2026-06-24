@@ -66,7 +66,7 @@ router.post("/auth/register", async (req, res) => {
       password: passwordHash,
       role: "MANAGER",
       systemRole: "ACCOUNT_MANAGER",
-      isActive: false, // Requires admin approval
+      isActive: true, // Auto-approve new registrations
     }).returning({
       id: usersTable.id,
       name: usersTable.name,
@@ -75,7 +75,7 @@ router.post("/auth/register", async (req, res) => {
       systemRole: usersTable.systemRole,
     });
 
-    return res.status(201).json({ message: "Account created successfully. Please wait for admin approval before logging in.", user });
+    return res.status(201).json({ message: "Account created successfully. You can now log in.", user });
   } catch (err) {
     console.error("Register error:", err);
     return res.status(500).json({ error: "Internal error" });

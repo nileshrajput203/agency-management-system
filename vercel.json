@@ -1,0 +1,19 @@
+{
+  "buildCommand": "pnpm run build",
+  "monorepo": true,
+  "monorepoRoot": ".",
+  "projects": [
+    {
+      "name": "api-server",
+      "rootDirectory": "artifacts/api-server",
+      "buildCommand": "pnpm run build",
+      "outputDirectory": "dist"
+    },
+    {
+      "name": "agency-os",
+      "rootDirectory": "artifacts/agency-os",
+      "buildCommand": "pnpm run build",
+      "outputDirectory": "dist"
+    }
+  ]
+}
