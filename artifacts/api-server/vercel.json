@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "dist",
+  "env": [
+    "DATABASE_URL",
+    "NODE_ENV",
+    "PORT",
+    "ADMIN_EMAIL",
+    "ADMIN_PASSWORD"
+  ],
+  "functions": {
+    "src/index.ts": {
+      "runtime": "nodejs20.x",
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  }
+}
