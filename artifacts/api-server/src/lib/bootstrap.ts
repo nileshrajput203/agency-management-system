@@ -276,6 +276,20 @@ export async function bootstrapDatabase(): Promise<void> {
     `);
 
     await db.execute(`
+      CREATE TABLE IF NOT EXISTS client_social_accounts (
+        id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        platform TEXT NOT NULL,
+        handle TEXT,
+        page_id TEXT,
+        profile_url TEXT,
+        access_token TEXT,
+        is_active TEXT DEFAULT 'true',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS client_calendar_shares (
         id TEXT PRIMARY KEY,
         client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,

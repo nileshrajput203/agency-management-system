@@ -44,3 +44,21 @@ export const clientCalendarSharesTable = pgTable("client_calendar_shares", {
 export const insertClientCalendarShareSchema = createInsertSchema(clientCalendarSharesTable).omit({ id: true, createdAt: true });
 export type InsertClientCalendarShare = z.infer<typeof insertClientCalendarShareSchema>;
 export type ClientCalendarShare = typeof clientCalendarSharesTable.$inferSelect;
+
+export const clientSocialAccountsTable = pgTable("client_social_accounts", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  clientId: text("client_id")
+    .notNull()
+    .references(() => clientsTable.id, { onDelete: "cascade" }),
+  platform: text("platform").notNull(),
+  handle: text("handle"),
+  pageId: text("page_id"),
+  profileUrl: text("profile_url"),
+  accessToken: text("access_token"),
+  isActive: text("is_active").default("true"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertClientSocialAccountSchema = createInsertSchema(clientSocialAccountsTable).omit({ id: true, createdAt: true });
+export type InsertClientSocialAccount = z.infer<typeof insertClientSocialAccountSchema>;
+export type ClientSocialAccount = typeof clientSocialAccountsTable.$inferSelect;

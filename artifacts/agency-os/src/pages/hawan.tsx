@@ -1,178 +1,445 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useListClients } from "@workspace/api-client-react";
 import {
-  Instagram, Facebook, Youtube, Linkedin, Link as LinkIcon, CheckCircle2, AlertCircle,
-  BarChart3, UploadCloud, Send, FileOutput, Flame
+  Instagram, Facebook, Youtube, Linkedin, Link as LinkIcon, CheckCircle2,
+  BarChart3, UploadCloud, Send, FileOutput, Flame, Plus, Trash2,
+  Twitter, Globe, X as XIcon,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const PLATFORMS = [
+  { id: "INSTAGRAM", label: "Instagram", icon: <Instagram className="h-4 w-4 text-pink-500" />, color: "bg-pink-50 border-pink-200 dark:bg-pink-950/20" },
+  { id: "FACEBOOK", label: "Facebook", icon: <Facebook className="h-4 w-4 text-blue-500" />, color: "bg-blue-50 border-blue-200 dark:bg-blue-950/20" },
+  { id: "YOUTUBE", label: "YouTube", icon: <Youtube className="h-4 w-4 text-red-500" />, color: "bg-red-50 border-red-200 dark:bg-red-950/20" },
+  { id: "LINKEDIN", label: "LinkedIn", icon: <Linkedin className="h-4 w-4 text-blue-600" />, color: "bg-blue-50 border-blue-200 dark:bg-blue-950/20" },
+  { id: "TWITTER", label: "X / Twitter", icon: <Twitter className="h-4 w-4 text-slate-800 dark:text-slate-200" />, color: "bg-slate-50 border-slate-200 dark:bg-slate-900/40" },
+  { id: "TIKTOK", label: "TikTok", icon: <span className="text-xs font-bold">TK</span>, color: "bg-slate-50 border-slate-200 dark:bg-slate-900/40" },
+  { id: "PINTEREST", label: "Pinterest", icon: <Globe className="h-4 w-4 text-red-600" />, color: "bg-red-50 border-red-200 dark:bg-red-950/20" },
+];
+
+type SocialAccount = {
+  id: string;
+  clientId: string;
+  platform: string;
+  handle: string | null;
+  pageId: string | null;
+  profileUrl: string | null;
+  accessToken: string | null;
+  isActive: string | null;
+};
+
+function getPlatformMeta(id: string) {
+  return PLATFORMS.find((p) => p.id === id) ?? { id, label: id, icon: <Globe className="h-4 w-4" />, color: "" };
+}
 
 export default function HawanHubPage() {
   const [activeTab, setActiveTab] = useState("accounts");
-  const [postContent, setPostContent] = useState("");
-  const [isPosting, setIsPosting] = useState(false);
+  const [activeClientId, setActiveClientId] = useState<string>("");
+  const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
 
-  const ACCOUNTS = [
-    { name: "Instagram", icon: <Instagram className="h-5 w-5 text-pink-500" />, connected: true, username: "@blinkbeyond" },
-    { name: "Facebook", icon: <Facebook className="h-5 w-5 text-blue-500" />, connected: true, username: "Blink Beyond Agency" },
-    { name: "YouTube", icon: <Youtube className="h-5 w-5 text-red-500" />, connected: false, username: null },
-    { name: "LinkedIn", icon: <Linkedin className="h-5 w-5 text-blue-600" />, connected: true, username: "Blink Beyond" },
-  ];
+  const [addOpen, setAddOpen] = useState(false);
+  const [addPlatform, setAddPlatform] = useState("INSTAGRAM");
+  const [addHandle, setAddHandle] = useState("");
+  const [addProfileUrl, setAddProfileUrl] = useState("");
+  const [addPageId, setAddPageId] = useState("");
+  const [addSaving, setAddSaving] = useState(false);
 
-  const handlePost = () => {
-    if (!postContent) {
-      toast.error("Please enter some content to post.");
-      return;
+  const [postTitle, setPostTitle] = useState("");
+  const [postCaption, setPostCaption] = useState("");
+  const [postDate, setPostDate] = useState("");
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [isIgniting, setIsIgniting] = useState(false);
+
+  const { data: clients } = useListClients();
+
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+
+  function authHeaders() {
+    return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+  }
+
+  async function loadAccounts(clientId: string) {
+    if (!clientId) { setAccounts([]); return; }
+    setLoadingAccounts(true);
+    try {
+      const res = await fetch(`/api/social-accounts?clientId=${clientId}`, { headers: authHeaders() });
+      if (!res.ok) throw new Error();
+      setAccounts(await res.json());
+    } catch {
+      toast.error("Failed to load social accounts");
+    } finally {
+      setLoadingAccounts(false);
     }
-    setIsPosting(true);
-    setTimeout(() => {
-      setIsPosting(false);
-      setPostContent("");
-      toast.success("Successfully pushed to 3 platforms via Hawan Hub! 🔥");
-    }, 1500);
-  };
+  }
 
-  const generateReport = () => {
-    toast.success("Generating Monthly Analytics Report... Please wait.", { icon: <FileOutput className="h-4 w-4" /> });
-  };
+  useEffect(() => {
+    if (clients && clients.length > 0 && !activeClientId) {
+      setActiveClientId(clients[0]!.id);
+    }
+  }, [clients]);
+
+  useEffect(() => {
+    loadAccounts(activeClientId);
+  }, [activeClientId]);
+
+  async function handleAddAccount() {
+    if (!activeClientId || !addPlatform) return;
+    setAddSaving(true);
+    try {
+      const res = await fetch("/api/social-accounts", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          clientId: activeClientId,
+          platform: addPlatform,
+          handle: addHandle || undefined,
+          profileUrl: addProfileUrl || undefined,
+          pageId: addPageId || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Social account added");
+      setAddOpen(false);
+      setAddHandle(""); setAddProfileUrl(""); setAddPageId("");
+      await loadAccounts(activeClientId);
+    } catch {
+      toast.error("Failed to add account");
+    } finally {
+      setAddSaving(false);
+    }
+  }
+
+  async function handleDeleteAccount(id: string) {
+    try {
+      await fetch(`/api/social-accounts/${id}`, { method: "DELETE", headers: authHeaders() });
+      setAccounts((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Removed");
+    } catch {
+      toast.error("Failed to remove");
+    }
+  }
+
+  function togglePlatform(id: string) {
+    setSelectedPlatforms((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id],
+    );
+  }
+
+  async function handleIgnite() {
+    if (!activeClientId) { toast.error("Select a client first"); return; }
+    if (!postCaption.trim()) { toast.error("Write a caption first"); return; }
+    if (selectedPlatforms.length === 0) { toast.error("Select at least one platform"); return; }
+    setIsIgniting(true);
+    try {
+      const res = await fetch("/api/social-accounts/ignite", {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          clientId: activeClientId,
+          caption: postCaption,
+          platforms: selectedPlatforms,
+          scheduledAt: postDate || undefined,
+          title: postTitle || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      toast.success(`🔥 ${data.created} posts added to Content Calendar!`);
+      setPostCaption(""); setPostTitle(""); setPostDate(""); setSelectedPlatforms([]);
+    } catch {
+      toast.error("Failed to schedule posts");
+    } finally {
+      setIsIgniting(false);
+    }
+  }
+
+  const clientAccounts = accounts.filter((a) => a.clientId === activeClientId);
+  const connectedPlatformIds = new Set(clientAccounts.map((a) => a.platform));
+  const activeClient = clients?.find((c) => c.id === activeClientId);
 
   return (
-    <div className="p-6 space-y-6 animated-fade-in">
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-5 animated-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
             <Flame className="h-6 w-6 text-orange-500" /> Hawan Hub
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Centralized Social Media Engine & Analytics</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Centralized Social Media Engine — per client</p>
         </div>
-        <Button onClick={generateReport} variant="outline" className="gap-2">
-          <FileOutput className="h-4 w-4" /> Export Monthly Report
+        <Button variant="outline" className="gap-2" onClick={() => toast.info("Report generation coming soon")}>
+          <FileOutput className="h-4 w-4" /> Export Report
         </Button>
       </div>
 
+      {/* Client Tabs */}
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
+        {(clients ?? []).map((client) => (
+          <button
+            key={client.id}
+            onClick={() => setActiveClientId(client.id)}
+            className={cn(
+              "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap",
+              activeClientId === client.id
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-muted/50 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            {client.companyName}
+          </button>
+        ))}
+        {(clients ?? []).length === 0 && (
+          <p className="text-sm text-muted-foreground">No clients yet — add clients first</p>
+        )}
+      </div>
+
+      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-3">
-          <TabsTrigger value="accounts">Connections</TabsTrigger>
-          <TabsTrigger value="publish">One-Click Post</TabsTrigger>
-          <TabsTrigger value="analytics">Live Analytics</TabsTrigger>
+        <TabsList className="grid w-full max-w-sm grid-cols-2">
+          <TabsTrigger value="accounts">Social Handles</TabsTrigger>
+          <TabsTrigger value="publish">Ignite Post</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="accounts" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {ACCOUNTS.map((acc) => (
-              <Card key={acc.name} className="scale-hover">
-                <CardContent className="p-5 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-muted rounded-xl">{acc.icon}</div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">{acc.name}</h3>
-                      {acc.connected ? (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> {acc.username}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <AlertCircle className="h-3.5 w-3.5 text-amber-500" /> Not connected
-                        </p>
-                      )}
+        {/* ── Accounts tab ── */}
+        <TabsContent value="accounts" className="mt-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {activeClient
+                ? `${clientAccounts.length} connected platform${clientAccounts.length !== 1 ? "s" : ""} for ${activeClient.companyName}`
+                : "Select a client above"}
+            </p>
+            {activeClientId && (
+              <Button size="sm" onClick={() => setAddOpen(true)} className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" /> Add Handle
+              </Button>
+            )}
+          </div>
+
+          {loadingAccounts ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-muted animate-pulse rounded-xl" />)}
+            </div>
+          ) : clientAccounts.length === 0 ? (
+            <div className="text-center py-14 border-2 border-dashed border-border rounded-xl text-muted-foreground">
+              <Flame className="h-10 w-10 mx-auto mb-3 text-orange-300 opacity-50" />
+              <p className="font-medium">No social handles yet</p>
+              <p className="text-sm mt-1">Click "Add Handle" to connect {activeClient?.companyName}'s social accounts</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {clientAccounts.map((acc) => {
+                const meta = getPlatformMeta(acc.platform);
+                return (
+                  <div key={acc.id} className={cn("flex items-center justify-between p-4 rounded-xl border bg-card", meta.color)}>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-background rounded-lg shadow-sm border border-border">{meta.icon}</div>
+                      <div>
+                        <p className="font-semibold text-sm">{meta.label}</p>
+                        {acc.handle ? (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <CheckCircle2 className="h-3 w-3 text-emerald-500" /> {acc.handle}
+                          </p>
+                        ) : acc.profileUrl ? (
+                          <a href={acc.profileUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline mt-0.5 block truncate max-w-[140px]">
+                            {acc.profileUrl}
+                          </a>
+                        ) : (
+                          <p className="text-xs text-muted-foreground mt-0.5">Connected</p>
+                        )}
+                      </div>
                     </div>
+                    <button
+                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                      onClick={() => handleDeleteAccount(acc.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
-                  <Button variant={acc.connected ? "outline" : "default"} size="sm" className="gap-2">
-                    <LinkIcon className="h-3.5 w-3.5" />
-                    {acc.connected ? "Reconnect" : "Connect"}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Platform coverage */}
+          {activeClientId && (
+            <div className="mt-4 p-4 rounded-xl border border-border bg-muted/30">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Platform Coverage</p>
+              <div className="flex flex-wrap gap-2">
+                {PLATFORMS.map((p) => (
+                  <div
+                    key={p.id}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors",
+                      connectedPlatformIds.has(p.id)
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-400"
+                        : "bg-muted/60 border-transparent text-muted-foreground"
+                    )}
+                  >
+                    {p.icon}
+                    {p.label}
+                    {connectedPlatformIds.has(p.id) && <CheckCircle2 className="h-3 w-3" />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </TabsContent>
 
-        <TabsContent value="publish" className="mt-6">
-          <Card className="max-w-2xl border-primary/20 bg-primary/5 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Send className="h-5 w-5 text-primary" /> Blast to All Platforms
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Textarea 
-                  placeholder="Write your post caption here... It will be pushed everywhere instantly." 
-                  className="min-h-[150px] resize-none bg-background"
-                  value={postContent}
-                  onChange={(e) => setPostContent(e.target.value)}
-                />
-              </div>
-              <div className="flex items-center gap-4 p-4 border border-border rounded-lg bg-background">
-                <div className="flex-1 flex items-center gap-2">
-                  <UploadCloud className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground font-medium">Attach Media (Images/Video)</span>
+        {/* ── Ignite Post tab ── */}
+        <TabsContent value="publish" className="mt-5">
+          <div className="max-w-2xl space-y-5">
+            <Card className="border-orange-200 bg-gradient-to-br from-orange-50/50 to-transparent dark:from-orange-950/10">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Flame className="h-5 w-5 text-orange-500" /> Compose & Schedule
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Client reminder */}
+                {activeClient && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-lg border border-primary/20 text-sm">
+                    <span className="font-medium">{activeClient.companyName}</span>
+                    <span className="text-muted-foreground">— {clientAccounts.length} platform{clientAccounts.length !== 1 ? "s" : ""} connected</span>
+                  </div>
+                )}
+
+                {/* Title */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Post Title (optional)</Label>
+                  <Input
+                    placeholder="e.g. Summer Launch Campaign"
+                    value={postTitle}
+                    onChange={(e) => setPostTitle(e.target.value)}
+                  />
                 </div>
-                <Input type="file" className="max-w-[250px] cursor-pointer" multiple />
-              </div>
-              <div className="flex items-center justify-between pt-2">
-                <div className="flex gap-2">
-                  <Badge variant="secondary" className="bg-pink-100 text-pink-700">Instagram</Badge>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">Facebook</Badge>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">LinkedIn</Badge>
+
+                {/* Caption */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Caption / Content</Label>
+                  <Textarea
+                    placeholder="Write your post caption here… it will be added to the Content Calendar for each selected platform."
+                    className="min-h-[130px] resize-none bg-background"
+                    value={postCaption}
+                    onChange={(e) => setPostCaption(e.target.value)}
+                  />
                 </div>
-                <Button onClick={handlePost} disabled={isPosting} className="gap-2 px-8">
-                  {isPosting ? <span className="animate-pulse">Igniting...</span> : <><Flame className="h-4 w-4" /> Ignite Post</>}
+
+                {/* Schedule date */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Schedule Date (optional)</Label>
+                  <Input type="date" value={postDate} onChange={(e) => setPostDate(e.target.value)} className="max-w-xs" />
+                </div>
+
+                {/* Platform selection */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Post To Platforms</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {PLATFORMS.map((p) => {
+                      const isConnected = connectedPlatformIds.has(p.id);
+                      const isSelected = selectedPlatforms.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => togglePlatform(p.id)}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all",
+                            isSelected
+                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                              : isConnected
+                              ? "bg-muted/60 border-border hover:border-primary/40 text-foreground"
+                              : "bg-muted/30 border-border/50 text-muted-foreground"
+                          )}
+                        >
+                          {p.icon} {p.label}
+                          {isConnected && !isSelected && <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedPlatforms.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {selectedPlatforms.length} platform{selectedPlatforms.length !== 1 ? "s" : ""} selected — this will create {selectedPlatforms.length} post{selectedPlatforms.length !== 1 ? "s" : ""} in Content Calendar
+                    </p>
+                  )}
+                </div>
+
+                {/* Info banner about auto-posting */}
+                <div className="flex gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/20 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
+                  <span className="shrink-0 mt-0.5">ℹ️</span>
+                  <span>
+                    Posts are added to your <strong>Content Calendar</strong> as "Scheduled" so your team tracks them.
+                    For <strong>automatic publishing</strong> to the actual platforms, connect each platform's API key in the handle settings.
+                  </span>
+                </div>
+
+                <Button
+                  onClick={handleIgnite}
+                  disabled={isIgniting || !postCaption.trim() || selectedPlatforms.length === 0}
+                  className="w-full gap-2 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white border-0"
+                  size="lg"
+                >
+                  {isIgniting
+                    ? <span className="animate-pulse">Igniting…</span>
+                    : <><Flame className="h-5 w-5" /> Ignite — Add to Calendar</>}
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="analytics" className="mt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <Card className="bg-gradient-to-br from-pink-500/10 to-transparent">
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground font-medium flex items-center gap-2">
-                  <Instagram className="h-4 w-4 text-pink-500" /> IG Reach
-                </p>
-                <p className="text-3xl font-bold mt-2">124.5K</p>
-                <p className="text-xs text-emerald-500 mt-1 font-medium">+12.5% this month</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-blue-500/10 to-transparent">
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground font-medium flex items-center gap-2">
-                  <Facebook className="h-4 w-4 text-blue-500" /> FB Engagement
-                </p>
-                <p className="text-3xl font-bold mt-2">45.2K</p>
-                <p className="text-xs text-emerald-500 mt-1 font-medium">+5.2% this month</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-blue-600/10 to-transparent">
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground font-medium flex items-center gap-2">
-                  <Linkedin className="h-4 w-4 text-blue-600" /> LI Impressions
-                </p>
-                <p className="text-3xl font-bold mt-2">89.1K</p>
-                <p className="text-xs text-emerald-500 mt-1 font-medium">+22.4% this month</p>
               </CardContent>
             </Card>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" /> Audience Growth (Live)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 flex items-center justify-center bg-muted/30 rounded-lg border border-dashed border-border">
-                <p className="text-muted-foreground font-medium">Interactive Chart Data Rendered Here</p>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Add Handle Dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Social Handle</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Platform</Label>
+              <Select value={addPlatform} onValueChange={setAddPlatform}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PLATFORMS.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <span className="flex items-center gap-2">{p.icon} {p.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Handle / Username</Label>
+              <Input placeholder="@username or page name" value={addHandle} onChange={(e) => setAddHandle(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Profile URL (optional)</Label>
+              <Input placeholder="https://instagram.com/yourpage" value={addProfileUrl} onChange={(e) => setAddProfileUrl(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Page / Channel ID (optional)</Label>
+              <Input placeholder="Page ID for API connections" value={addPageId} onChange={(e) => setAddPageId(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddAccount} disabled={addSaving || !addPlatform}>
+              {addSaving ? "Adding…" : "Add Handle"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
