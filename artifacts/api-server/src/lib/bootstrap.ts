@@ -168,6 +168,15 @@ export async function bootstrapDatabase(): Promise<void> {
       )
     `);
 
+    for (const col of [
+      "title TEXT", "script TEXT", "ideation TEXT",
+      "reference_links JSON", "shoot_date TEXT", "assets_link TEXT",
+      "format TEXT", "needs_revision TEXT DEFAULT 'false'",
+      "custom_properties JSON", "comments JSON",
+    ]) {
+      await db.execute(`ALTER TABLE content_posts ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
+    }
+
     await db.execute(`
       CREATE TABLE IF NOT EXISTS invoices (
         id TEXT PRIMARY KEY,
