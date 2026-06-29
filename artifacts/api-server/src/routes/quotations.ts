@@ -1,12 +1,21 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { quotationsTable, invoicesTable, clientsTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 const router = Router();
 
-let quotationCounter = 2000;
 let invoiceCounterQ = 3000;
+
+async function generateQuotationNumber(): Promise<string> {
+  try {
+    const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(quotationsTable);
+    const n = (Number(count) + 1).toString().padStart(5, "0");
+    return `QT-${n}`;
+  } catch {
+    return `QT-${Date.now()}`;
+  }
+}
 
 router.get("/", async (req, res) => {
   try {
@@ -15,25 +24,66 @@ router.get("/", async (req, res) => {
         id: quotationsTable.id,
         number: quotationsTable.number,
         clientId: quotationsTable.clientId,
-        clientName: clientsTable.companyName,
+        joinedClientName: clientsTable.companyName,
         status: quotationsTable.status,
+        quotationDate: quotationsTable.quotationDate,
         validUntil: quotationsTable.validUntil,
-        subtotal: quotationsTable.subtotal,
-        taxAmount: quotationsTable.taxAmount,
-        total: quotationsTable.total,
-        notes: quotationsTable.notes,
+        dueDate: quotationsTable.dueDate,
+        currency: quotationsTable.currency,
+        companyName: quotationsTable.companyName,
+        companyPhone: quotationsTable.companyPhone,
         companyGstin: quotationsTable.companyGstin,
+        companyAddress: quotationsTable.companyAddress,
+        companyCity: quotationsTable.companyCity,
+        companyPostal: quotationsTable.companyPostal,
+        companyState: quotationsTable.companyState,
+        companyEmail: quotationsTable.companyEmail,
+        companyPan: quotationsTable.companyPan,
+        logoUrl: quotationsTable.logoUrl,
+        clientName: quotationsTable.clientName,
+        clientPhone: quotationsTable.clientPhone,
         clientGstin: quotationsTable.clientGstin,
+        clientAddress: quotationsTable.clientAddress,
+        clientCity: quotationsTable.clientCity,
+        clientPostal: quotationsTable.clientPostal,
+        clientState: quotationsTable.clientState,
+        clientEmail: quotationsTable.clientEmail,
+        clientPan: quotationsTable.clientPan,
         billingAddress: quotationsTable.billingAddress,
         shippingAddress: quotationsTable.shippingAddress,
-        termsAndConditions: quotationsTable.termsAndConditions,
-        bankDetails: quotationsTable.bankDetails,
         lineItems: quotationsTable.lineItems,
+        subtotal: quotationsTable.subtotal,
+        taxAmount: quotationsTable.taxAmount,
+        discount: quotationsTable.discount,
+        discountType: quotationsTable.discountType,
+        total: quotationsTable.total,
+        notes: quotationsTable.notes,
+        termsAndConditions: quotationsTable.termsAndConditions,
+        signatureText: quotationsTable.signatureText,
+        bankDetails: quotationsTable.bankDetails,
         createdAt: quotationsTable.createdAt,
       })
       .from(quotationsTable)
       .leftJoin(clientsTable, eq(quotationsTable.clientId, clientsTable.id));
-    return res.json(rows);
+
+    const mapped = rows.map((r) => ({
+      ...r,
+      clientName: r.clientName || r.joinedClientName || null,
+    }));
+    return res.json(mapped);
+  } catch {
+    return res.status(500).json({ error: "Internal error" });
+  }
+});
+
+router.get("/:id", async (req, res) => {
+  try {
+    const [row] = await db
+      .select()
+      .from(quotationsTable)
+      .where(eq(quotationsTable.id, req.params.id));
+    if (!row) return res.status(404).json({ error: "Not found" });
+    return res.json(row);
   } catch {
     return res.status(500).json({ error: "Internal error" });
   }
@@ -41,10 +91,9 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    quotationCounter++;
     const body = { ...req.body };
     if (!body.clientId) delete body.clientId;
-    body.number = `QUO-${quotationCounter}`;
+    if (!body.number) body.number = await generateQuotationNumber();
     const [row] = await db.insert(quotationsTable).values(body).returning();
     return res.status(201).json(row);
   } catch {
@@ -56,7 +105,11 @@ router.patch("/:id", async (req, res) => {
   try {
     const body = { ...req.body };
     if (body.clientId === "") body.clientId = null;
-    const [row] = await db.update(quotationsTable).set(body).where(eq(quotationsTable.id, req.params.id)).returning();
+    const [row] = await db
+      .update(quotationsTable)
+      .set(body)
+      .where(eq(quotationsTable.id, req.params.id))
+      .returning();
     return res.json(row);
   } catch {
     return res.status(500).json({ error: "Internal error" });
@@ -74,7 +127,10 @@ router.delete("/:id", async (req, res) => {
 
 router.post("/:id/convert-to-invoice", async (req, res) => {
   try {
-    const [quot] = await db.select().from(quotationsTable).where(eq(quotationsTable.id, req.params.id));
+    const [quot] = await db
+      .select()
+      .from(quotationsTable)
+      .where(eq(quotationsTable.id, req.params.id));
     if (!quot) return res.status(404).json({ error: "Not found" });
 
     invoiceCounterQ++;
@@ -98,7 +154,10 @@ router.post("/:id/convert-to-invoice", async (req, res) => {
       })
       .returning();
 
-    await db.update(quotationsTable).set({ status: "APPROVED" }).where(eq(quotationsTable.id, req.params.id));
+    await db
+      .update(quotationsTable)
+      .set({ status: "APPROVED" })
+      .where(eq(quotationsTable.id, req.params.id));
 
     return res.status(201).json(invoice);
   } catch {

@@ -197,18 +197,55 @@ export async function bootstrapDatabase(): Promise<void> {
     await db.execute(`
       CREATE TABLE IF NOT EXISTS quotations (
         id TEXT PRIMARY KEY,
-        quotation_number TEXT,
+        number TEXT,
         client_id TEXT REFERENCES clients(id) ON DELETE SET NULL,
-        client_name TEXT,
         status TEXT DEFAULT 'DRAFT',
         valid_until TEXT,
         subtotal NUMERIC DEFAULT 0,
-        tax NUMERIC DEFAULT 0,
+        tax_amount NUMERIC DEFAULT 0,
         total NUMERIC DEFAULT 0,
         notes TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
+
+    for (const col of [
+      "quotation_date TEXT",
+      "due_date TEXT",
+      "currency TEXT DEFAULT 'INR'",
+      "company_name TEXT",
+      "company_phone TEXT",
+      "company_gstin TEXT",
+      "company_address TEXT",
+      "company_city TEXT",
+      "company_postal TEXT",
+      "company_state TEXT",
+      "company_email TEXT",
+      "company_pan TEXT",
+      "logo_url TEXT",
+      "client_name TEXT",
+      "client_phone TEXT",
+      "client_gstin TEXT",
+      "client_address TEXT",
+      "client_city TEXT",
+      "client_postal TEXT",
+      "client_state TEXT",
+      "client_email TEXT",
+      "client_pan TEXT",
+      "billing_address TEXT",
+      "shipping_address TEXT",
+      "line_items JSON",
+      "tax_amount NUMERIC DEFAULT 0",
+      "discount NUMERIC DEFAULT 0",
+      "discount_type TEXT DEFAULT 'AMOUNT'",
+      "terms_and_conditions TEXT",
+      "signature_text TEXT",
+      "bank_details JSON",
+      "quotation_number TEXT",
+    ]) {
+      const [colName] = col.split(" ");
+      await db.execute(`ALTER TABLE quotations ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {});
+    }
 
     await db.execute(`
       CREATE TABLE IF NOT EXISTS proforma_invoices (
