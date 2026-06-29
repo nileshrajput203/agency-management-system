@@ -1,5 +1,4 @@
 import { hash } from "bcryptjs";
-import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
@@ -17,12 +16,13 @@ function requireAdminConfig(): { email: string; password: string; name: string }
   }
 
   const resolvedEmail = email ?? "admin@agencyos.com";
-  const resolvedPassword = password ?? randomBytes(16).toString("hex");
+  const DEFAULT_PASSWORD = "Admin@123";
+  const resolvedPassword = password ?? DEFAULT_PASSWORD;
 
-  if (!password && process.env.NODE_ENV !== "production") {
+  if (!password) {
     logger.warn(
-      { email: resolvedEmail },
-      `Bootstrap: ADMIN_PASSWORD not set — generated a one-time password. Set ADMIN_PASSWORD env var to use a fixed password.`
+      { email: resolvedEmail, defaultPassword: DEFAULT_PASSWORD },
+      `Bootstrap: ADMIN_PASSWORD not set — using default password. Set ADMIN_PASSWORD in Replit Secrets to use a custom password.`
     );
   }
 

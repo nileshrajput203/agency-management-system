@@ -14,7 +14,7 @@ import {
   LayoutDashboard, Users, TrendingUp, FolderKanban, CheckSquare,
   Calendar, FileText, Receipt, ClipboardList, Clock, Umbrella,
   UserCog, Settings, Sun, Moon, LogOut, ChevronRight, Briefcase, Flame,
-  FileCheck2, ShoppingCart, Truck
+  ShoppingCart
 } from "lucide-react";
 
 interface NavItem {
@@ -51,9 +51,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: "Invoices", href: "/invoices", icon: <Receipt className="h-4 w-4" /> },
       { label: "Quotations", href: "/quotations", icon: <FileText className="h-4 w-4" /> },
-      { label: "Proforma Invoices", href: "/proforma-invoices", icon: <FileCheck2 className="h-4 w-4" /> },
       { label: "Purchase Orders", href: "/purchase-orders", icon: <ShoppingCart className="h-4 w-4" /> },
-      { label: "Delivery Challans", href: "/delivery-challans", icon: <Truck className="h-4 w-4" /> },
       { label: "Proposals", href: "/proposals", icon: <ClipboardList className="h-4 w-4" /> },
     ],
   },
@@ -104,9 +102,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         "/hawan": "hawan",
         "/invoices": "invoices",
         "/quotations": "quotations",
-        "/proforma-invoices": "proformaInvoices",
         "/purchase-orders": "purchaseOrders",
-        "/delivery-challans": "deliveryChallans",
         "/proposals": "proposals",
         "/attendance": "attendance",
         "/leaves": "leaves",
