@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <style>
+      .bg { fill: #1D1037; }
+      .white-text { fill: #FFFFFF; font-family: 'DejaVu Sans', 'Liberation Sans', 'Arial', sans-serif; }
+      .bold-title { font-weight: 800; font-size: 70px; letter-spacing: -1px; }
+      .sub-title { font-weight: 500; font-size: 26px; letter-spacing: 0px; }
+    </style>
+  </defs>
+
+  <!-- Dark Purple Circle -->
+  <circle cx="256" cy="256" r="256" class="bg" />
+
+  <!-- Content Container -->
+  <g transform="translate(48, 168)">
+    <!-- Arrow 1 -->
+    <path d="M 0 32 Q 0 20 12 20 L 48 20 Q 56 20 62 27 L 102 78 Q 108 85 102 92 L 62 143 Q 56 150 48 150 L 12 150 Q 0 150 0 138 Z" fill="#FFFFFF" />
+
+    <!-- Arrow 2 -->
+    <path d="M 68 32 Q 68 20 80 20 L 116 20 Q 124 20 130 27 L 170 78 Q 176 85 170 92 L 130 143 Q 124 150 116 150 L 80 150 Q 68 150 68 138 Z" fill="#FFFFFF" />
+
+    <!-- Text -->
+    <text x="188" y="72" class="white-text bold-title">Blink</text>
+    <text x="188" y="140" class="white-text bold-title">Beyond</text>
+    <text x="328" y="172" class="white-text sub-title">media.</text>
+  </g>
+</svg>
