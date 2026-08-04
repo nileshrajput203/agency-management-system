@@ -150,7 +150,7 @@ export function TaskActionDialogs({
                 )} />
               </div>
               <div className="space-y-1.5">
-                <Label>Assignee</Label>
+                <Label>Primary Assignee</Label>
                 <Controller control={control} name="assigneeId" render={({ field }) => (
                   <Select value={field.value || "unassigned"} onValueChange={(val) => field.onChange(val === "unassigned" ? "" : val)}>
                     <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
@@ -161,6 +161,15 @@ export function TaskActionDialogs({
                   </Select>
                 )} />
               </div>
+            </div>
+            <div className="relative">
+              <MultiAssigneePicker
+                users={users ?? []}
+                value={createCoAssignees}
+                onChange={setCreateCoAssignees}
+                label="Additional Assignees"
+                placeholder="Select additional team members…"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -279,7 +288,7 @@ export function TaskActionDialogs({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Assignee</Label>
+                <Label>Primary Assignee</Label>
                 <Select name="assigneeId" defaultValue={selectedTaskForAction?.assigneeId || "unassigned"}>
                   <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
                   <SelectContent>
@@ -288,6 +297,17 @@ export function TaskActionDialogs({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            {/* hidden input carries co-assignees as JSON for the native form handler */}
+            <input type="hidden" name="coAssignees" value={JSON.stringify(modifyCoAssignees)} />
+            <div className="relative">
+              <MultiAssigneePicker
+                users={users ?? []}
+                value={modifyCoAssignees}
+                onChange={setModifyCoAssignees}
+                label="Additional Assignees"
+                placeholder="Select additional team members…"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -377,7 +397,7 @@ export function TaskActionDialogs({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Assignee</Label>
+                <Label>Primary Assignee</Label>
                 <Select name="assigneeId" defaultValue={selectedTaskForAction?.assigneeId || "unassigned"}>
                   <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
                   <SelectContent>
@@ -386,6 +406,17 @@ export function TaskActionDialogs({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            {/* hidden input carries co-assignees as JSON for the native form handler */}
+            <input type="hidden" name="coAssignees" value={JSON.stringify(editCoAssignees)} />
+            <div className="relative">
+              <MultiAssigneePicker
+                users={users ?? []}
+                value={editCoAssignees}
+                onChange={setEditCoAssignees}
+                label="Additional Assignees"
+                placeholder="Select additional team members…"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

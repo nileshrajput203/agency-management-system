@@ -77,6 +77,8 @@ export function AdminTasksView() {
     const rawAssigneeId = formData.get("assigneeId") as string;
     const assigneeId = (!rawAssigneeId || rawAssigneeId === "unassigned") ? null : rawAssigneeId;
     const dueDate = formData.get("dueDate") as string || null;
+    const rawCoAssignees = formData.get("coAssignees") as string;
+    const coAssignees = rawCoAssignees ? JSON.parse(rawCoAssignees) : [];
 
     updateMutation.mutate({
       id: selectedTaskForAction.id,
@@ -92,6 +94,7 @@ export function AdminTasksView() {
         status,
         projectId,
         assigneeId,
+        coAssignees,
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
       } as any,
     }, {
@@ -214,6 +217,8 @@ export function AdminTasksView() {
     const rawAssigneeId = formData.get("assigneeId") as string;
     const assigneeId = (!rawAssigneeId || rawAssigneeId === "unassigned") ? null : rawAssigneeId;
     const dueDate = formData.get("dueDate") as string || null;
+    const rawCoAssignees = formData.get("coAssignees") as string;
+    const coAssignees = rawCoAssignees ? JSON.parse(rawCoAssignees) : [];
 
     updateMutation.mutate({
       id: selectedTaskForAction.id,
@@ -229,6 +234,7 @@ export function AdminTasksView() {
         status,
         projectId,
         assigneeId,
+        coAssignees,
         dueDate: dueDate || null,
         approvalStatus: "MODIFIED",
       } as any,

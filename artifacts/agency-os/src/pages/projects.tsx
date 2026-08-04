@@ -21,8 +21,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm, Controller } from "react-hook-form";
 import {
   Plus, FolderKanban, Trash2, Pencil, Calendar, PlayCircle, CheckCircle2, PauseCircle,
-  UserCheck, UserX, Clock, User, AlertCircle, FileText, Check, X, MessageSquare
+  UserCheck, UserX, Clock, User, AlertCircle, FileText, Check, X, MessageSquare, Activity
 } from "lucide-react";
+import { MultiAssigneePicker } from "@/components/common/MultiAssigneePicker";
 import { SearchBar } from "@/components/common/SearchBar";
 import { cn, formatDateOnly } from "@/lib/utils";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -244,6 +245,8 @@ export default function ProjectsPage() {
     defaultValues: { name: "", description: "", status: "NOT_STARTED", priority: "MEDIUM" },
   });
 
+  const [projectCoAssignees, setProjectCoAssignees] = useState<string[]>([]);
+
   const openAdd = () => {
     reset({
       name: "",
@@ -256,6 +259,7 @@ export default function ProjectsPage() {
       assignedTo: "",
       assignmentDescription: "",
     });
+    setProjectCoAssignees([]);
     setEditId(null);
     setDialogOpen(true);
   };
@@ -275,6 +279,7 @@ export default function ProjectsPage() {
       assignedTo: freshP.assignedTo ?? undefined,
       assignmentDescription: freshP.assignmentDescription ?? "",
     });
+    setProjectCoAssignees(Array.isArray((freshP as any).coAssignees) ? (freshP as any).coAssignees : []);
     setDialogOpen(true);
     console.log("[Projects] Edit modal opened. Current editId:", freshP.id);
   };
@@ -290,6 +295,7 @@ export default function ProjectsPage() {
       dueDate: data.dueDate || null,
       assignedTo: data.assignedTo && data.assignedTo !== "none" && data.assignedTo !== "" ? data.assignedTo : null,
       assignmentDescription: data.assignmentDescription || null,
+      coAssignees: projectCoAssignees,
     };
     if (editId) {
       updateMutation.mutate({ id: editId, data: payload });
@@ -527,15 +533,36 @@ export default function ProjectsPage() {
                     </div>
 
                     {/* Assignment details section */}
-                    {(p.assignedEmployeeName || p.assignedTo) && (
+                    {(p.assignedEmployeeName || p.assignedTo || ((p as any).coAssignees?.length > 0)) && (
                       <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 text-xs space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-muted-foreground flex items-center gap-1 font-medium">
-                            <User className="h-3.5 w-3.5 text-primary shrink-0" />
-                            Assigned To:
-                          </span>
-                          <span className="font-semibold text-foreground truncate">{p.assignedEmployeeName || "Employee"}</span>
-                        </div>
+                        {(p.assignedEmployeeName || p.assignedTo) && (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-muted-foreground flex items-center gap-1 font-medium">
+                              <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                              Assigned To:
+                            </span>
+                            <span className="font-semibold text-foreground truncate">{p.assignedEmployeeName || "Employee"}</span>
+                          </div>
+                        )}
+
+                        {Array.isArray((p as any).coAssignees) && (p as any).coAssignees.length > 0 && (
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-muted-foreground flex items-center gap-1 font-medium shrink-0">
+                              <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                              Also:
+                            </span>
+                            <span className="flex flex-wrap gap-1 justify-end">
+                              {(p as any).coAssignees.map((id: string) => {
+                                const u = (users ?? []).find((usr) => usr.id === id);
+                                return u ? (
+                                  <span key={id} className="inline-flex items-center bg-primary/10 text-primary px-1.5 py-0.5 rounded-full text-[10px] font-medium">
+                                    {u.name.split(" ")[0]}
+                                  </span>
+                                ) : null;
+                              })}
+                            </span>
+                          </div>
+                        )}
 
                         {p.assignmentDescription && (
                           <div className="pt-1 border-t border-border/40 text-muted-foreground leading-relaxed">
@@ -679,7 +706,7 @@ export default function ProjectsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label>Assigned Employee</Label>
+                <Label>Primary Assignee</Label>
                 <Controller
                   control={control}
                   name="assignedTo"
@@ -696,6 +723,16 @@ export default function ProjectsPage() {
                   )}
                 />
               </div>
+            </div>
+
+            <div className="relative">
+              <MultiAssigneePicker
+                users={(users ?? []).map((u) => ({ id: u.id, name: u.name, systemRole: u.systemRole ?? undefined }))}
+                value={projectCoAssignees}
+                onChange={setProjectCoAssignees}
+                label="Additional Assignees"
+                placeholder="Select additional team members…"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
