@@ -182,28 +182,28 @@ export function UserAccessManagement() {
                   <CardContent className="p-5 space-y-4">
                     {/* User Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3 border-border/60">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className={cn("h-10 w-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0", u.isDelegatedAdmin ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
                           {u.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-sm">{u.name}</h3>
-                            {isSelf && <Badge variant="outline" className="text-[10px] py-0 px-1.5">You</Badge>}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-sm truncate">{u.name}</h3>
+                            {isSelf && <Badge variant="outline" className="text-[10px] py-0 px-1.5 shrink-0">You</Badge>}
                             {u.isDelegatedAdmin && (
-                              <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-[10px] gap-1">
+                              <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 text-[10px] gap-1 shrink-0">
                                 <Sparkles className="h-3 w-3" /> Delegated Admin
                               </Badge>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground">{u.email}</p>
+                          <p className="text-xs text-muted-foreground truncate">{u.email}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 shrink-0">
                         <div className="text-right">
                           <p className="text-[11px] text-muted-foreground">Primary Role</p>
-                          <Badge variant="secondary" className="text-xs font-medium">
+                          <Badge variant="secondary" className="text-xs font-medium whitespace-nowrap">
                             {ROLE_LABELS[u.systemRole] || u.systemRole}
                           </Badge>
                         </div>
@@ -211,7 +211,7 @@ export function UserAccessManagement() {
                         {/* Grant Delegated Access Toggle */}
                         <div className="flex items-center gap-2 border-l pl-3 border-border/80">
                           <div className="text-right">
-                            <p className="text-xs font-semibold leading-tight">Grant Administrative Access</p>
+                            <p className="text-xs font-semibold leading-tight whitespace-nowrap">Grant Admin Access</p>
                             <p className="text-[10px] text-muted-foreground">{u.isDelegatedAdmin ? "ON" : "OFF"}</p>
                           </div>
                           <Switch
@@ -319,16 +319,23 @@ export function UserAccessManagement() {
                       </div>
                     ) : (
                       /* Standard User Module Access Summary */
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Assigned Modules ({u.allowedModules?.length || 0}):</span>
-                        <div className="flex flex-wrap gap-1">
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Assigned Modules
+                          {(u.allowedModules?.length ?? 0) > 0 && (
+                            <span className="ml-1 text-[10px] bg-muted rounded-full px-1.5 py-0.5">
+                              {u.allowedModules.length}
+                            </span>
+                          )}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
                           {(u.allowedModules || []).map((mod: string) => (
-                            <Badge key={mod} variant="outline" className="text-[10px] uppercase">
+                            <Badge key={mod} variant="outline" className="text-[10px] uppercase tracking-wide">
                               {mod}
                             </Badge>
                           ))}
                           {(!u.allowedModules || u.allowedModules.length === 0) && (
-                            <span className="italic text-[11px]">Standard Employee View</span>
+                            <span className="text-[11px] text-muted-foreground italic">Standard Employee View — no module restrictions</span>
                           )}
                         </div>
                       </div>
