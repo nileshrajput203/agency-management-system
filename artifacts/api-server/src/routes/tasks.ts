@@ -79,10 +79,10 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
       approvedAt: tasksTable.approvedAt,
       rejectionReason: tasksTable.rejectionReason,
       requestedAt: tasksTable.requestedAt,
-      coAssignees: (tasksTable as any).coAssignees,
-      assignmentNote: (tasksTable as any).assignmentNote,
-      managerApprovedBy: (tasksTable as any).managerApprovedBy,
-      managerApprovedAt: (tasksTable as any).managerApprovedAt,
+      coAssignees: tasksTable.coAssignees,
+      assignmentNote: tasksTable.assignmentNote,
+      managerApprovedBy: tasksTable.managerApprovedBy,
+      managerApprovedAt: tasksTable.managerApprovedAt,
     })
     .from(tasksTable)
     .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))

@@ -174,6 +174,18 @@ export async function ensureSubprojectsTable(): Promise<void> {
       review_comment TEXT,
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS project_requests (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      requested_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      request_type TEXT NOT NULL,
+      title TEXT,
+      description TEXT NOT NULL,
+      status TEXT DEFAULT 'PENDING' NOT NULL,
+      admin_notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
     )`
   ];
 

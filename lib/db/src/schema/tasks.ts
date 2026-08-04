@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { projectsTable } from "./projects";
@@ -28,6 +28,12 @@ export const tasksTable = pgTable("tasks", {
   rejectionReason: text("rejection_reason"),
   requestedAt: timestamp("requested_at"),
   
+  // Extended workflow fields (added via bootstrap; must mirror DB columns)
+  coAssignees: jsonb("co_assignees").default([]),
+  assignmentNote: text("assignment_note"),
+  managerApprovedBy: text("manager_approved_by").references(() => usersTable.id, { onDelete: "set null" }),
+  managerApprovedAt: timestamp("manager_approved_at"),
+
   // Audit fields
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
