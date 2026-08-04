@@ -83,7 +83,7 @@ export default function ProjectsPage() {
   const qc = useQueryClient();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ACTIVE");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [viewProjectModalTarget, setViewProjectModalTarget] = useState<any | null>(null);
@@ -336,7 +336,8 @@ export default function ProjectsPage() {
   };
 
   const filtered = (projects ?? []).filter((p) => {
-    if (statusFilter !== "ALL" && p.status !== statusFilter) return false;
+    if (statusFilter === "ACTIVE" && (p.status === "COMPLETED" || p.status === "CANCELLED")) return false;
+    if (statusFilter !== "ALL" && statusFilter !== "ACTIVE" && p.status !== statusFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       const matchName = p.name.toLowerCase().includes(q);
@@ -422,11 +423,12 @@ export default function ProjectsPage() {
           onChange={setSearch}
           className="flex-1 min-w-48 max-w-72"
         />
-        <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val ?? "ALL")}>
-          <SelectTrigger className="w-44">
+        <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val ?? "ACTIVE")}>
+          <SelectTrigger className="w-48">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="ACTIVE">Active Projects</SelectItem>
             <SelectItem value="ALL">All Statuses</SelectItem>
             {Object.entries(STATUS_CONFIG).map(([k, v]) => (
               <SelectItem key={k} value={k}>{v.label}</SelectItem>
@@ -448,11 +450,11 @@ export default function ProjectsPage() {
           </div>
           <p className="font-semibold text-foreground">No projects found</p>
           <p className="text-sm text-muted-foreground mt-1">
-            {search || statusFilter !== "ALL"
+            {search || statusFilter !== "ACTIVE"
               ? "Try adjusting your search or status filter"
-              : "Create your first project to get started"}
+              : "All active projects are complete — switch to \"All Statuses\" to see archived ones"}
           </p>
-          {!search && statusFilter === "ALL" && isAdmin && (
+          {!search && statusFilter === "ACTIVE" && isAdmin && (
             <Button onClick={openAdd} className="mt-4 gap-2 btn-micro-anim" size="sm">
               <Plus className="h-4 w-4" /> New Project
             </Button>

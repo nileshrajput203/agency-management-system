@@ -1,0 +1,111 @@
+# Agency Management Platform — Refined Requirements
+
+*Consolidated from your written list + the voice note (30 Jul). De-duplicated and grouped by module. 24 items — 17 features, 4 bugs, 2 feature/bug fixes, 1 standing quality bar.*
+
+*(Your written notes contained two numbered lists — items 1–8, then a second list restarting at 1 inside item 8. Tags below mark origin: `[#n]` = first list, `[inner #n]` = second list.)*
+
+**How to use:** hand this file to your developer or coding AI as-is. Tick the checkbox on anything already built before sharing, so the remaining scope is clear.
+
+## System context (inferred — confirm if wrong)
+Internal platform for a content/marketing agency: task & project management (with sub-projects, e.g. reels), a 2-step approval workflow, an internal + client-facing content calendar, employee attendance, a leads/CRM module, and client documents (quotation/invoice/proposal) with reporting.
+
+---
+
+## 1. Tasks & Projects
+
+- [ ] **1.1 Multiple assignees per task** — Feature `[#1]`
+  A task must support more than one assignee, not just one.
+
+- [ ] **1.2 Sub-projects** — Feature `[#6]`
+  A project can contain multiple sub-projects, each tracked individually. E.g. a "6 Reels" project = 1 parent project + 6 sub-projects, one per reel.
+
+- [ ] **1.3 More detail fields on task/project** — Feature `[#7]`
+  Task/project view needs richer detail fields. *Exact fields not specified in source notes — confirm with client.*
+
+- [ ] **1.4 "Completed" status hides the project** — Feature `[#5]`
+  Add a Completed status for projects. Completed projects drop out of the default/active list into an archive or "Completed" filter, instead of staying visible.
+
+- [ ] **1.5 Deadline/start time shown on task & project cards** — Feature `[#15]`
+  Cards in list/board view should show deadline, start time, and assignee(s) directly, without opening the item.
+
+- [ ] **1.6 Date bug when editing task/project** — Bug `[inner #4]`
+  Updating a task or project mishandles its date. *Repro steps needed before fixing.*
+
+## 2. Assignment, Approval & Notifications
+
+- [ ] **2.1 Two-step approval** — Feature `[#2, duplicate of inner #6]`
+  Manager approval → final/admin approval, then the item moves to the next stage (e.g. assigned to an editor). Applies to task and project completion.
+
+- [ ] **2.2 Self-assignment breaks approval/notification** — Bug `[#4]`
+  When a manager assigns a task to themself, approval and/or the assignment notification misbehaves. Approval logic should work identically regardless of who does the assigning.
+
+- [ ] **2.3 Per-assignment note/reminder** — Feature `[#3]`
+  Let a note or reminder be attached to one person's assignment on a task.
+
+- [ ] **2.4 Notify on assignment/approval** — Feature `[inner #11]`
+  Employee gets notified when a task is assigned to them, and again when it's approved.
+
+- [ ] **2.5 Schedule a meeting/note assigned to a person** — Feature `[inner #5]`
+  Separate from a task: schedule a meeting or an important note and assign it to someone.
+
+## 3. Content Calendar
+
+- [ ] **3.1 Downloadable calendar link** — Feature `[#8]`
+  Exportable/shareable calendar listing items by date (e.g. "Reel 1 / Post 1" on a given date).
+
+- [ ] **3.2 Items leak into the wrong month** — Bug `[inner #1]`
+  A post/idea dated e.g. 7 July also incorrectly shows up in August. Calendar must filter by exact date, not day-of-month.
+
+- [ ] **3.3 Client-facing shareable calendar** — Feature `[inner #13]`
+  A link clients can open to see their scheduled posts/ideation and leave change suggestions directly on it.
+
+## 4. Attendance
+
+- [ ] **4.1 Break tracking + total hours** — Feature/Bug `[inner #2]`
+  No way to log a break, and total worked hours isn't calculating/showing as a result.
+
+- [ ] **4.2 Attendance logs restricted by role** — Feature `[inner #2]`
+  Only admins (or roles explicitly granted access) should see attendance logs — not all employees.
+
+- [ ] **4.3 Check-in/out log missing employee name** — Bug `[inner #3]`
+  Log entries don't show whose check-in/check-out it is.
+
+- [ ] **4.4 Auto-mark absent** — Feature `[inner #7]`
+  No check-in recorded for the day → automatically mark that employee absent.
+
+## 5. Leads / CRM
+
+- [ ] **5.1 Lead notes/description field** — Feature `[inner #8]`
+  Free-text field per lead for location, current work, research — reviewable before calling the lead.
+
+- [ ] **5.2 Remove the 50-lead cap** — Bug/Config `[inner #12]`
+  Leads are currently capped at 50 stored records. Raise or remove. *Confirm target number, or unlimited.*
+
+## 6. Business Documents
+
+- [ ] **6.1 Letterhead-based quotation & invoice** — Feature `[inner #9]`
+  Generate quotations/invoices formatted on the company letterhead.
+
+- [ ] **6.2 Auto-generated client proposal** — Feature `[inner #10]`
+  Short guided Q&A → auto-produces a complete, formatted client proposal.
+
+## 7. Reporting
+
+- [ ] **7.1 One-click monthly employee report** — Feature `[#15]`
+  Auto-generated monthly report per employee from completed work, one-click download — used to identify who's lagging.
+
+## 8. System-wide
+
+- [ ] **8.1 Stability & performance** — NFR `[inner #14]`
+  Efficient database, stable connections, no recurring errors. A standing bar across every module above, not a one-off fix.
+
+---
+
+## Before you hand this off
+- **1.3** — which fields count as "detail"?
+- **1.6 / 2.2** — need repro steps for both bugs.
+- **5.2** — raise the cap to a specific number, or make it unlimited?
+- **2.1** — treated original item #2 and inner #6 as the same requirement; flag if that's wrong.
+
+## From the voice note
+Audio (auto-transcribed) walks through your list in the same order, roughly items 1.1 through 3.1, and confirms two-step approval = **manager → final approval**, then the task moves on (e.g. to an editor). Transcription quality drops in the last ~15 seconds — worth a manual re-listen in case anything important is there.

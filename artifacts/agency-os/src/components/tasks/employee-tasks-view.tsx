@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { useForm, Controller } from "react-hook-form";
 import {
-  Plus, Trash2, Calendar, CheckSquare, CheckCircle2, Edit3, FileText
+  Plus, Trash2, Calendar, CheckSquare, CheckCircle2, Edit3, FileText, EyeOff, Eye
 } from "lucide-react";
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,7 @@ export function EmployeeTasksView() {
   const qc = useQueryClient();
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [hideCompleted, setHideCompleted] = useState(true);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [employeeEditDialogOpen, setEmployeeEditDialogOpen] = useState(false);
   const [selectedTaskForActionState, setSelectedTaskForAction] = useState<any | null>(null);
@@ -165,6 +166,7 @@ export function EmployeeTasksView() {
   );
 
   const filteredAssigned = assignedTasks.filter((t) => {
+    if (hideCompleted && t.status === "DONE") return false;
     if (priorityFilter !== "ALL" && t.priority !== priorityFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -229,6 +231,16 @@ export function EmployeeTasksView() {
               <SelectItem value="URGENT">Urgent</SelectItem>
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setHideCompleted(!hideCompleted)}
+            className="gap-2 text-xs"
+            title={hideCompleted ? "Show completed tasks" : "Hide completed tasks"}
+          >
+            {hideCompleted ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+            {hideCompleted ? "Show Done" : "Hide Done"}
+          </Button>
           <Button onClick={openRequestDialog} className="gap-2 btn-micro-anim bg-primary hover:bg-primary/95 font-semibold" id="employee-request-task-btn">
             <Plus className="h-4 w-4" /> Request Task
           </Button>

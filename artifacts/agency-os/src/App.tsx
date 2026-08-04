@@ -391,6 +391,7 @@ import PurchaseOrdersPage from "@/pages/purchase-orders";
 import ExcelReportsPage from "@/pages/excel-reports";
 import NotificationsPage from "@/pages/notifications";
 import WorkReportsPage from "@/pages/work-reports";
+import PerformanceReportPage from "@/pages/performance-report";
 
 // ─── Employee Portal imports ────────────────────────────────────
 import EmployeeLayout from "@/pages/employee/layout";
@@ -677,6 +678,15 @@ function AppRouter() {
           <ProtectedRoute>
             <DashboardLayout>
               <WorkReportsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/performance-report">
+        {() => (
+          <ProtectedRoute>
+            <DashboardLayout>
+              <PerformanceReportPage />
             </DashboardLayout>
           </ProtectedRoute>
         )}

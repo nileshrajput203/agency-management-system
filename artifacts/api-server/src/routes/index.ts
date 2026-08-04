@@ -27,6 +27,7 @@ import meetingsRouter from "./meetings";
 import notificationsRouter from "./notifications";
 import employeesRouter from "./employees";
 import workReportsRouter from "./workReports";
+import performanceRouter from "./performance";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -62,5 +63,6 @@ router.use("/meetings", meetingsRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/employees", employeesRouter);
 router.use("/work-reports", workReportsRouter);
+router.use("/performance", performanceRouter);
 
 export default router;

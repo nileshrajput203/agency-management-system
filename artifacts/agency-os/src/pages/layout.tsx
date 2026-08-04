@@ -13,7 +13,7 @@ import {
 import {
   LayoutDashboard, Users, TrendingUp, FolderKanban, CheckSquare,
   Calendar, Receipt, FileText, ShoppingCart, ClipboardList, Clock, Umbrella,
-  UserCog, Settings, Sun, Moon, LogOut, ChevronRight, Briefcase, Flame, Sheet, CalendarDays,
+  UserCog, Settings, Sun, Moon, LogOut, ChevronRight, Briefcase, Flame, Sheet, CalendarDays, BarChart3,
 } from "lucide-react";
 import { NotificationsPopover } from "@/components/common/NotificationsPopover";
 import { CompanyLogo } from "@/components/common/CompanyLogo";
@@ -64,6 +64,7 @@ const navGroups: NavGroup[] = [
     label: "People & HR",
     items: [
       { label: "Work Reports", href: "/work-reports", icon: <FileText className="h-4 w-4 text-emerald-500" /> },
+      { label: "Performance Report", href: "/performance-report", icon: <BarChart3 className="h-4 w-4 text-violet-500" /> },
       { label: "Attendance", href: "/attendance", icon: <Clock className="h-4 w-4" /> },
       { label: "Leave Management", href: "/leaves", icon: <Umbrella className="h-4 w-4" /> },
       { label: "Team & Roles", href: "/users", icon: <UserCog className="h-4 w-4" /> },
@@ -123,6 +124,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         "/attendance",
         "/leaves",
         "/work-reports",
+        "/performance-report",
       ];
 
       if (standardWorkspacePaths.includes(item.href)) {
