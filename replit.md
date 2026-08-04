@@ -10,7 +10,7 @@ All-in-one agency management platform for managing clients, projects, tasks, inv
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required env: `NEON_DATABASE_URL` — Neon Postgres connection string (set as Replit Secret); takes priority over Replit-managed `DATABASE_URL`
 
 ## Stack
 
@@ -49,7 +49,9 @@ Modules: Clients, Projects, Tasks (Kanban), Content Calendar, Invoices, Quotatio
 
 ## Gotchas
 
-- `pnpm install` from repo root times out in Replit agent shell; use `pnpm add --filter @workspace/xxx` per package instead
+- `pnpm install` works from root with `.npmrc` containing `link-workspace-packages=true` (required so `@workspace/*` deps resolve locally instead of hitting the registry)
+- `artifacts/desktop-app` must be excluded from `pnpm-workspace.yaml` — its `electron-builder` dep pulls in `tar` which is blocked in Replit
+- `artifacts/api-server/src/index.ts` port must read `process.env.PORT`; hardcoded `3000` was the original bug fixed during import setup
 - `drizzle-kit` binary is at `lib/db/node_modules/.bin/drizzle-kit` — run DB push from `lib/db/` dir: `node_modules/.bin/drizzle-kit push --config ./drizzle.config.ts`
 - Orval codegen fails with Node 20 (`js-yaml` ESM issue) — update generated files manually in `lib/api-client-react/src/generated/api.schemas.ts` and `lib/api-zod/src/generated/types/`
 - After `pnpm store prune`, run `pnpm add --filter @workspace/agency-os @base-ui/react` to restore the package (pnpm store was corrupted)

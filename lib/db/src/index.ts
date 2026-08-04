@@ -43,7 +43,7 @@ if (!envLoaded && fs.existsSync("/.env")) {
 
 const POPULATED_NEON_URL = "postgresql://postgres.dndbbrhkrffxkvqiiujw:agency_123management@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres";
 
-let databaseUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || POPULATED_NEON_URL;
+let databaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || POPULATED_NEON_URL;
 if (databaseUrl) {
   let cleanUrl = databaseUrl.trim();
   if (cleanUrl.includes("agency@123management")) {

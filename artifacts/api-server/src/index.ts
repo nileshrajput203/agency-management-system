@@ -25,7 +25,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { bootstrapDatabase } from "./lib/bootstrap";
 
-const port = 3000;
+const port = parseInt(initialPort || process.env["PORT"] || "3000", 10);
 
 const server = app.listen(port, "0.0.0.0", () => {
   logger.info({ port }, `Server listening on http://0.0.0.0:${port}`);
