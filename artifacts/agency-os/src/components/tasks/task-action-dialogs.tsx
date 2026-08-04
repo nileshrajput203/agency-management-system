@@ -176,6 +176,10 @@ export function TaskActionDialogs({
               <Label>Notes</Label>
               <Textarea {...register("notes")} rows={2} placeholder="Additional notes..." />
             </div>
+            <div className="space-y-1.5">
+              <Label>Assignment Note <span className="text-muted-foreground text-xs">(visible to assignee)</span></Label>
+              <Textarea {...register("assignmentNote" as any)} rows={2} placeholder="Reminder or instruction for the assignee…" />
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isCreatePending} className="font-semibold">Create Task</Button>
@@ -299,6 +303,10 @@ export function TaskActionDialogs({
               <Label>Notes</Label>
               <Textarea name="notes" rows={2} defaultValue={selectedTaskForAction?.notes || ""} />
             </div>
+            <div className="space-y-1.5">
+              <Label>Assignment Note <span className="text-muted-foreground text-xs">(reminder for assignee)</span></Label>
+              <Textarea name="assignmentNote" rows={2} defaultValue={selectedTaskForAction?.assignmentNote || ""} placeholder="Instruction or reminder for the assignee…" />
+            </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setModifyDialogOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isUpdatePending} className="font-semibold">Modify & Approve</Button>
@@ -392,6 +400,10 @@ export function TaskActionDialogs({
             <div className="space-y-1.5">
               <Label>Notes</Label>
               <Textarea name="notes" rows={2} defaultValue={selectedTaskForAction?.notes || ""} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Assignment Note <span className="text-muted-foreground text-xs">(reminder for assignee)</span></Label>
+              <Textarea name="assignmentNote" rows={2} defaultValue={selectedTaskForAction?.assignmentNote || ""} placeholder="Instruction or reminder for the assignee…" />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setAdminEditDialogOpen(false)}>Cancel</Button>

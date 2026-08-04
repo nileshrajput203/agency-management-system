@@ -32,15 +32,19 @@ function sanitizeTask(body: any, isUpdate = false) {
       throw createError("Task title cannot be empty", 400, undefined, "title");
     }
   }
-  return sanitizeAndValidate(body, {
-    uuids: ["projectId", "assigneeId", "parentId", "requestedBy", "approvedBy"],
-    dates: ["startDate", "dueDate", "approvedAt", "requestedAt"],
+  const result = sanitizeAndValidate(body, {
+    uuids: ["projectId", "assigneeId", "parentId", "requestedBy", "approvedBy", "managerApprovedBy"],
+    dates: ["startDate", "dueDate", "approvedAt", "requestedAt", "managerApprovedAt"],
     enums: {
       status: ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE", "BLOCKED", "COMPLETED"],
       priority: ["LOW", "MEDIUM", "HIGH", "URGENT"],
-      approvalStatus: ["PENDING", "APPROVED", "REJECTED", "MODIFIED"],
+      approvalStatus: ["PENDING", "APPROVED", "REJECTED", "MODIFIED", "MANAGER_APPROVED"],
     },
   });
+  // Pass through non-sensitive string fields not in the validator
+  if (body.assignmentNote !== undefined) result.assignmentNote = String(body.assignmentNote || "").slice(0, 2000);
+  if (body.coAssignees !== undefined) result.coAssignees = Array.isArray(body.coAssignees) ? body.coAssignees : [];
+  return result;
 }
 
 router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
@@ -75,6 +79,10 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
       approvedAt: tasksTable.approvedAt,
       rejectionReason: tasksTable.rejectionReason,
       requestedAt: tasksTable.requestedAt,
+      coAssignees: (tasksTable as any).coAssignees,
+      assignmentNote: (tasksTable as any).assignmentNote,
+      managerApprovedBy: (tasksTable as any).managerApprovedBy,
+      managerApprovedAt: (tasksTable as any).managerApprovedAt,
     })
     .from(tasksTable)
     .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
@@ -267,6 +275,9 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
   } else {
     // Admin / Manager is modifying/approving
     if (sanitized.approvalStatus !== "REJECTED") {
+      const isManagerRole = ["MANAGER", "ACCOUNT_MANAGER"].includes(requesterSystemRole ?? "");
+      const isFinalApprover = ["SUPER_ADMIN", "ADMIN"].includes(requesterSystemRole ?? "");
+
       if (
         task.approvalStatus === "PENDING" ||
         sanitized.status === "DONE" ||
@@ -275,9 +286,24 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
         sanitized.approvalStatus === "MODIFIED" ||
         !sanitized.approvalStatus
       ) {
-        sanitized.approvalStatus = sanitized.approvalStatus || "APPROVED";
-        sanitized.approvedBy = requesterId;
-        sanitized.approvedAt = new Date();
+        // Two-step: Manager first approval → MANAGER_APPROVED; Admin/SuperAdmin → APPROVED
+        if (task.approvalStatus === "PENDING" && isManagerRole && !isFinalApprover) {
+          // First step: Manager approval
+          sanitized.approvalStatus = "MANAGER_APPROVED";
+          sanitized.managerApprovedBy = requesterId;
+          sanitized.managerApprovedAt = new Date();
+          // Don't set approvedBy/approvedAt yet — that's the final step
+        } else {
+          // Final approval (admin, super_admin, or manager approving MANAGER_APPROVED tasks)
+          sanitized.approvalStatus = sanitized.approvalStatus || "APPROVED";
+          sanitized.approvedBy = requesterId;
+          sanitized.approvedAt = new Date();
+          // Preserve manager approval if it was already set
+          if (!sanitized.managerApprovedBy && (task as any).managerApprovedBy) {
+            sanitized.managerApprovedBy = (task as any).managerApprovedBy;
+            sanitized.managerApprovedAt = (task as any).managerApprovedAt;
+          }
+        }
       }
 
       if (!sanitized.assigneeId && !task.assigneeId) {
@@ -308,8 +334,8 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
     const [emp] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, requesterId));
     const empName = emp?.name || "An employee";
 
-    // 1. Assignee changed
-    if (row.assigneeId && row.assigneeId !== task.assigneeId && row.assigneeId !== requesterId) {
+    // 1. Assignee changed — notify even if self-assigned (manager assigning to themselves)
+    if (row.assigneeId && row.assigneeId !== task.assigneeId) {
       await NotificationService.createNotification({
         userId: row.assigneeId,
         title: "📋 Task Assigned",
@@ -326,7 +352,20 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
 
     // 2. Approval status changed
     if (sanitized.approvalStatus && sanitized.approvalStatus !== task.approvalStatus && task.requestedBy) {
-      if (sanitized.approvalStatus === "APPROVED" && task.requestedBy !== requesterId) {
+      if (sanitized.approvalStatus === "MANAGER_APPROVED" && task.requestedBy !== requesterId) {
+        await NotificationService.createNotification({
+          userId: task.requestedBy,
+          title: "⏳ Task Awaiting Final Approval",
+          message: `Your task "${row.title}" was approved by your manager and is pending final approval`,
+          type: "TASK",
+          priority: "MEDIUM",
+          referenceId: row.id,
+          referenceType: "TASK",
+          createdBy: requesterId,
+          action: "View Task",
+          actionUrl: "/tasks",
+        });
+      } else if (sanitized.approvalStatus === "APPROVED" && task.requestedBy !== requesterId) {
         await NotificationService.createNotification({
           userId: task.requestedBy,
           title: "✅ Task Approved",

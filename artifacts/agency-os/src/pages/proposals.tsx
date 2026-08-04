@@ -89,9 +89,37 @@ export default function ProposalsPage() {
     },
   });
 
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
   const { register, handleSubmit, control, reset, setValue } = useForm<ProposalFormData>({
     defaultValues: { title: "", clientId: "", status: "DRAFT", template: "social" },
   });
+
+  const getAuthToken = () =>
+    localStorage.getItem("agency_token") || localStorage.getItem("token") || localStorage.getItem("auth_token") || "";
+
+  const handleAiGenerate = async (clientName: string, template: string) => {
+    setIsAiGenerating(true);
+    try {
+      const res = await fetch("/api/ai/fill-form", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getAuthToken()}` },
+        body: JSON.stringify({
+          context: "proposal",
+          fields: ["title", "notes"],
+          hints: { clientName, template: TEMPLATE_CONFIG[template] ?? template },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "AI generation failed");
+      if (data.title) setValue("title", data.title, { shouldDirty: true });
+      if (data.notes) setValue("notes", data.notes, { shouldDirty: true });
+      toast.success("AI generated proposal outline — review and customise before sending");
+    } catch (err: any) {
+      toast.error(err.message || "AI generation failed");
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
 
   const openAdd = () => {
     reset({ title: "", clientId: "", status: "DRAFT", template: "social", notes: "" });
@@ -234,8 +262,7 @@ export default function ProposalsPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
             <WriteWithAI
               context="proposal"
-              onFill={(fields) => {
-                if (fields.title) setValue("title", fields.title, { shouldDirty: true });
+              onFill={(fields) => {                if (fields.title) setValue("title", fields.title, { shouldDirty: true });
                 if (fields.notes) setValue("notes", fields.notes, { shouldDirty: true });
               }}
             />

@@ -53,12 +53,22 @@ const CONTENT_COLUMNS = {
 };
 
 router.get("/", requirePermission("content.view"), asyncHandler(async (req, res) => {
-  const { clientId } = req.query as Record<string, string>;
+  const { clientId, month } = req.query as Record<string, string>;
+
+  // Build WHERE conditions
+  const conditions = [];
+  if (clientId) conditions.push(eq(contentPostsTable.clientId, clientId));
+  // Filter by month (yyyy-MM) — scheduledAt is stored as text "yyyy-MM-dd"
+  if (month && /^\d{4}-\d{2}$/.test(month)) {
+    const { like } = await import("drizzle-orm");
+    conditions.push(like(contentPostsTable.scheduledAt, `${month}%`));
+  }
+
   const rows = await db
     .select(CONTENT_COLUMNS)
     .from(contentPostsTable)
     .leftJoin(clientsTable, eq(contentPostsTable.clientId, clientsTable.id))
-    .where(clientId ? eq(contentPostsTable.clientId, clientId) : undefined);
+    .where(conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : (await import("drizzle-orm")).and(...conditions)) : undefined);
   return res.json(rows);
 }));
 

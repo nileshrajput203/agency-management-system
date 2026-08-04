@@ -260,7 +260,7 @@ export function AdminTasksView() {
 
   const byStatus = (status: string) => filteredActive.filter((t) => t.status === status);
 
-  const pendingTasks = (tasks ?? []).filter((t) => t.approvalStatus === "PENDING");
+  const pendingTasks = (tasks ?? []).filter((t) => t.approvalStatus === "PENDING" || t.approvalStatus === "MANAGER_APPROVED");
   const filteredPending = pendingTasks.filter((t) => {
     if (priorityFilter !== "ALL" && t.priority !== priorityFilter) return false;
     if (searchQuery) {
@@ -311,6 +311,8 @@ export function AdminTasksView() {
         return <Badge className="bg-rose-100 text-rose-800 border-rose-200">Rejected</Badge>;
       case "MODIFIED":
         return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Modified</Badge>;
+      case "MANAGER_APPROVED":
+        return <Badge className="bg-violet-100 text-violet-800 border-violet-200">Manager Approved</Badge>;
       default:
         return <Badge className="bg-slate-100 text-slate-800 border-slate-200">Approved</Badge>;
     }

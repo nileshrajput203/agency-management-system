@@ -210,16 +210,43 @@ export default function AttendancePage() {
             Daily check-in, break tracking, live board & history logs
           </p>
         </div>
-        {isUserAdminOrManager && (attendanceHistory ?? []).length > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={() => exportAttendanceCSV(attendanceHistory ?? [])}
-          >
-            <Download className="h-4 w-4" /> Export CSV
-          </Button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {isUserAdminOrManager && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-400 dark:hover:bg-rose-950/20"
+              onClick={async () => {
+                try {
+                  const token = localStorage.getItem("agency_token") || localStorage.getItem("auth_token") || localStorage.getItem("token") || "";
+                  const res = await fetch("/api/attendance/process-absent", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ date: new Date().toISOString().slice(0, 10) }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.error || "Failed");
+                  toast.success(`Absent records processed: ${data.processed ?? 0} employees marked`);
+                  qc.invalidateQueries({ queryKey: getListAttendanceQueryKey() });
+                } catch (err: any) {
+                  toast.error(err.message || "Failed to process absent records");
+                }
+              }}
+            >
+              <AlertTriangle className="h-4 w-4" /> Mark Absent (Today)
+            </Button>
+          )}
+          {isUserAdminOrManager && (attendanceHistory ?? []).length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => exportAttendanceCSV(attendanceHistory ?? [])}
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
