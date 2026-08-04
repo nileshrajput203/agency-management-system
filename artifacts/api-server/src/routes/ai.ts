@@ -52,10 +52,24 @@ async function generateWithAI(systemPrompt: string, userPrompt: string): Promise
 
   if (openaiKey) {
     if (!openaiClient) {
-      openaiClient = new OpenAI({ apiKey: openaiKey });
+      // Support OpenRouter keys (sk-or-*) or standard OpenAI keys
+      const isOpenRouter = openaiKey.startsWith("sk-or-") || openaiKey.includes("openrouter");
+      openaiClient = new OpenAI({
+        apiKey: openaiKey,
+        baseURL: isOpenRouter ? "https://openrouter.ai/api/v1" : "https://api.openai.com/v1",
+        defaultHeaders: isOpenRouter
+          ? {
+              "HTTP-Referer": "https://agencyos.app",
+              "X-Title": "AgencyOS",
+            }
+          : {},
+      });
     }
+    // Use a model available on both OpenRouter and OpenAI
+    const isOpenRouter = openaiKey.startsWith("sk-or-") || openaiKey.includes("openrouter");
+    const model = isOpenRouter ? "google/gemini-2.5-flash" : "gpt-4o-mini";
     const completion = await openaiClient.chat.completions.create({
-      model: "gpt-4o-mini",
+      model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

@@ -5,24 +5,33 @@ description: Known quirks and fixes for the AgencyOS Replit development environm
 
 ## drizzle-kit location
 - Binary is at `lib/db/node_modules/.bin/drizzle-kit` — NOT in root node_modules
-- Run DB push: `cd lib/db && node_modules/.bin/drizzle-kit push --config ./drizzle.config.ts`
+- Run DB push from REPO ROOT: `lib/db/node_modules/.bin/drizzle-kit push --config ./lib/db/drizzle.config.ts`
+- drizzle-kit push hangs in interactive mode in Replit shell (no TTY) — always add a pseudo-TTY wrapper: `script -q -c '...' /dev/null`
+- If drizzle-kit prompts about truncating tables for unique constraints, rename constraints directly via SQL instead (rename `*_key` → `*_unique` pattern)
 
 ## pnpm install quirk
-- `pnpm install` from repo root times out in Replit agent shell (bash timeout)
-- Use `pnpm add --filter @workspace/xxx <package>` per workspace package instead
-- Or run `pnpm install` as a background process
+- `pnpm install` works fine from root with a 120s timeout — takes ~13s with cold cache
 
-## Orval codegen Node20 issue
-- `pnpm --filter @workspace/api-spec run codegen` fails with: `SyntaxError: The requested module 'js-yaml' does not provide an export named 'default'`
-- Node 20.x is used for codegen but orval v8.9.1 expects ESM js-yaml
-- Fix: Update generated files manually in:
-  - `lib/api-client-react/src/generated/api.schemas.ts` (Client + ClientInput interfaces)
-  - `lib/api-zod/src/generated/types/client.ts` and `clientInput.ts`
+## OpenRouter AI key
+- `OPENAI_API_KEY` is actually an OpenRouter key (starts with `sk-or-`)
+- `artifacts/api-server/src/routes/ai.ts` auto-detects OpenRouter keys by prefix and sets `baseURL: 'https://openrouter.ai/api/v1'` + model `google/gemini-2.5-flash`
+- Fill-form contexts supported: quotation, invoice, proposal, purchase-order, task, content-post, client, lead
 
-## @base-ui/react pnpm store fix
-- After `pnpm store prune` was run, @base-ui/react was missing its `esm/` directory (incomplete package in store)
-- Fix: `pnpm add --filter @workspace/agency-os @base-ui/react@1.5.0 --force` after `pnpm store prune`
-- **Why:** pnpm store had a corrupted/partial download of @base-ui/react; force reinstall fetches fresh copy
+## Admin credentials
+- Default admin: `admin@agencyos.com` / `Admin@123`
+- DB column is `password_hash` but Drizzle schema field is `password` — maps correctly via `text("password_hash")`
+
+## DB schema gaps fixed
+- `agency_settings` was missing: `working_days`, `grace_period_min`, `half_day_cutoff_time`, `absent_cutoff_time` — added via ALTER TABLE
+- `leads` was missing: `phone` — added
+- `tasks` was missing: `estimated_hours` — added
+- `subprojects` was missing: `deleted_at` — added
+- All unique constraints renamed from `*_key` → `*_unique` naming pattern drizzle expects
+
+## Neon connection
+- NEON_DATABASE_URL secret set and verified
+- Server logs `[Database Connection Audit] Provider: Neon PostgreSQL` and `Fallback Mode: FALSE` on startup
+- Bootstrap runs successfully and syncs users on every start
 
 ## File upload pattern
 - POST multipart/form-data to `/api/uploads` with field `file`
