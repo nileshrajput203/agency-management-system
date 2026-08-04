@@ -227,8 +227,13 @@ export default function AttendancePage() {
                     body: JSON.stringify({ date: new Date().toISOString().slice(0, 10) }),
                   });
                   const data = await res.json();
-                  if (!res.ok) throw new Error(data.error || "Failed");
-                  toast.success(`Absent records processed: ${data.processed ?? 0} employees marked`);
+                  if (!res.ok) throw new Error(data.error || data.reason || "Failed");
+                  if (data.skipped) {
+                    toast.info(data.reason || "Processing skipped");
+                  } else {
+                    const total = (data.markedAbsentCount ?? 0) + (data.markedLeaveCount ?? 0);
+                    toast.success(`Done: ${data.markedAbsentCount ?? 0} absent, ${data.markedLeaveCount ?? 0} on leave marked (${total} total)`);
+                  }
                   qc.invalidateQueries({ queryKey: getListAttendanceQueryKey() });
                 } catch (err: any) {
                   toast.error(err.message || "Failed to process absent records");
@@ -238,7 +243,7 @@ export default function AttendancePage() {
               <AlertTriangle className="h-4 w-4" /> Mark Absent (Today)
             </Button>
           )}
-          {isUserAdminOrManager && (attendanceHistory ?? []).length > 0 && (
+          {(attendanceHistory ?? []).length > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -430,8 +435,8 @@ export default function AttendancePage() {
           </CardContent>
         </Card>
 
-        {/* Live Board */}
-        {isUserAdminOrManager && (
+        {/* Live Board — admin only */}
+        {isUserAdminOrManager ? (
           <Card className="md:col-span-2 shadow-sm border border-border">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -478,6 +483,67 @@ export default function AttendancePage() {
               )}
             </CardContent>
           </Card>
+        ) : (
+          /* Employee monthly summary */
+          (() => {
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const myRecords = (attendanceHistory ?? []).filter((r: any) => {
+              const recMonth = r.date ? r.date.slice(0, 7) : (r.checkInAt ? r.checkInAt.slice(0, 7) : "");
+              return recMonth === currentMonth;
+            });
+            const presentDays = myRecords.filter((r: any) => r.status === "PRESENT" || r.status === "HALF_DAY").length;
+            const absentDays = myRecords.filter((r: any) => r.status === "ABSENT").length;
+            const leaveDays  = myRecords.filter((r: any) => r.status === "ON_LEAVE").length;
+            const lateDays   = myRecords.filter((r: any) => r.isLate && r.status !== "ABSENT").length;
+            const totalWorkMs = myRecords.reduce((acc: number, r: any) => {
+              return acc + calculateNetWorkingMs(r.checkInAt, r.checkOutAt, r.breakDurationMin || 0)
+                         + calculateDuration(r.overtimeCheckInAt, r.overtimeCheckOutAt);
+            }, 0);
+
+            return (
+              <Card className="md:col-span-2 shadow-sm border border-border">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    My Monthly Summary — {new Date().toLocaleString("default", { month: "long", year: "numeric" })}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {historyLoading ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/50 p-4 text-center">
+                        <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{presentDays}</p>
+                        <p className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5 font-medium">Present Days</p>
+                      </div>
+                      <div className="rounded-lg bg-rose-50 dark:bg-rose-950/20 border border-rose-100 dark:border-rose-900/50 p-4 text-center">
+                        <p className="text-2xl font-bold text-rose-700 dark:text-rose-400">{absentDays}</p>
+                        <p className="text-xs text-rose-600 dark:text-rose-500 mt-0.5 font-medium">Absent Days</p>
+                      </div>
+                      <div className="rounded-lg bg-sky-50 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/50 p-4 text-center">
+                        <p className="text-2xl font-bold text-sky-700 dark:text-sky-400">{leaveDays}</p>
+                        <p className="text-xs text-sky-600 dark:text-sky-500 mt-0.5 font-medium">On Leave</p>
+                      </div>
+                      <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/50 p-4 text-center">
+                        <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{lateDays}</p>
+                        <p className="text-xs text-amber-600 dark:text-amber-500 mt-0.5 font-medium">Late Arrivals</p>
+                      </div>
+                      {totalWorkMs > 0 && (
+                        <div className="col-span-2 sm:col-span-4 rounded-lg bg-muted/40 border border-border p-3 text-center">
+                          <p className="text-sm font-semibold text-foreground">
+                            Total Hours Worked This Month: <span className="text-primary">{formatDuration(totalWorkMs)}</span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()
         )}
       </div>
 
@@ -500,7 +566,7 @@ export default function AttendancePage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Employee Name</TableHead>
+                  {isUserAdminOrManager && <TableHead>Employee Name</TableHead>}
                   <TableHead>Check In</TableHead>
                   <TableHead>Check Out</TableHead>
                   <TableHead>Break Time</TableHead>
