@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { WriteWithAI } from "@/components/common/WriteWithAI";
+import { MultiAssigneePicker } from "@/components/common/MultiAssigneePicker";
 import { COLUMNS } from "./task-constants";
 import { useForm, Controller } from "react-hook-form";
+import { useState } from "react";
 import type { TaskInput } from "@workspace/api-client-react";
 
 interface TaskActionDialogsProps {
@@ -71,15 +73,29 @@ export function TaskActionDialogs({
     },
   });
 
+  // coAssignees state per dialog
+  const [createCoAssignees, setCreateCoAssignees] = useState<string[]>([]);
+  const [modifyCoAssignees, setModifyCoAssignees] = useState<string[]>(
+    Array.isArray(selectedTaskForAction?.coAssignees) ? selectedTaskForAction.coAssignees : []
+  );
+  const [editCoAssignees, setEditCoAssignees] = useState<string[]>(
+    Array.isArray(selectedTaskForAction?.coAssignees) ? selectedTaskForAction.coAssignees : []
+  );
+
+  // Wrap create submit to inject coAssignees
+  const handleCreateSubmit = (data: TaskInput) => {
+    onCreateSubmit({ ...data, coAssignees: createCoAssignees } as any);
+  };
+
   return (
     <>
       {/* ADMIN ADD/CREATE DIALOG */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setCreateCoAssignees([]); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New Task</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit(onCreateSubmit)} className="space-y-4 mt-2">
+          <form onSubmit={handleSubmit(handleCreateSubmit)} className="space-y-4 mt-2">
             <WriteWithAI
               context="task"
               onFill={(fields) => {

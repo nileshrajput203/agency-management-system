@@ -75,6 +75,7 @@ interface ProjectFormData {
   dueDate?: string;
   assignedTo?: string;
   assignmentDescription?: string;
+  coAssignees?: string[];
 }
 
 export default function ProjectsPage() {

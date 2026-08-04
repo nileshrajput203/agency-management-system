@@ -23,6 +23,7 @@ export const projectsTable = pgTable("projects", {
 
   // Assignment fields
   assignedTo: text("assigned_to").references(() => usersTable.id, { onDelete: "set null" }),
+  coAssignees: jsonb("co_assignees").$type<string[]>().default([]),
   assignmentStatus: text("assignment_status"),
   assignmentDescription: text("assignment_description"),
   rejectionReason: text("rejection_reason"),

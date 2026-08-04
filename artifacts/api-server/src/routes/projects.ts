@@ -40,7 +40,7 @@ function sanitizeProject(body: any, isUpdate = false) {
     rest.dueDate = rest.endDate;
   }
 
-  return sanitizeAndValidate(rest, {
+  const result = sanitizeAndValidate(rest, {
     uuids: ["clientId", "assignedTo"],
     dates: ["startDate", "dueDate", "endDate", "assignmentActionAt", "startedAt", "completedAt"],
     enums: {
@@ -49,6 +49,10 @@ function sanitizeProject(body: any, isUpdate = false) {
       assignmentStatus: ["PENDING", "ACCEPTED", "REJECTED", "pending", "accepted", "rejected"],
     },
   });
+  if (rest.coAssignees !== undefined) {
+    result.coAssignees = Array.isArray(rest.coAssignees) ? rest.coAssignees : [];
+  }
+  return result;
 }
 
 router.get("/", requirePermission("projects.view"), asyncHandler(async (req, res) => {
@@ -169,6 +173,7 @@ router.get("/:id", requirePermission("projects.view"), asyncHandler(async (req, 
       updatedAt: projectsTable.updatedAt,
       createdBy: projectsTable.createdBy,
       assignedTo: projectsTable.assignedTo,
+      coAssignees: projectsTable.coAssignees,
       assignedEmployeeName: assignedUserTable.name,
       assignmentStatus: projectsTable.assignmentStatus,
       assignmentDescription: projectsTable.assignmentDescription,
