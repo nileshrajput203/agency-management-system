@@ -24,7 +24,7 @@ import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { useForm, Controller } from "react-hook-form";
 import { Plus, Trash2, IndianRupee, TrendingUp, Calendar } from "lucide-react";
 import { cn, formatDateOnly } from "@/lib/utils";
-import { DndContext, useDraggable, useDroppable, DragOverlay, closestCorners, defaultDropAnimationSideEffects } from "@dnd-kit/core";
+import { DndContext, useDraggable, useDroppable, DragOverlay, closestCorners } from "@dnd-kit/core";
 
 const STAGES = [
   { key: "LEAD", label: "Lead", color: "border-t-slate-400" },
@@ -77,20 +77,15 @@ function DraggableLeadCard({ lead, deleteMutation, isActive, isOverlay }: any) {
     data: lead,
   });
 
-  const style = transform ? {
-    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-  } : undefined;
-
   return (
     <div
       ref={isOverlay ? undefined : setNodeRef}
-      style={style}
       {...(isOverlay ? {} : listeners)}
       {...(isOverlay ? {} : attributes)}
       className={cn(
         "bg-card border border-border rounded-lg p-3 shadow-sm group",
-        isOverlay ? "cursor-grabbing ring-2 ring-primary rotate-2 scale-105 shadow-xl" : "cursor-grab active:cursor-grabbing",
-        isDragging && "opacity-0" // Hide original while dragging
+        isOverlay ? "cursor-grabbing ring-2 ring-primary/40 shadow-md" : "cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-30" // Dim original while dragging
       )}
     >
       <div className="flex items-start justify-between gap-1">
@@ -216,10 +211,6 @@ export default function SalesPage() {
     );
   });
 
-  const dropAnimation = {
-    sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0.5" } } }),
-  };
-
   return (
     <div className="p-6 animated-fade-in space-y-5">
       <div className="space-y-5 flex flex-col">
@@ -292,7 +283,7 @@ export default function SalesPage() {
                 );
               })}
             </div>
-            <DragOverlay dropAnimation={dropAnimation}>
+            <DragOverlay dropAnimation={null}>
               {activeLead ? (
                 <DraggableLeadCard lead={activeLead} isOverlay={true} />
               ) : null}

@@ -28,9 +28,9 @@ export default function DashboardPage() {
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useGetDashboardStats({
     query: {
-      refetchInterval: 3000,
-      refetchOnWindowFocus: true,
-      refetchOnMount: true,
+      staleTime: 60_000,
+      refetchInterval: 120_000,
+      refetchOnWindowFocus: false,
     },
   });
   const isEmployee = user?.systemRole === "EMPLOYEE";

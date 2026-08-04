@@ -54,7 +54,7 @@ export default function ClientsPage() {
   const [editClientState, setEditClient] = useState<{ id: string } & ClientInput | null>(null);
   const [serviceType, setServiceType] = useState("SOCIAL_MEDIA");
 
-  const { data: clients, isLoading } = useListClients({
+  const { data: clients, isLoading, isError } = useListClients({
     search: search || undefined,
     category: category !== "ALL" ? category : undefined,
   });
@@ -245,6 +245,14 @@ export default function ClientsPage() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Error state */}
+      {isError && (
+        <div className="flex items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Failed to load clients. Please refresh the page.
+        </div>
+      )}
 
       {/* Grid */}
       {isLoading ? (
