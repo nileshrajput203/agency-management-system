@@ -2,4 +2,5 @@
 - [Git commit restriction](git-commit-restriction.md) — git commit is blocked in main agent; Replit auto-commits at session end; push via `bash push-to-github.sh` after checkpoint
 - [AgencyOS dev environment](agencyos-dev-env.md) — drizzle-kit location, pnpm install quirks, orval codegen Node20 issue, @base-ui/react pnpm store fix
 - [AgencyOS feature set](agencyos-features.md) — SearchBar, Finance tabbed page, Excel export, Dashboard overhaul with recharts; pre-existing DB schema gaps (probability, priority columns missing from leads/projects)
+- [AgencyOS AI wiring](agencyos-ai.md) — All AI goes through Express /api/ai/* endpoints; OPENROUTER_API_KEY is primary, OPENAI_API_KEY is fallback (auto-detects sk-or- prefix); finance copilot and clause writer use /api/ai/generate-template and /api/ai/generate-clause
 - [AgencyOS drizzle config fix](agencyos-drizzle-config.md) — drizzle.config.ts schema path was workspace-root-relative; fixed to ./src/schema/*.ts so push runs from lib/db/

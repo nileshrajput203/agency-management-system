@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Sparkles, FileText, RefreshCw, Check } from "lucide-react";
 import { toast } from "sonner";
-import { generateAITemplate } from "@/lib/actions/ai-generator";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -59,8 +58,6 @@ export function FinanceAiCopilotDialog({
   onApplyDraft,
 }: FinanceAiCopilotDialogProps) {
   const [aiType, setAiType] = useState<"invoice" | "proposal" | "agreement">("invoice");
-  const [aiProvider, setAiProvider] = useState<"gemini" | "groq" | "openrouter" | "local">("local");
-  const [aiApiKey, setAiApiKey] = useState("");
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [aiResult, setAiResult] = useState<any>(null);
 
@@ -132,25 +129,37 @@ export function FinanceAiCopilotDialog({
     toast.success("Draft generated instantly!");
   };
 
+  const getAuthToken = () =>
+    localStorage.getItem("agency_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("auth_token") ||
+    localStorage.getItem("agency_jwt_token") ||
+    "";
+
   const handleAITemplateGenerate = async () => {
     setIsAiGenerating(true);
     setAiResult(null);
 
-    const promptText = `Client: ${aiClientName || 'Client'}, Project: ${aiProjectTitle || 'Services'}, Amount: ${aiAmount || '50000'}, Scope: ${aiScope || 'General'}`;
+    const promptText = `Client: ${aiClientName || 'Client'}, Project: ${aiProjectTitle || 'Services'}, Amount: ₹${aiAmount || '50000'}, Revisions: ${aiRevisions}, Payment terms: ${aiTermsDays} days, Scope: ${aiScope || 'General digital agency services'}`;
 
     try {
-      const res = await generateAITemplate({
-        type: aiType,
-        prompt: promptText,
-        provider: aiProvider,
-        apiKey: aiApiKey || undefined,
+      const token = getAuthToken();
+      const res = await fetch("/api/ai/generate-template", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ type: aiType, prompt: promptText }),
       });
 
-      if (!res.ok || !res.content) {
-        throw new Error(res.error || "Failed to generate AI template");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as any).error || `Server error ${res.status}`);
       }
 
-      setAiResult(res.content);
+      const json = await res.json();
+      setAiResult(json.data);
       toast.success("AI draft refined successfully!");
     } catch (err: any) {
       toast.error(err.message || "AI generation failed");
@@ -289,40 +298,10 @@ export function FinanceAiCopilotDialog({
             </div>
           </div>
 
-          {/* Config Expandable Accordion / Panel */}
-          <div className="border border-slate-800 bg-slate-950/40 rounded-xl p-3 space-y-2 text-xs">
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">AI Config (For Refinements only)</span>
-              <Badge variant="outline" className="text-[8px] border-slate-800 text-slate-500">Optional</Badge>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-[9px] text-slate-500">AI Provider</Label>
-                <select
-                  value={aiProvider}
-                  onChange={(e) => { setAiProvider(e.target.value as any); setAiResult(null); }}
-                  className="flex h-7 w-full rounded-md border border-slate-850 bg-slate-950 px-1 text-[11px] text-white"
-                >
-                  <option value="local">Local Simulator (Free)</option>
-                  <option value="gemini">Gemini API</option>
-                  <option value="groq">Groq API</option>
-                  <option value="openrouter">OpenRouter API</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-[9px] text-slate-500">API Key</Label>
-                <Input
-                  type="password"
-                  value={aiApiKey}
-                  onChange={(e) => setAiApiKey(e.target.value)}
-                  disabled={aiProvider === "local"}
-                  placeholder={aiProvider === "local" ? "No key needed for mock" : "Paste API key..."}
-                  className="bg-slate-950 border-slate-850 h-7 text-[11px] text-white placeholder-slate-700 font-mono"
-                />
-              </div>
-            </div>
+          {/* AI provider info */}
+          <div className="border border-slate-800 bg-slate-950/40 rounded-xl p-3 text-xs flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 text-violet-400 shrink-0" />
+            <span className="text-slate-400">AI Refine uses <span className="text-violet-300 font-semibold">OpenRouter</span> — configured server-side. No API key needed here.</span>
           </div>
 
           {/* Action Buttons */}

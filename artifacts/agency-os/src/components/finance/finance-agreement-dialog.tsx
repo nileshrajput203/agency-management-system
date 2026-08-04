@@ -44,7 +44,6 @@ interface FinanceAgreementDialogProps {
   aiClausePrompt: string;
   setAiClausePrompt: (prompt: string) => void;
   isClauseGenerating: boolean;
-  aiProvider: string;
   handleAIClauseAdd: () => void;
   handleSaveAgreementDraft: () => void;
   handleSignAgreement: () => void;
@@ -62,7 +61,6 @@ export function FinanceAgreementDialog({
   aiClausePrompt,
   setAiClausePrompt,
   isClauseGenerating,
-  aiProvider,
   handleAIClauseAdd,
   handleSaveAgreementDraft,
   handleSignAgreement,
@@ -226,7 +224,7 @@ export function FinanceAgreementDialog({
                   </p>
                 </div>
                 <Badge className="bg-violet-100 text-violet-700 border-0 text-[8px] py-0 leading-none hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-400">
-                  {aiProvider === "local" ? "Local Simulator" : aiProvider.toUpperCase()}
+                  OpenRouter
                 </Badge>
               </div>
 

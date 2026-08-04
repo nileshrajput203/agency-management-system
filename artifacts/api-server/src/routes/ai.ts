@@ -1,91 +1,100 @@
 import { Router } from "express";
-import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 
 const router = Router();
 
-let openaiClient: OpenAI | null = null;
-let geminiClient: GoogleGenAI | null = null;
+// ---------------------------------------------------------------------------
+// Shared AI client factory
+// Priority: OPENROUTER_API_KEY → OPENAI_API_KEY (auto-detect OpenRouter) → Gemini via OpenRouter
+// ---------------------------------------------------------------------------
 
-async function generateWithAI(systemPrompt: string, userPrompt: string): Promise<string> {
-  const geminiKey = process.env.GEMINI_API_KEY;
+function buildOpenRouterClient(apiKey: string): OpenAI {
+  return new OpenAI({
+    apiKey,
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultHeaders: {
+      "HTTP-Referer": "https://agencyos.app",
+      "X-Title": "AgencyOS",
+    },
+  });
+}
+
+function buildOpenAIClient(apiKey: string): OpenAI {
+  return new OpenAI({ apiKey, baseURL: "https://api.openai.com/v1" });
+}
+
+function getAIClient(): { client: OpenAI; model: string } | null {
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
 
-  if (geminiKey) {
-    if (!geminiClient) {
-      geminiClient = new GoogleGenAI({
-        apiKey: geminiKey,
-        httpOptions: {
-          headers: {
-            "User-Agent": "aistudio-build",
-          },
-        },
-      });
-    }
-    const modelsToTry = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3-flash-preview"];
-    let lastError: unknown = null;
-    for (const model of modelsToTry) {
-      try {
-        const response = await geminiClient.models.generateContent({
-          model,
-          contents: userPrompt,
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: "application/json",
-            temperature: 0.4,
-            maxOutputTokens: 1200,
-          },
-        });
-        if (response.text) {
-          return response.text.trim();
-        }
-      } catch (err) {
-        lastError = err;
-      }
-    }
-    if (lastError && !openaiKey) {
-      throw createError(`Gemini generation failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`, 500);
-    }
+  if (openrouterKey) {
+    return { client: buildOpenRouterClient(openrouterKey), model: "google/gemini-2.5-flash" };
   }
 
   if (openaiKey) {
-    if (!openaiClient) {
-      // Support OpenRouter keys (sk-or-*) or standard OpenAI keys
-      const isOpenRouter = openaiKey.startsWith("sk-or-") || openaiKey.includes("openrouter");
-      openaiClient = new OpenAI({
-        apiKey: openaiKey,
-        baseURL: isOpenRouter ? "https://openrouter.ai/api/v1" : "https://api.openai.com/v1",
-        defaultHeaders: isOpenRouter
-          ? {
-              "HTTP-Referer": "https://agencyos.app",
-              "X-Title": "AgencyOS",
-            }
-          : {},
-      });
-    }
-    // Use a model available on both OpenRouter and OpenAI
+    // Auto-detect OpenRouter keys (start with sk-or-)
     const isOpenRouter = openaiKey.startsWith("sk-or-") || openaiKey.includes("openrouter");
-    const model = isOpenRouter ? "google/gemini-2.5-flash" : "gpt-4o-mini";
-    const completion = await openaiClient.chat.completions.create({
-      model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.4,
-      max_tokens: 1200,
-    });
-    return completion.choices[0]?.message?.content?.trim() || "{}";
+    if (isOpenRouter) {
+      return { client: buildOpenRouterClient(openaiKey), model: "google/gemini-2.5-flash" };
+    }
+    return { client: buildOpenAIClient(openaiKey), model: "gpt-4o-mini" };
   }
 
-  throw createError(
-    "AI assistant is not configured. Add a GEMINI_API_KEY or OPENAI_API_KEY environment variable to enable it.",
-    503,
-  );
+  return null;
 }
+
+async function generateWithAI(systemPrompt: string, userPrompt: string): Promise<string> {
+  const config = getAIClient();
+
+  if (!config) {
+    throw createError(
+      "AI assistant is not configured. Add an OPENROUTER_API_KEY or OPENAI_API_KEY environment variable to enable it.",
+      503,
+    );
+  }
+
+  const { client, model } = config;
+  const completion = await client.chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.4,
+    max_tokens: 1200,
+  });
+  return completion.choices[0]?.message?.content?.trim() || "{}";
+}
+
+async function generateTextWithAI(systemPrompt: string, userPrompt: string): Promise<string> {
+  const config = getAIClient();
+
+  if (!config) {
+    throw createError(
+      "AI assistant is not configured. Add an OPENROUTER_API_KEY or OPENAI_API_KEY environment variable to enable it.",
+      503,
+    );
+  }
+
+  const { client, model } = config;
+  const completion = await client.chat.completions.create({
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.5,
+    max_tokens: 2000,
+  });
+  return completion.choices[0]?.message?.content?.trim() || "";
+}
+
+// ---------------------------------------------------------------------------
+// Prompt schemas for the fill-form feature
+// ---------------------------------------------------------------------------
 
 const FILL_FORM_SCHEMAS: Record<string, { prompt: string; schema: string }> = {
   quotation: {
@@ -167,6 +176,46 @@ Only include fields you can reasonably infer. Return valid JSON only.`,
   },
 };
 
+// ---------------------------------------------------------------------------
+// Finance document generation prompts
+// ---------------------------------------------------------------------------
+
+function getFinanceSystemPrompt(type: "invoice" | "proposal" | "agreement"): string {
+  if (type === "invoice") {
+    return `You are a professional accounting AI for a creative agency. Based on the client details and parameters provided, draft a professional invoice.
+Respond with a raw JSON object matching this schema exactly. Do not wrap in markdown. Output only JSON:
+{
+  "lineDescription": "Professional Creative Retainer / Custom services name describing the work",
+  "subtotal": 75000,
+  "gstRate": 18,
+  "dueDate": "YYYY-MM-DD"
+}`;
+  }
+  if (type === "proposal") {
+    return `You are a professional agency business development AI. Based on the client details and requirements, draft a professional business proposal.
+Respond with a raw JSON object matching this schema exactly. Do not wrap in markdown. Output only JSON:
+{
+  "title": "Proposal for [service] for [client]",
+  "subtotal": 125000,
+  "discount": 10000,
+  "templateKey": "website",
+  "scopeDescription": "Describe the main deliverables, scope of work, timeline, and value proposition in 2-3 clear paragraphs."
+}
+templateKey MUST be one of: 'website', 'social', 'performance', 'retainer', 'branding'`;
+  }
+  return `You are an expert corporate legal counsel. Based on the client details, draft a comprehensive agency service contract agreement.
+Respond with a raw JSON object matching this schema exactly. Do not wrap in markdown. Output only JSON:
+{
+  "title": "Master Services Agreement: [Client Company Name] & Agency",
+  "content": "Full markdown agreement text with sections for: Scope of Services, Payment Terms, Term and Termination, Confidentiality & IP, SLA"
+}`;
+}
+
+// ---------------------------------------------------------------------------
+// Routes
+// ---------------------------------------------------------------------------
+
+// Fill form with AI (used by WriteWithAI component for structured forms)
 router.post(
   "/fill-form",
   asyncHandler(async (req, res) => {
@@ -180,7 +229,6 @@ router.post(
     }
 
     const { prompt: systemPrompt } = FILL_FORM_SCHEMAS[context];
-
     const raw = await generateWithAI(systemPrompt, prompt);
     let fields: Record<string, unknown> = {};
     try {
@@ -193,6 +241,7 @@ router.post(
   }),
 );
 
+// Free-text generation (used by WriteWithAI for text expansion)
 router.post(
   "/generate",
   asyncHandler(async (req, res) => {
@@ -203,9 +252,60 @@ router.post(
     }
 
     const systemPrompt = `You are a professional assistant writing content for an agency management system. Context: ${context || "general"}. ${existingText ? `Existing text to improve or base on: ${existingText}` : ""} Return clear, polished response text.`;
-
-    const text = await generateWithAI(systemPrompt, prompt);
+    const text = await generateTextWithAI(systemPrompt, prompt);
     res.json({ text });
+  }),
+);
+
+// Finance document generation (invoice / proposal / agreement) — used by Finance AI Copilot dialog
+router.post(
+  "/generate-template",
+  asyncHandler(async (req, res) => {
+    const { type, prompt } = req.body as { type?: string; prompt?: string };
+
+    if (!type || !["invoice", "proposal", "agreement"].includes(type)) {
+      throw createError("type must be one of: invoice, proposal, agreement", 400);
+    }
+    if (!prompt || !prompt.trim()) {
+      throw createError("prompt is required", 400);
+    }
+
+    const systemPrompt = getFinanceSystemPrompt(type as "invoice" | "proposal" | "agreement");
+    const raw = await generateWithAI(systemPrompt, `Client Description and Parameters:\n"${prompt}"`);
+
+    let data: Record<string, unknown> = {};
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      // Try to extract JSON from the response
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) {
+        try { data = JSON.parse(match[0]); } catch { data = {}; }
+      }
+    }
+
+    res.json({ data });
+  }),
+);
+
+// Contract clause generation — used by Finance Agreement clause writer
+router.post(
+  "/generate-clause",
+  asyncHandler(async (req, res) => {
+    const { prompt, existingContent } = req.body as { prompt?: string; existingContent?: string };
+
+    if (!prompt || !prompt.trim()) {
+      throw createError("prompt is required", 400);
+    }
+
+    const systemPrompt = `You are an expert corporate legal counsel. Write a contract clause based on the user's prompt.
+Integrate it nicely to match the styling of a standard Master Services Agreement.
+Output ONLY the markdown clause text. Do not write any conversational intro or outro.`;
+
+    const userPrompt = `${existingContent ? `Existing Contract Context (brief): ${existingContent.substring(0, 500)}...\n\n` : ""}Draft a clause for: "${prompt}"`;
+    const clause = await generateTextWithAI(systemPrompt, userPrompt);
+
+    res.json({ clause: `\n\n${clause.trim()}` });
   }),
 );
 

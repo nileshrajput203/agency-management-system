@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { updateProposalStatus } from "@/lib/actions/proposals";
 import { markInvoicePaid as markPaid } from "@/lib/actions/invoices";
 import { updateAgreementContent, signAgreement, updateAgreementStatus } from "@/lib/actions/agreements";
-import { generateAIClause } from "@/lib/actions/ai-generator";
 import { ENABLE_PROPOSALS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -42,8 +41,6 @@ export function FinanceManager({
 
   // AI template drafter states
   const [aiOpen, setAiOpen] = useState(false);
-  const [aiProvider, setAiProvider] = useState<"gemini" | "groq" | "openrouter" | "local">("local");
-  const [aiApiKey, setAiApiKey] = useState("");
 
   // Prefill states
   const [prefilledProposal, setPrefilledProposal] = useState<{ title: string; subtotal: number; discount: number; templateKey: string } | null>(null);
@@ -53,27 +50,36 @@ export function FinanceManager({
   const [aiClausePrompt, setAiClausePrompt] = useState("");
   const [isClauseGenerating, setIsClauseGenerating] = useState(false);
 
-  // Load saved AI configurations from local storage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedKey = localStorage.getItem("blink_beyond_ai_key");
-      const savedProvider = localStorage.getItem("blink_beyond_ai_provider");
-      if (savedKey) setAiApiKey(savedKey);
-      if (savedProvider) setAiProvider(savedProvider as any);
-    }
-  }, []);
+  const getAuthToken = () =>
+    localStorage.getItem("agency_token") ||
+    localStorage.getItem("token") ||
+    localStorage.getItem("auth_token") ||
+    localStorage.getItem("agency_jwt_token") ||
+    "";
 
   // Action handler for appending AI clause to current contract content
   const handleAIClauseAdd = async () => {
     setIsClauseGenerating(true);
     try {
-      const res = await generateAIClause(aiClausePrompt, agreementContent, aiApiKey, aiProvider);
-      if (res.ok && res.clause) {
-        setAgreementContent(prev => prev + res.clause);
+      const token = getAuthToken();
+      const res = await fetch("/api/ai/generate-clause", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ prompt: aiClausePrompt, existingContent: agreementContent }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error((err as any).error || "Failed to draft contract clause.");
+        return;
+      }
+      const data = await res.json();
+      if (data.clause) {
+        setAgreementContent(prev => prev + data.clause);
         setAiClausePrompt("");
         toast.success("Clause drafted and appended to agreement content!");
-      } else {
-        toast.error(res.error || "Failed to draft contract clause.");
       }
     } catch (e) {
       toast.error("Error communicating with AI service.");
@@ -297,7 +303,6 @@ export function FinanceManager({
           aiClausePrompt={aiClausePrompt}
           setAiClausePrompt={setAiClausePrompt}
           isClauseGenerating={isClauseGenerating}
-          aiProvider={aiProvider}
           handleAIClauseAdd={handleAIClauseAdd}
           handleSaveAgreementDraft={handleSaveAgreementDraft}
           handleSignAgreement={handleSignAgreement}

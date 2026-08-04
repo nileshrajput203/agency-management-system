@@ -33,22 +33,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ 
-        error: "OpenAI API key not configured",
+        error: "No AI API key configured",
         response: "System error: Missing API Key configuration."
       }, { status: 500 });
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const isOpenRouter = !!process.env.OPENROUTER_API_KEY || apiKey.startsWith("sk-or-");
+    const baseURL = isOpenRouter ? "https://openrouter.ai/api/v1" : "https://api.openai.com/v1";
+    const model = isOpenRouter ? "google/gemini-2.5-flash" : "gpt-4o-mini";
+    const extraHeaders = isOpenRouter
+      ? { "HTTP-Referer": "https://agencyos.app", "X-Title": "AgencyOS" }
+      : {};
+
+    const response = await fetch(`${baseURL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
+        ...extraHeaders,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: message }
