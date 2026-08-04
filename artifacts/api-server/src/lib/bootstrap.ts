@@ -82,6 +82,7 @@ export async function ensureSubprojectsTable(): Promise<void> {
       created_by TEXT,
       updated_by TEXT
     )`,
+    `ALTER TABLE leads ADD COLUMN IF NOT EXISTS next_call_date TIMESTAMP WITH TIME ZONE`,
     `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS start_date TIMESTAMP WITH TIME ZONE`,
     `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS objective TEXT`,
     `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS requirements TEXT`,

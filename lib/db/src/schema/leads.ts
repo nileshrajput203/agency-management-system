@@ -15,6 +15,7 @@ export const leadsTable = pgTable("leads", {
   source: text("source"),
   description: text("description"),
   notes: text("notes"),
+  nextCallDate: timestamp("next_call_date"),
   stageChangedAt: timestamp("stage_changed_at").defaultNow(),
   
   // Audit fields

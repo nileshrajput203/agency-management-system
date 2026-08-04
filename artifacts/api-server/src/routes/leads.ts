@@ -16,7 +16,7 @@ function sanitizeLead(body: any, isUpdate = false) {
     throw createError("Lead title is required", 400);
   }
   return sanitizeAndValidate(body, {
-    dates: ["expectedCloseDate", "stageChangedAt"],
+    dates: ["expectedCloseDate", "stageChangedAt", "nextCallDate"],
     numbers: ["value", "probability"],
     enums: {
       stage: STAGES,
@@ -89,6 +89,29 @@ router.patch("/:id", requirePermission("sales.edit"), asyncHandler(async (req, r
 router.delete("/:id", requirePermission("sales.delete"), asyncHandler(async (req, res) => {
   await db.delete(leadsTable).where(eq(leadsTable.id, (req.params.id as string)));
   return res.status(204).send();
+}));
+
+// Returns leads with a nextCallDate that is today or overdue (for Sales Tasks tab)
+router.get("/scheduled-calls", requirePermission("sales.view"), asyncHandler(async (req, res) => {
+  const rows = await db.select().from(leadsTable);
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const scheduled = rows
+    .filter((l) => l.nextCallDate && new Date(l.nextCallDate) <= new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30))
+    .map((lead) => {
+      const callDate = new Date(lead.nextCallDate!);
+      const isOverdue = callDate < todayStart;
+      const isToday = callDate >= todayStart && callDate < new Date(todayStart.getTime() + 86400000);
+      return {
+        ...lead,
+        daysInStage: lead.stageChangedAt
+          ? Math.floor((Date.now() - new Date(lead.stageChangedAt).getTime()) / 86400000)
+          : 0,
+        callStatus: isOverdue ? "OVERDUE" : isToday ? "TODAY" : "UPCOMING",
+      };
+    })
+    .sort((a, b) => new Date(a.nextCallDate!).getTime() - new Date(b.nextCallDate!).getTime());
+  return res.json(scheduled);
 }));
 
 export default router;
