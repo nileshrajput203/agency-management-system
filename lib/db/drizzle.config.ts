@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
-let dbUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "postgresql://neondb_owner:npg_hiXFZ8PUsL9m@ep-sparkling-bonus-apfpbh78.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require";
+let dbUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "postgresql://neondb_owner:npg_G8ClxfpYR6WU@ep-bold-sun-adfekmu3-pooler.c-2.us-east-1.aws.neon.tech/agencyos_db?sslmode=require&channel_binding=require";
 if (dbUrl) {
   let cleanUrl = dbUrl.trim();
   if (cleanUrl.startsWith("DATABASE_URL=") || cleanUrl.startsWith("NEON_DATABASE_URL=")) {
