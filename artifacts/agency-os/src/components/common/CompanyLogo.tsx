@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-const logoSvgUrl = "/logo.png"; // uploaded Blink Beyond brand logo
+const logoSvgUrl = "/logo.svg";
 const logoPngUrl = "/logo.png";
 
 export interface CompanyLogoProps {

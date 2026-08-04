@@ -57,7 +57,7 @@ Thumbs.db
 .cache/
 .local/
 .env
-
-# Runtime AlaSQL fallback database (contains seeded state, never commit)
 local_db.json
-**/local_db.json
+logs/
+*.zip
+
