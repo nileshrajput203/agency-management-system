@@ -3,6 +3,8 @@ modules = ["nodejs-20", "web", "bash"]
 [deployment]
 router = "application"
 deploymentTarget = "autoscale"
+run = ["bash", "-c", "SERVE_STATIC=true PORT=5000 pnpm --filter @workspace/api-server run start"]
+build = ["bash", "-c", "pnpm install --frozen-lockfile && pnpm --filter @workspace/agency-os run build && pnpm --filter @workspace/api-server run build"]
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]
