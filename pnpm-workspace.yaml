@@ -1,0 +1,6 @@
+packages:
+  - 'artifacts/agency-os'
+  - 'artifacts/api-server'
+  - 'artifacts/desktop-app'
+  - 'artifacts/mockup-sandbox'
+  - 'lib/*'
