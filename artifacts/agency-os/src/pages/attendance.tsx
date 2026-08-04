@@ -207,7 +207,9 @@ export default function AttendancePage() {
         <div>
           <h1 className="text-2xl font-bold font-heading">Attendance</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Daily check-in, break tracking, live board & history logs
+            {isUserAdminOrManager
+              ? "Daily check-in, break tracking, live board & history logs"
+              : "Track your daily check-in, breaks & attendance history"}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -518,9 +520,11 @@ export default function AttendancePage() {
                       <TableCell className="font-medium whitespace-nowrap">
                         {r.date ? format(new Date(`${r.date}T00:00:00`), "MMM dd, yyyy") : (r.checkInAt ? formatDateOnly(r.checkInAt, "MMM dd, yyyy") : "—")}
                       </TableCell>
-                      <TableCell className="font-semibold text-foreground">
-                        {r.userName || "Unknown Employee"}
-                      </TableCell>
+                      {isUserAdminOrManager && (
+                        <TableCell className="font-semibold text-foreground">
+                          {r.userName || "Unknown Employee"}
+                        </TableCell>
+                      )}
                       <TableCell>
                         {r.checkInAt ? format(new Date(r.checkInAt), "HH:mm") : "—"}
                       </TableCell>

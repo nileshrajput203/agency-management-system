@@ -85,7 +85,7 @@ function SortableLeadCard({
       className={cn(
         "bg-card border border-border rounded-lg p-3 shadow-sm group select-none",
         isDragOverlay
-          ? "cursor-grabbing ring-2 ring-primary/40 shadow-xl rotate-1 scale-105"
+          ? "cursor-grabbing shadow-lg opacity-90"
           : "cursor-grab active:cursor-grabbing hover:shadow-md transition-all",
         isDragging && "ring-1 ring-primary/20",
       )}
@@ -617,7 +617,7 @@ export default function SalesPage() {
                   );
                 })}
               </div>
-              <DragOverlay dropAnimation={null}>
+              <DragOverlay>
                 {activeLead ? (
                   <SortableLeadCard lead={activeLead} isDragOverlay />
                 ) : null}
