@@ -113,8 +113,12 @@ router.get("/attendance", requirePermission("attendance.view"), asyncHandler(asy
   const requesterId = (req as any).userId;
   const requesterRole = (req as any).userRole;
 
+  const requesterSystemRole = (req as any).userSystemRole;
+  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(requesterSystemRole);
+
   const conditions = [];
-  if (requesterRole === "EMPLOYEE") {
+  if (!isFullAdmin) {
+    // Non-super-admin roles (ACCOUNT_MANAGER, DESIGNER, etc.) only see their own records
     conditions.push(eq(attendance.userId, requesterId));
   } else if (userId) {
     if (!isValidUUID(userId)) {

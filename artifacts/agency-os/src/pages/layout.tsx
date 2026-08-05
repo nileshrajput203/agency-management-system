@@ -92,66 +92,52 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
 
-  const isAdmin = user?.systemRole === "SUPER_ADMIN";
+  const userSystemRole = user?.systemRole ?? "";
+  // Full admins see everything; account managers are filtered by their allowedModules
+  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(userSystemRole);
+  const isSuperAdmin = userSystemRole === "SUPER_ADMIN";
   const userAllowedModules = user?.allowedModules ?? [];
+
+  // Module key each path requires (null = always visible to full admins)
+  const PATH_MODULE_MAP: Record<string, string | string[] | null> = {
+    "/dashboard":           null,
+    "/clients":             "clients",
+    "/sales":               "sales",
+    "/projects":            "projects",
+    "/tasks":               "tasks",
+    "/meetings":            ["clients", "projects"],
+    "/content":             "content",
+    "/hawan":               null,
+    "/attendance":          "attendance",
+    "/leaves":              "leaves",
+    "/work-reports":        null,
+    "/performance-report":  null,
+    "/invoices":            "invoices",
+    "/quotations":          "quotations",
+    "/proposals":           "proposals",
+    "/purchase-orders":     "__superadmin__",
+    "/excel-reports":       ["invoices", "quotations", "proposals"],
+    "/settings":            "__superadmin__",
+    "/users":               "__superadmin__",
+  };
 
   const filteredNavGroups = navGroups.map(group => {
     const filteredItems = group.items.filter(item => {
-      if (item.href === "/dashboard") return true;
+      const required = PATH_MODULE_MAP[item.href];
 
-      // Strictly Admin-only paths
-      const adminOnlyPaths = [
-        "/settings",
-        "/users",
-        "/purchase-orders",
-      ];
+      // Super-admin-only paths
+      if (required === "__superadmin__") return isSuperAdmin;
 
-      if (adminOnlyPaths.includes(item.href)) {
-        return isAdmin;
-      }
+      // Full admins (SUPER_ADMIN/ADMIN/MANAGER) see everything else
+      if (isFullAdmin) return true;
 
-      if (isAdmin) return true;
-
-      // Standard workspace operational & HR modules are always visible to all authenticated users
-      const standardWorkspacePaths = [
-        "/clients",
-        "/sales",
-        "/projects",
-        "/tasks",
-        "/meetings",
-        "/content",
-        "/hawan",
-        "/attendance",
-        "/leaves",
-        "/work-reports",
-        "/performance-report",
-      ];
-
-      if (standardWorkspacePaths.includes(item.href)) {
-        return true;
-      }
-
-      if (item.href === "/excel-reports") {
-        return userAllowedModules.includes("invoices") ||
-               userAllowedModules.includes("quotations") ||
-               userAllowedModules.includes("proposals");
-      }
-
-      const financeModuleMap: Record<string, string> = {
-        "/invoices": "invoices",
-        "/quotations": "quotations",
-        "/proposals": "proposals",
-      };
-
-      const moduleKey = financeModuleMap[item.href];
-      if (!moduleKey) return false;
-      return userAllowedModules.includes(moduleKey);
+      // ACCOUNT_MANAGER and other roles: filter strictly by allowedModules
+      if (required === null) return true; // dashboard, work-reports, performance-report always visible
+      if (Array.isArray(required)) return required.some(m => userAllowedModules.includes(m));
+      return userAllowedModules.includes(required);
     });
 
-    return {
-      ...group,
-      items: filteredItems,
-    };
+    return { ...group, items: filteredItems };
   }).filter(group => group.items.length > 0);
 
   return (

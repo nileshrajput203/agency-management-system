@@ -28,7 +28,16 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const employeeNavGroups: NavGroup[] = [
+interface NavItemDef extends NavItem {
+  modules?: string[]; // allowed if user has ANY of these modules; undefined = always visible
+}
+
+interface NavGroupDef {
+  label: string;
+  items: NavItemDef[];
+}
+
+const ALL_EMPLOYEE_NAV_GROUPS: NavGroupDef[] = [
   {
     label: "Overview",
     items: [
@@ -38,27 +47,27 @@ const employeeNavGroups: NavGroup[] = [
   {
     label: "My Work",
     items: [
-      { label: "My Clients", href: "/employee/clients", icon: <Users className="h-4 w-4" /> },
-      { label: "Sales Funnel", href: "/employee/leads", icon: <TrendingUp className="h-4 w-4" /> },
-      { label: "My Projects", href: "/employee/projects", icon: <FolderKanban className="h-4 w-4" /> },
-      { label: "My Tasks", href: "/employee/tasks", icon: <CheckSquare className="h-4 w-4" /> },
-      { label: "Work Reports", href: "/employee/work-reports", icon: <FileCheck className="h-4 w-4 text-emerald-500" /> },
-      { label: "Meetings", href: "/employee/meetings", icon: <CalendarDays className="h-4 w-4 text-blue-500" /> },
-      { label: "Content Calendar", href: "/employee/content-calendar", icon: <Calendar className="h-4 w-4" /> },
+      { label: "My Clients",        href: "/employee/clients",          icon: <Users className="h-4 w-4" />,                               modules: ["clients"] },
+      { label: "Sales Funnel",      href: "/employee/leads",            icon: <TrendingUp className="h-4 w-4" />,                           modules: ["sales"] },
+      { label: "My Projects",       href: "/employee/projects",         icon: <FolderKanban className="h-4 w-4" />,                         modules: ["projects"] },
+      { label: "My Tasks",          href: "/employee/tasks",            icon: <CheckSquare className="h-4 w-4" />,                          modules: ["tasks"] },
+      { label: "Work Reports",      href: "/employee/work-reports",     icon: <FileCheck className="h-4 w-4 text-emerald-500" /> },
+      { label: "Meetings",          href: "/employee/meetings",         icon: <CalendarDays className="h-4 w-4 text-blue-500" />,           modules: ["clients", "projects"] },
+      { label: "Content Calendar",  href: "/employee/content-calendar", icon: <Calendar className="h-4 w-4" />,                            modules: ["content"] },
     ],
   },
   {
     label: "People & HR",
     items: [
-      { label: "Attendance", href: "/employee/attendance", icon: <Clock className="h-4 w-4" /> },
-      { label: "Leave", href: "/employee/leave", icon: <Umbrella className="h-4 w-4" /> },
+      { label: "Attendance", href: "/employee/attendance", icon: <Clock className="h-4 w-4" />,    modules: ["attendance"] },
+      { label: "Leave",      href: "/employee/leave",      icon: <Umbrella className="h-4 w-4" />, modules: ["leaves"] },
     ],
   },
   {
     label: "Account",
     items: [
       { label: "Notifications", href: "/employee/notifications", icon: <Bell className="h-4 w-4" /> },
-      { label: "Profile", href: "/employee/profile", icon: <User className="h-4 w-4" /> },
+      { label: "Profile",       href: "/employee/profile",       icon: <User className="h-4 w-4" /> },
     ],
   },
 ];
@@ -76,6 +85,17 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   const initials = user?.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "E";
+
+  const userAllowedModules: string[] = user?.allowedModules ?? [];
+  const employeeNavGroups = ALL_EMPLOYEE_NAV_GROUPS
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => {
+        if (!item.modules) return true; // no restriction = always visible
+        return item.modules.some(m => userAllowedModules.includes(m));
+      }),
+    }))
+    .filter(group => group.items.length > 0);
 
   const getBreadcrumb = () => {
     if (location.includes("work-reports")) return "Work Reports";
