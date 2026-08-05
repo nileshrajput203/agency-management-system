@@ -33,7 +33,9 @@ export default function DashboardPage() {
       refetchOnWindowFocus: false,
     },
   });
-  const isEmployee = user?.systemRole === "EMPLOYEE";
+  // Full admins (SUPER_ADMIN/ADMIN/MANAGER) see the BI console; everyone else sees the employee view
+  const adminRoles = ["SUPER_ADMIN", "ADMIN", "MANAGER"];
+  const isEmployee = !adminRoles.includes(user?.systemRole ?? "");
 
   const { data: revenueChart, isLoading: chartLoading } = useQuery<{ month: string; amount: number }[]>({
     queryKey: ["revenue-chart", chartRange],
