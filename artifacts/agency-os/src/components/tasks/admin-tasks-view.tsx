@@ -31,7 +31,7 @@ import { useAuth } from "@/App";
 import {
   Tooltip, TooltipTrigger, TooltipContent
 } from "@/components/ui/tooltip";
-import { COLUMNS, PRIORITY_CONFIG, COL_STYLE } from "./task-constants";
+import { COLUMNS, PRIORITY_CONFIG, COL_STYLE, isCompletedTask, sortTasksByDueDate } from "./task-constants";
 import { TaskActionDialogs } from "./task-action-dialogs";
 
 export function AdminTasksView() {
@@ -251,7 +251,7 @@ export function AdminTasksView() {
   );
 
   const filteredActive = activeTasks.filter((t) => {
-    if (hideCompleted && t.status === "DONE") return false;
+    if (hideCompleted && isCompletedTask(t.status)) return false;
     if (priorityFilter !== "ALL" && t.priority !== priorityFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -264,10 +264,10 @@ export function AdminTasksView() {
     return true;
   });
 
-  const byStatus = (status: string) => filteredActive.filter((t) => t.status === status);
+  const byStatus = (status: string) => sortTasksByDueDate(filteredActive.filter((t) => t.status === status));
 
   const pendingTasks = (tasks ?? []).filter((t) => t.approvalStatus === "PENDING" || t.approvalStatus === "MANAGER_APPROVED");
-  const filteredPending = pendingTasks.filter((t) => {
+  const filteredPending = sortTasksByDueDate(pendingTasks.filter((t) => {
     if (priorityFilter !== "ALL" && t.priority !== priorityFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -278,7 +278,7 @@ export function AdminTasksView() {
       );
     }
     return true;
-  });
+  }));
 
   const myRequests = (tasks ?? []).filter((t) => t.requestedBy === user?.id || (t as any).createdBy === user?.id);
   const filteredRequests = myRequests.filter((t) => {
@@ -294,14 +294,23 @@ export function AdminTasksView() {
     return true;
   });
 
-  const totalDone = activeTasks.filter((t) => t.status === "DONE").length;
+  const totalDone = activeTasks.filter((t) => isCompletedTask(t.status)).length;
   const totalInProg = activeTasks.filter((t) => t.status === "IN_PROGRESS").length;
+  const totalDueToday = activeTasks.filter((t) => {
+    if (isCompletedTask(t.status) || !t.dueDate) return false;
+    const due = new Date(t.dueDate);
+    const today = new Date();
+    return due.getFullYear() === today.getFullYear() &&
+      due.getMonth() === today.getMonth() &&
+      due.getDate() === today.getDate();
+  }).length;
   const totalOverdue = activeTasks.filter((t) =>
-    t.status !== "DONE" && t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(new Date()))
+    !isCompletedTask(t.status) && t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(new Date()))
   ).length;
 
   const taskStatChips = [
-    { label: "Active Tasks", value: activeTasks.length, accent: "border-l-primary", icon: <ListTodo className="h-4 w-4" /> },
+    { label: "Approved", value: activeTasks.length, accent: "border-l-primary", icon: <ListTodo className="h-4 w-4" /> },
+    { label: "Due Today", value: totalDueToday, accent: "border-l-amber-500", icon: <Calendar className="h-4 w-4" /> },
     { label: "In Progress", value: totalInProg, accent: "border-l-blue-500", icon: <Clock className="h-4 w-4" /> },
     { label: "Completed", value: totalDone, accent: "border-l-emerald-500", icon: <CheckCircle2 className="h-4 w-4" /> },
     { label: "Overdue", value: totalOverdue, accent: totalOverdue > 0 ? "border-l-rose-500" : "border-l-slate-300", icon: <AlertCircle className="h-4 w-4" /> },

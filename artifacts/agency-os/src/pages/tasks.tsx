@@ -11,7 +11,9 @@ export const TaskApprovalStatus = {
 
 export default function TasksPage() {
   const { user } = useAuth();
-  const isAdminOrManager = user?.systemRole === "SUPER_ADMIN" || user?.systemRole === "ADMIN" || user?.systemRole === "MANAGER" || user?.systemRole === "ACCOUNT_MANAGER";
+  // Account managers may have full access to Sales, but their task workspace
+  // remains personal. Only true task managers can see the company board.
+  const isAdminOrManager = user?.systemRole === "SUPER_ADMIN" || user?.systemRole === "ADMIN" || user?.systemRole === "MANAGER";
 
   if (isAdminOrManager) {
     return <AdminTasksView />;

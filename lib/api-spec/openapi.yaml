@@ -1560,6 +1560,8 @@ components:
           type: ["string", "null"]
         email:
           type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
         value:
           type: ["number", "null"]
         daysInStage:
@@ -1578,6 +1580,8 @@ components:
         contactName:
           type: ["string", "null"]
         email:
+          type: ["string", "null"]
+        phone:
           type: ["string", "null"]
         value:
           type: ["number", "null"]

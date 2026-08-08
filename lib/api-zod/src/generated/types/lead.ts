@@ -13,6 +13,7 @@ export interface Lead {
   companyName?: string | null;
   /** @nullable */
   contactName?: string | null;
+  phone?: string | null;
   /** @nullable */
   contactEmail?: string | null;
   /** @nullable */

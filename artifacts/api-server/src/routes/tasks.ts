@@ -6,7 +6,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
-import { requirePermission, isPrivilegedRole } from "../middleware/auth";
+import { requirePermission, isTaskManagerRole } from "../middleware/auth";
 import { NotificationService } from "../services/notificationService";
 import { logger, notificationLogger } from "../lib/logger";
 import { hideItemForUser, getHiddenEntityIds, deleteHiddenItemsForEntity } from "../services/hiddenItemsService";
@@ -50,7 +50,7 @@ function sanitizeTask(body: any, isUpdate = false) {
 router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = isPrivilegedRole(requesterSystemRole);
+  const isPrivileged = isTaskManagerRole(requesterSystemRole);
 
   let query = db
     .select({
@@ -107,7 +107,7 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
   const requesterRole = (req as any).userRole || requesterSystemRole;
-  const isPrivileged = isPrivilegedRole(requesterSystemRole);
+  const isPrivileged = isTaskManagerRole(requesterSystemRole);
 
   if (!isPrivileged) {
     // Employees create a task request for themselves
@@ -179,7 +179,7 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
 router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = isPrivilegedRole(requesterSystemRole);
+  const isPrivileged = isTaskManagerRole(requesterSystemRole);
 
   const [row] = await db
     .select({
@@ -236,7 +236,7 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
   const requesterRole = (req as any).userRole || requesterSystemRole;
-  const isPrivileged = isPrivilegedRole(requesterSystemRole);
+  const isPrivileged = isTaskManagerRole(requesterSystemRole);
 
   if (!isPrivileged) {
     // Security check: task.assigneeId == currentUser.id
@@ -262,12 +262,16 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
       if (task.assigneeId !== requesterId) {
         throw createError("Forbidden: You can only update the status of tasks assigned to you", 403);
       }
-      // Active task: employee can ONLY update status or description
+      // Active task: employees can only update status or description.
+      // Completing a task is a manager decision; employees submit it for review.
       const forbiddenKeys = ["approvalStatus", "assigneeId", "approvedBy", "approvedAt", "requestedBy", "requestedAt"];
       const updateKeys = Object.keys(sanitized).filter(k => sanitized[k] !== undefined && sanitized[k] !== null);
       const hasForbiddenChanges = updateKeys.some(k => forbiddenKeys.includes(k) && sanitized[k] !== task[k as keyof typeof task]);
       if (hasForbiddenChanges) {
         throw createError("Forbidden: Employees cannot approve tasks or modify assignees", 403);
+      }
+      if (sanitized.status === "DONE" || sanitized.status === "COMPLETED") {
+        sanitized.status = "IN_REVIEW";
       }
     } else {
       throw createError("Forbidden: Cannot modify a rejected task request", 403);
@@ -452,7 +456,7 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
             actionUrl: "/tasks",
           });
         }
-      } else if (requesterRole === "EMPLOYEE") {
+      } else if (!isTaskManagerRole(requesterSystemRole)) {
         // Employee updated status to something else (e.g., IN_PROGRESS, BLOCKED)
         await NotificationService.notifyAdminsAndManagers({
           title: "📝 Task Status Updated",
@@ -512,7 +516,7 @@ router.delete("/:id", requirePermission("tasks.delete"), asyncHandler(async (req
 
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = isPrivilegedRole(requesterSystemRole);
+  const isPrivileged = isTaskManagerRole(requesterSystemRole);
 
   if (!isPrivileged) {
     if (task.assigneeId !== requesterId) {
@@ -533,7 +537,7 @@ router.delete("/:id", requirePermission("tasks.delete"), asyncHandler(async (req
 router.get("/:id/subtasks", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = isPrivilegedRole(requesterSystemRole);
+  const isPrivileged = isTaskManagerRole(requesterSystemRole);
 
   if (!isPrivileged) {
     const [parentTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, req.params.id as string));

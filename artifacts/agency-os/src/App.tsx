@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider, MutationCache } from "@tanstack/react-query";
 import { Toaster } from "sonner";
 import { useEffect, useState, createContext, useContext, Component, ErrorInfo, ReactNode } from "react";
@@ -411,6 +411,7 @@ import EmployeeWorkReportsPage from "@/pages/employee/work-reports";
 // ─── Protected route wrapper ────────────────────────────────────
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const [location] = useLocation();
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -428,6 +429,23 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (isEmployee) {
     if (user.isDelegatedAdmin && user.portalMode === "MODE_2") {
+      return <>{children}</>;
+    }
+    // A delegated employee with an explicitly enabled module can use the
+    // complete module page, not just the limited employee dashboard.
+    const moduleForPath: Record<string, string> = {
+      "/sales": "sales",
+      "/clients": "clients",
+      "/projects": "projects",
+      "/content": "content",
+      "/tasks": "tasks",
+      "/attendance": "attendance",
+      "/leaves": "leaves",
+    };
+    const module = Object.entries(moduleForPath).find(([path]) =>
+      location === path || location.startsWith(`${path}/`)
+    )?.[1];
+    if (module && (user.allowedModules ?? []).includes(module)) {
       return <>{children}</>;
     }
     return <Redirect to="/employee/dashboard" />;

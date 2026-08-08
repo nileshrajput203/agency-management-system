@@ -4,7 +4,7 @@ import {
   quotationsTable, purchaseOrdersTable, leaveRequestsTable, usersTable,
 } from "@workspace/db/schema";
 import { eq, gte, sql, and } from "drizzle-orm";
-import { isPrivilegedRole } from "../middleware/auth";
+import { isTaskManagerRole } from "../middleware/auth";
 
 function toIso(val: any): string | null {
   if (!val) return null;
@@ -26,7 +26,7 @@ export async function getDashboardStatsService(userId: string) {
 
   const now = new Date();
 
-  if (!isPrivilegedRole(user?.systemRole)) {
+  if (!isTaskManagerRole(user?.systemRole)) {
     // 1. Employee Work Summary
     const employeeTasks = await db
       .select({
@@ -65,6 +65,12 @@ export async function getDashboardStatsService(userId: string) {
       .from(tasksTable)
       .where(eq(tasksTable.requestedBy, userId));
 
+    const activeEmployeeTasks = employeeTasks.filter((t) =>
+      t.approvalStatus === "APPROVED" ||
+      t.approvalStatus === "MODIFIED" ||
+      !t.approvalStatus
+    );
+
     const allProjects = await db
       .select({
         id: projectsTable.id,
@@ -82,7 +88,7 @@ export async function getDashboardStatsService(userId: string) {
       })
       .from(projectsTable);
 
-    const assignedProjectIds = Array.from(new Set(employeeTasks.map((t) => t.projectId).filter(Boolean))) as string[];
+    const assignedProjectIds = Array.from(new Set(activeEmployeeTasks.map((t) => t.projectId).filter(Boolean))) as string[];
     const myProjects = allProjects.filter((p) => p.createdBy === userId || p.assignedTo === userId || assignedProjectIds.includes(p.id));
 
     const allProjectTasks = await db
@@ -97,7 +103,7 @@ export async function getDashboardStatsService(userId: string) {
     const myProjectsWithCompletion = myProjects.map((p) => {
       const projectTasks = allProjectTasks.filter((t) => t.projectId === p.id);
       const totalTasks = projectTasks.length;
-      const completedTasks = projectTasks.filter((t) => t.status === "COMPLETED").length;
+      const completedTasks = projectTasks.filter((t) => t.status === "COMPLETED" || t.status === "DONE").length;
       const completion = p.status === "COMPLETED" ? 100 : totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
       return {
         id: p.id,
@@ -114,21 +120,21 @@ export async function getDashboardStatsService(userId: string) {
       };
     });
 
-    const totalAssignedTasks = employeeTasks.length;
+    const totalAssignedTasks = activeEmployeeTasks.length;
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
-    const tasksDueTodayCount = employeeTasks.filter((t) => {
-      if (t.status === "COMPLETED" || !t.dueDate) return false;
+    const tasksDueTodayCount = activeEmployeeTasks.filter((t) => {
+      if (t.status === "COMPLETED" || t.status === "DONE" || !t.dueDate) return false;
       const d = new Date(t.dueDate);
       return d >= todayStart && d <= todayEnd;
     }).length;
 
-    const overdueTasksCount = employeeTasks.filter((t) => {
-      if (t.status === "COMPLETED" || !t.dueDate) return false;
+    const overdueTasksCount = activeEmployeeTasks.filter((t) => {
+      if (t.status === "COMPLETED" || t.status === "DONE" || !t.dueDate) return false;
       return new Date(t.dueDate) < now;
     }).length;
 
@@ -148,8 +154,8 @@ export async function getDashboardStatsService(userId: string) {
 
     // Upcoming Deadlines
     const upcomingDeadlines: any[] = [];
-    for (const t of employeeTasks) {
-      if (t.dueDate && t.status !== "COMPLETED") {
+    for (const t of activeEmployeeTasks) {
+      if (t.dueDate && t.status !== "COMPLETED" && t.status !== "DONE") {
         const iso = toIso(t.dueDate);
         if (iso) {
           upcomingDeadlines.push({
@@ -218,7 +224,9 @@ export async function getDashboardStatsService(userId: string) {
       .from(tasksTable)
       .where(eq(tasksTable.assigneeId, userId));
 
-    const approvedMyTasks = myTasksList.filter((t) => t.approvalStatus === "APPROVED");
+    const approvedMyTasks = myTasksList.filter((t) =>
+      t.approvalStatus === "APPROVED" || t.approvalStatus === "MODIFIED" || !t.approvalStatus
+    );
 
     const formattedMyTasks = approvedMyTasks.map((t) => {
       const proj = allProjects.find((p) => p.id === t.projectId);

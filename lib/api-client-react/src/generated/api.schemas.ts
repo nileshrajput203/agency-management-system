@@ -96,6 +96,8 @@ export interface Client {
   /** @nullable */
   email?: string | null;
   /** @nullable */
+  phone?: string | null;
+  /** @nullable */
   category?: string | null;
   /** @nullable */
   health?: string | null;
@@ -125,6 +127,8 @@ export interface ClientInput {
   phone?: string | null;
   /** @nullable */
   email?: string | null;
+  /** @nullable */
+  phone?: string | null;
   /** @nullable */
   category?: string | null;
   /** @nullable */
@@ -186,6 +190,8 @@ export interface Lead {
   /** @nullable */
   email?: string | null;
   /** @nullable */
+  phone?: string | null;
+  /** @nullable */
   value?: number | null;
   /** @nullable */
   daysInStage?: number | null;
@@ -201,6 +207,8 @@ export interface LeadInput {
   contactName?: string | null;
   /** @nullable */
   email?: string | null;
+  /** @nullable */
+  phone?: string | null;
   /** @nullable */
   value?: number | null;
 }

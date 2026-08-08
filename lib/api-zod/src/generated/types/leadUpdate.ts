@@ -12,6 +12,7 @@ export interface LeadUpdate {
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
+  phone?: string;
   value?: number;
   stage?: string;
   probability?: number;

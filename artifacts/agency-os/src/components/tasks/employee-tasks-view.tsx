@@ -31,7 +31,7 @@ import { useAuth } from "@/App";
 import {
   Tooltip, TooltipTrigger, TooltipContent
 } from "@/components/ui/tooltip";
-import { COLUMNS, PRIORITY_CONFIG } from "./task-constants";
+import { COLUMNS, PRIORITY_CONFIG, isCompletedTask, sortTasksByDueDate } from "./task-constants";
 
 export function EmployeeTasksView() {
   const { user } = useAuth();
@@ -54,7 +54,8 @@ export function EmployeeTasksView() {
     if (!selectedTaskForAction) return;
     const formData = new FormData(e.currentTarget);
     const description = formData.get("description") as string;
-    const status = formData.get("status") as string;
+    const selectedStatus = formData.get("status") as string;
+    const status = isCompletedTask(selectedStatus) ? "IN_REVIEW" : selectedStatus;
 
     updateRequestMutation.mutate({
       id: selectedTaskForAction.id,
@@ -79,6 +80,7 @@ export function EmployeeTasksView() {
       onSuccess: () => {
         toast.success("Task Request Submitted. Waiting for Admin Approval.");
         qc.invalidateQueries({ queryKey: getListTasksQueryKey() });
+        reset({ title: "", status: "TODO", priority: "MEDIUM", description: "" });
         setRequestDialogOpen(false);
       },
       onError: () => toast.error("Failed to submit task request"),
@@ -118,12 +120,15 @@ export function EmployeeTasksView() {
   };
 
   const handleUpdateStatus = (taskId: string, newStatus: string) => {
+    const requestedStatus = isCompletedTask(newStatus) ? "IN_REVIEW" : newStatus;
     updateRequestMutation.mutate({
       id: taskId,
-      data: { status: newStatus } as any,
+      data: { status: requestedStatus } as any,
     }, {
       onSuccess: () => {
-        toast.success("Task status updated");
+        toast.success(requestedStatus === "IN_REVIEW" && isCompletedTask(newStatus)
+          ? "Task submitted for manager review"
+          : "Task status updated");
       }
     });
   };
@@ -165,8 +170,9 @@ export function EmployeeTasksView() {
     (t) => t.assigneeId === user?.id && (t.approvalStatus === "APPROVED" || t.approvalStatus === "MODIFIED" || !t.approvalStatus)
   );
 
-  const filteredAssigned = assignedTasks.filter((t) => {
-    if (hideCompleted && t.status === "DONE") return false;
+  const filteredAssigned = sortTasksByDueDate(assignedTasks.filter((t) => {
+    // Completed work is rendered in its own section below.
+    if (isCompletedTask(t.status)) return false;
     if (priorityFilter !== "ALL" && t.priority !== priorityFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -176,11 +182,14 @@ export function EmployeeTasksView() {
       );
     }
     return true;
-  });
+  }));
+  const completedAssigned = sortTasksByDueDate(
+    assignedTasks.filter((t) => isCompletedTask(t.status))
+  );
 
   const myRequests = (tasks ?? []).filter((t) => t.requestedBy === user?.id);
 
-  const filteredRequests = myRequests.filter((t) => {
+  const filteredRequests = sortTasksByDueDate(myRequests.filter((t) => {
     if (priorityFilter !== "ALL" && t.priority !== priorityFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -190,7 +199,7 @@ export function EmployeeTasksView() {
       );
     }
     return true;
-  });
+  }));
 
   const getStatusBadge = (status: string | null | undefined) => {
     switch (status) {
@@ -269,7 +278,7 @@ export function EmployeeTasksView() {
             <div className="space-y-3" id="employee-assigned-tasks-list">
               {filteredAssigned.map((task) => {
                 const pc = PRIORITY_CONFIG[task.priority ?? "MEDIUM"] ?? PRIORITY_CONFIG.MEDIUM;
-                const isOverdue = task.dueDate && task.status !== "DONE" && isBefore(parseISO(task.dueDate), startOfDay(new Date()));
+                const isOverdue = task.dueDate && !isCompletedTask(task.status) && isBefore(parseISO(task.dueDate), startOfDay(new Date()));
                 const cardEl = (
                   <Card
                     key={task.id}
@@ -375,6 +384,24 @@ export function EmployeeTasksView() {
                   <CheckCircle2 className="h-10 w-10 mb-2 opacity-50 text-emerald-500" />
                   <p className="text-sm font-bold text-foreground">All Caught Up!</p>
                   <p className="text-xs text-muted-foreground mt-0.5">No tasks assigned to you right now.</p>
+                </div>
+              )}
+              {!hideCompleted && completedAssigned.length > 0 && (
+                <div className="pt-4 mt-4 border-t border-border/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-muted-foreground flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Completed Tasks
+                    </h3>
+                    <Badge variant="outline" className="text-[10px]">{completedAssigned.length}</Badge>
+                  </div>
+                  {completedAssigned.map((task) => (
+                    <Card key={task.id} className="border border-emerald-200/70 bg-emerald-50/20 dark:border-emerald-900/40 dark:bg-emerald-950/10 opacity-75">
+                      <div className="p-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium line-through text-muted-foreground">{task.title}</p>
+                        {task.dueDate && <span className="text-[10px] text-muted-foreground shrink-0">{format(new Date(task.dueDate), "dd MMM yyyy")}</span>}
+                      </div>
+                    </Card>
+                  ))}
                 </div>
               )}
             </div>

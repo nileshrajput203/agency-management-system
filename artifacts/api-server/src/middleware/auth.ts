@@ -12,6 +12,16 @@ export function isPrivilegedRole(systemRole?: string | null): boolean {
   return PRIVILEGED_ROLES.includes(systemRole as any);
 }
 
+// Account managers have delegated access to modules such as Sales, but they
+// are still employees for the task workspace. Only these roles can see and
+// manage the company-wide task board.
+export const TASK_MANAGER_ROLES = ["SUPER_ADMIN", "ADMIN", "MANAGER"] as const;
+
+export function isTaskManagerRole(systemRole?: string | null): boolean {
+  if (!systemRole) return false;
+  return TASK_MANAGER_ROLES.includes(systemRole as any);
+}
+
 export type UserRole = "ADMIN" | "EMPLOYEE";
 
 export type Permission =

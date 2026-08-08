@@ -51,6 +51,7 @@ export const ListClientsResponseItem = zod.object({
   "contactPerson": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "category": zod.string().nullish(),
   "health": zod.string().nullish(),
   "notes": zod.string().nullish(),
@@ -72,6 +73,7 @@ export const CreateClientBody = zod.object({
   "contactPerson": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "category": zod.string().nullish(),
   "health": zod.string().nullish(),
   "notes": zod.string().nullish(),
@@ -104,6 +106,7 @@ export const GetClientResponse = zod.object({
   "contactPerson": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "category": zod.string().nullish(),
   "health": zod.string().nullish(),
   "notes": zod.string().nullish(),
@@ -128,6 +131,7 @@ export const UpdateClientBody = zod.object({
   "contactPerson": zod.string().nullish(),
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "category": zod.string().nullish(),
   "health": zod.string().nullish(),
   "notes": zod.string().nullish(),
@@ -200,6 +204,7 @@ export const ListLeadsResponseItem = zod.object({
   "companyName": zod.string().nullish(),
   "contactName": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "value": zod.number().nullish(),
   "daysInStage": zod.number().nullish()
 })
@@ -215,6 +220,7 @@ export const CreateLeadBody = zod.object({
   "companyName": zod.string().nullish(),
   "contactName": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "value": zod.number().nullish()
 })
 
@@ -243,6 +249,7 @@ export const UpdateLeadBody = zod.object({
   "companyName": zod.string().nullish(),
   "contactName": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "value": zod.number().nullish()
 })
 
@@ -253,6 +260,7 @@ export const UpdateLeadResponse = zod.object({
   "companyName": zod.string().nullish(),
   "contactName": zod.string().nullish(),
   "email": zod.string().nullish(),
+  "phone": zod.string().nullish(),
   "value": zod.number().nullish(),
   "daysInStage": zod.number().nullish()
 })
