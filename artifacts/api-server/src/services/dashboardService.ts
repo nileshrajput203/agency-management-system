@@ -121,6 +121,11 @@ export async function getDashboardStatsService(userId: string) {
     });
 
     const totalAssignedTasks = activeEmployeeTasks.length;
+    const approvedTasksCount = activeEmployeeTasks.length;
+    const runningTasksCount = activeEmployeeTasks.filter((t) => t.status === "IN_PROGRESS").length;
+    const completedTasksCount = activeEmployeeTasks.filter(
+      (t) => t.status === "DONE" || t.status === "COMPLETED"
+    ).length;
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -145,7 +150,7 @@ export async function getDashboardStatsService(userId: string) {
     ).length;
 
     const approvedRequestsCount = employeeTaskRequests.filter(
-      (t) => t.approvalStatus === "APPROVED"
+      (t) => t.approvalStatus === "APPROVED" || t.approvalStatus === "MODIFIED"
     ).length;
 
     const rejectedRequestsCount = employeeTaskRequests.filter(
@@ -265,6 +270,9 @@ export async function getDashboardStatsService(userId: string) {
         projectsAssignedToMe: projectsAssignedToMeCount,
         pendingTaskRequests: pendingTaskRequestsCount,
         approvedRequests: approvedRequestsCount,
+          approvedTasks: approvedTasksCount,
+          runningTasks: runningTasksCount,
+          completedTasks: completedTasksCount,
         rejectedRequests: rejectedRequestsCount,
       },
       assignedProjects: myProjectsWithCompletion,

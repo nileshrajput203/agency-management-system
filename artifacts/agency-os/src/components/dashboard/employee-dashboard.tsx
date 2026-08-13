@@ -100,9 +100,11 @@ export function EmployeeDashboard({
 
   // Task breakdown
   const totalTasks     = myTasks.length;
-  const doneTasks      = myTasks.filter((t: any) => t.status === "COMPLETED" || t.status === "DONE").length;
-  const overdueTasks   = myTasks.filter((t: any) => t.dueDate && isPast(new Date(t.dueDate)) && t.status !== "COMPLETED" && t.status !== "DONE").length;
-  const dueToday       = myTasks.filter((t: any) => t.dueDate && isToday(new Date(t.dueDate))).length;
+  const doneTasks      = summary.completedTasks ?? myTasks.filter((t: any) => t.status === "COMPLETED" || t.status === "DONE").length;
+  const runningTasks   = summary.runningTasks ?? myTasks.filter((t: any) => t.status === "IN_PROGRESS").length;
+  const approvedTasks  = summary.approvedTasks ?? totalTasks;
+  const overdueTasks   = summary.overdueTasks ?? myTasks.filter((t: any) => t.dueDate && isPast(new Date(t.dueDate)) && t.status !== "COMPLETED" && t.status !== "DONE").length;
+  const dueToday       = summary.tasksDueToday ?? myTasks.filter((t: any) => t.dueDate && isToday(new Date(t.dueDate))).length;
   const progressPct    = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
   // Upcoming tasks: non-completed, sorted by due date
@@ -219,10 +221,14 @@ export function EmployeeDashboard({
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <CheckSquare className="h-4 w-4 text-indigo-500" /> My Tasks
             </div>
-            <div className="grid grid-cols-3 gap-1 text-center text-xs">
+            <div className="grid grid-cols-5 gap-1 text-center text-xs">
               <div>
-                <p className="text-xl font-bold text-foreground font-heading">{totalTasks}</p>
-                <p className="text-[10px] text-muted-foreground">Total</p>
+                <p className="text-xl font-bold text-foreground font-heading">{approvedTasks}</p>
+                <p className="text-[10px] text-muted-foreground">Approved</p>
+              </div>
+              <div>
+                <p className="text-xl font-bold text-blue-500 font-heading">{runningTasks}</p>
+                <p className="text-[10px] text-muted-foreground">Running</p>
               </div>
               <div>
                 <p className={cn("text-xl font-bold font-heading", dueToday > 0 ? "text-amber-500" : "text-foreground")}>{dueToday}</p>
@@ -231,6 +237,10 @@ export function EmployeeDashboard({
               <div>
                 <p className={cn("text-xl font-bold font-heading", overdueTasks > 0 ? "text-rose-500" : "text-foreground")}>{overdueTasks}</p>
                 <p className="text-[10px] text-muted-foreground">Overdue</p>
+              </div>
+              <div>
+                <p className="text-xl font-bold text-emerald-500 font-heading">{doneTasks}</p>
+                <p className="text-[10px] text-muted-foreground">Complete</p>
               </div>
             </div>
           </CardContent>

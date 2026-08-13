@@ -48,7 +48,7 @@ const ALL_EMPLOYEE_NAV_GROUPS: NavGroupDef[] = [
     label: "My Work",
     items: [
       { label: "My Clients",        href: "/employee/clients",          icon: <Users className="h-4 w-4" />,                               modules: ["clients"] },
-      { label: "Sales Funnel",      href: "/employee/leads",            icon: <TrendingUp className="h-4 w-4" />,                           modules: ["sales"] },
+      { label: "Sales Funnel",      href: "/sales",                      icon: <TrendingUp className="h-4 w-4" />,                           modules: ["sales"] },
       { label: "My Projects",       href: "/employee/projects",         icon: <FolderKanban className="h-4 w-4" />,                         modules: ["projects"] },
       { label: "My Tasks",          href: "/employee/tasks",            icon: <CheckSquare className="h-4 w-4" />,                          modules: ["tasks"] },
       { label: "Work Reports",      href: "/employee/work-reports",     icon: <FileCheck className="h-4 w-4 text-emerald-500" /> },

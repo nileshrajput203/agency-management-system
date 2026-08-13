@@ -12,7 +12,7 @@ import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { MultiAssigneePicker } from "@/components/common/MultiAssigneePicker";
 import { COLUMNS } from "./task-constants";
 import { useForm, Controller } from "react-hook-form";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { TaskInput } from "@workspace/api-client-react";
 
 interface TaskActionDialogsProps {
@@ -66,7 +66,7 @@ export function TaskActionDialogs({
   onConfirmAdminEdit,
   isUpdatePending,
 }: TaskActionDialogsProps) {
-  const { register, handleSubmit, control, setValue } = useForm<TaskInput>({
+  const { register, handleSubmit, control, setValue, reset } = useForm<TaskInput>({
     defaultValues: {
       status: defaultStatus,
       priority: "MEDIUM",
@@ -81,6 +81,22 @@ export function TaskActionDialogs({
   const [editCoAssignees, setEditCoAssignees] = useState<string[]>(
     Array.isArray(selectedTaskForAction?.coAssignees) ? selectedTaskForAction.coAssignees : []
   );
+
+  useEffect(() => {
+    if (dialogOpen) {
+      reset({ title: "", status: defaultStatus, priority: "MEDIUM" });
+      setCreateCoAssignees([]);
+    }
+  }, [dialogOpen, defaultStatus, reset]);
+
+  useEffect(() => {
+    if (!selectedTaskForAction) return;
+    const coAssignees = Array.isArray(selectedTaskForAction.coAssignees)
+      ? selectedTaskForAction.coAssignees
+      : [];
+    if (modifyDialogOpen) setModifyCoAssignees(coAssignees);
+    if (adminEditDialogOpen) setEditCoAssignees(coAssignees);
+  }, [selectedTaskForAction?.id, modifyDialogOpen, adminEditDialogOpen]);
 
   // Wrap create submit to inject coAssignees
   const handleCreateSubmit = (data: TaskInput) => {
@@ -248,7 +264,7 @@ export function TaskActionDialogs({
           <DialogHeader>
             <DialogTitle>Modify & Approve Task Request</DialogTitle>
           </DialogHeader>
-          <form onSubmit={onConfirmModify} className="space-y-4 mt-2">
+          <form key={`modify-${selectedTaskForAction?.id ?? "empty"}`} onSubmit={onConfirmModify} className="space-y-4 mt-2">
             <div className="space-y-1.5">
               <Label>Title *</Label>
               <Input name="title" defaultValue={selectedTaskForAction?.title || ""} required />
@@ -357,7 +373,7 @@ export function TaskActionDialogs({
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>
           </DialogHeader>
-          <form onSubmit={onConfirmAdminEdit} className="space-y-4 mt-2">
+          <form key={`edit-${selectedTaskForAction?.id ?? "empty"}`} onSubmit={onConfirmAdminEdit} className="space-y-4 mt-2">
             <div className="space-y-1.5">
               <Label>Title *</Label>
               <Input name="title" defaultValue={selectedTaskForAction?.title || ""} required />

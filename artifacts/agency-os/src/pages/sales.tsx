@@ -299,6 +299,7 @@ function LeadFormFields({ register, control, setValue, isEdit = false }: any) {
             if (fields.companyName) setValue("companyName", fields.companyName, { shouldDirty: true });
             if (fields.contactName) setValue("contactName", fields.contactName, { shouldDirty: true });
             if (fields.email) setValue("email", fields.email, { shouldDirty: true });
+             if (fields.phone) setValue("phone", fields.phone, { shouldDirty: true });
             if (fields.value) setValue("value", Number(fields.value) as any, { shouldDirty: true });
             if (fields.stage) setValue("stage", fields.stage, { shouldDirty: true });
           }}
@@ -344,6 +345,13 @@ function LeadFormFields({ register, control, setValue, isEdit = false }: any) {
           <Label>Email</Label>
           <Input {...register("email")} type="email" placeholder="lead@company.com" />
         </div>
+        <div className="space-y-1.5">
+          <Label>Phone Number</Label>
+          <Input {...register("phone")} type="tel" placeholder="+91 98765 43210" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label>Expected Close Date</Label>
           <Input {...register("expectedCloseDate")} type="date" />
@@ -417,6 +425,7 @@ export default function SalesPage() {
         qc.invalidateQueries({ queryKey: getListLeadsQueryKey() });
         qc.invalidateQueries({ queryKey: ["leads-scheduled"] });
         setCreateOpen(false);
+        createForm.reset({ title: "", stage: "LEAD" });
       },
       onError: () => toast.error("Failed to create lead"),
     },
@@ -508,6 +517,7 @@ export default function SalesPage() {
       l.title?.toLowerCase().includes(q) ||
       l.companyName?.toLowerCase().includes(q) ||
       l.email?.toLowerCase().includes(q) ||
+      l.phone?.toLowerCase().includes(q) ||
       l.stage?.toLowerCase().includes(q) ||
       l.description?.toLowerCase().includes(q) ||
       l.contactName?.toLowerCase().includes(q)

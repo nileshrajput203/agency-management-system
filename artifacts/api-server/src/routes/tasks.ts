@@ -112,6 +112,9 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
   if (!isPrivileged) {
     // Employees create a task request for themselves
     sanitized.approvalStatus = "PENDING";
+    // A request always starts as work to be done. Completion must happen
+    // after approval and then go through IN_REVIEW for manager review.
+    sanitized.status = "TODO";
     sanitized.requestedBy = requesterId;
     sanitized.requestedAt = new Date();
     sanitized.assigneeId = requesterId; // Employees request tasks for themselves
@@ -279,9 +282,6 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
   } else {
     // Admin / Manager is modifying/approving
     if (sanitized.approvalStatus !== "REJECTED") {
-      const isManagerRole = ["MANAGER", "ACCOUNT_MANAGER"].includes(requesterSystemRole ?? "");
-      const isFinalApprover = ["SUPER_ADMIN", "ADMIN"].includes(requesterSystemRole ?? "");
-
       if (
         task.approvalStatus === "PENDING" ||
         sanitized.status === "DONE" ||
@@ -290,23 +290,14 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
         sanitized.approvalStatus === "MODIFIED" ||
         !sanitized.approvalStatus
       ) {
-        // Two-step: Manager first approval → MANAGER_APPROVED; Admin/SuperAdmin → APPROVED
-        if (task.approvalStatus === "PENDING" && isManagerRole && !isFinalApprover) {
-          // First step: Manager approval
-          sanitized.approvalStatus = "MANAGER_APPROVED";
-          sanitized.managerApprovedBy = requesterId;
-          sanitized.managerApprovedAt = new Date();
-          // Don't set approvedBy/approvedAt yet — that's the final step
-        } else {
-          // Final approval (admin, super_admin, or manager approving MANAGER_APPROVED tasks)
-          sanitized.approvalStatus = sanitized.approvalStatus || "APPROVED";
-          sanitized.approvedBy = requesterId;
-          sanitized.approvedAt = new Date();
-          // Preserve manager approval if it was already set
-          if (!sanitized.managerApprovedBy && (task as any).managerApprovedBy) {
-            sanitized.managerApprovedBy = (task as any).managerApprovedBy;
-            sanitized.managerApprovedAt = (task as any).managerApprovedAt;
-          }
+        // Any task manager can approve a request. Do not leave legacy DONE
+        // values in place when an old request is approved.
+        sanitized.approvalStatus = sanitized.approvalStatus || "APPROVED";
+        sanitized.approvedBy = requesterId;
+        sanitized.approvedAt = new Date();
+        if (task.approvalStatus === "PENDING" &&
+            (task.status === "DONE" || task.status === "COMPLETED" || task.status === "IN_REVIEW")) {
+          sanitized.status = "TODO";
         }
       }
 
