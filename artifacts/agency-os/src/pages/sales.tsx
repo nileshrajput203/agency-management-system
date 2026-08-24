@@ -418,6 +418,12 @@ export default function SalesPage() {
   const { data: leads = [], isLoading } = useListLeads();
   const { data: pipeline } = useGetPipelineSummary();
 
+  const emptyLead = {
+    title: "", stage: "LEAD", companyName: "", contactName: "", email: "",
+    phone: "", value: undefined, probability: 0, expectedCloseDate: "",
+    source: "", description: "", notes: "", nextCallDate: "",
+  } as any;
+
   const createMutation = useCreateLead({
     mutation: {
       onSuccess: () => {
@@ -425,7 +431,7 @@ export default function SalesPage() {
         qc.invalidateQueries({ queryKey: getListLeadsQueryKey() });
         qc.invalidateQueries({ queryKey: ["leads-scheduled"] });
         setCreateOpen(false);
-        createForm.reset({ title: "", stage: "LEAD" });
+        createForm.reset(emptyLead);
       },
       onError: () => toast.error("Failed to create lead"),
     },
@@ -463,7 +469,7 @@ export default function SalesPage() {
   });
 
   /* Create form */
-  const createForm = useForm<LeadInput>({ defaultValues: { title: "", stage: "LEAD" } });
+  const createForm = useForm<LeadInput>({ defaultValues: emptyLead });
   const onCreateSubmit = (data: LeadInput) => {
     createMutation.mutate({ data: { ...data, value: data.value ? Number(data.value) : undefined } as any });
   };
@@ -537,7 +543,7 @@ export default function SalesPage() {
         <div className="flex items-center gap-3">
           <SearchBar placeholder="Search leads…" value={searchQuery} onChange={setSearchQuery} />
           <Button
-            onClick={() => { createForm.reset({ title: "", stage: "LEAD" }); setCreateOpen(true); }}
+            onClick={() => { createForm.reset(emptyLead); setCreateOpen(true); }}
             className="gap-2 btn-micro-anim"
             data-testid="add-lead-btn"
           >

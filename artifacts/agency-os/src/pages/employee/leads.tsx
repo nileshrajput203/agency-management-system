@@ -42,24 +42,10 @@ export default function EmployeeLeadsPage() {
     search: search || undefined,
   });
 
-  // Filter leads assigned to logged in employee
-  const myLeads = (leads ?? []).filter((l: any) =>
-    l.assignedTo === user?.id ||
-    l.assignedTo === user?.name ||
-    l.assignedTo === user?.email ||
-    l.createdBy === user?.id
-  );
-
-  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(user?.systemRole || user?.role);
-  const isDelegatedAdmin = Boolean(user?.isDelegatedAdmin);
-  const userAllowedModules = Array.isArray(user?.allowedModules) ? user.allowedModules : [];
-
-  const canManageLeads = isFullAdmin || (isDelegatedAdmin && (userAllowedModules.length === 0 || userAllowedModules.includes("leads") || userAllowedModules.includes("sales")));
-
-  // Fallback if no explicit assignedTo filter matches
-  const displayLeads = canManageLeads
-    ? (leads ?? [])
-    : (myLeads.length > 0 ? myLeads : (leads ?? []).filter((l: any) => l.assignedTo === user?.id || l.assignedTo === user?.name));
+  // The API already scopes this response to the current employee. Never use
+  // an unscoped fallback here, otherwise an empty result would reveal the
+  // entire sales pipeline.
+  const displayLeads = leads ?? [];
 
   const updateLeadMutation = useUpdateLead({
     mutation: {
@@ -74,8 +60,8 @@ export default function EmployeeLeadsPage() {
 
   const openEditModal = (lead: any) => {
     setSelectedLead(lead);
-    setStage(lead.status || "LEAD");
-    setFollowUpDate(lead.followUpDate ? lead.followUpDate.split("T")[0] : "");
+    setStage(lead.stage || "LEAD");
+    setFollowUpDate(lead.nextCallDate ? lead.nextCallDate.split("T")[0] : "");
     setDescription(lead.description || "");
     setNotes(lead.notes || "");
   };
@@ -85,8 +71,8 @@ export default function EmployeeLeadsPage() {
     updateLeadMutation.mutate({
       id: selectedLead.id,
       data: {
-        status: stage,
-        followUpDate: followUpDate || undefined,
+        stage,
+        nextCallDate: followUpDate || null,
         description,
         notes,
       } as any,

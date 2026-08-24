@@ -274,6 +274,25 @@ export function requirePermission(permission: Permission) {
           }
         }
       }
+    } else if (!isPrivileged && allowedModulesList.length > 0) {
+      // An explicitly enabled module is a complete employee-facing section.
+      // Keep task data scoped to the employee below, but allow the section's
+      // normal create/edit actions instead of showing a page that can only be
+      // read.
+      const MODULE_EMPLOYEE_PERMISSIONS: Record<string, string[]> = {
+        sales: ["sales.view", "sales.create", "sales.edit", "sales.delete"],
+        clients: ["clients.view", "clients.create", "clients.edit"],
+        projects: ["projects.view", "projects.create", "projects.edit"],
+        tasks: ["tasks.view", "tasks.create", "tasks.edit"],
+        content: ["content.view", "content.create", "content.edit"],
+        attendance: ["attendance.view", "attendance.manage"],
+        leaves: ["leave.view", "leave.apply"],
+      };
+      for (const mod of allowedModulesList) {
+        if (MODULE_EMPLOYEE_PERMISSIONS[mod]) {
+          effectivePermissions.push(...MODULE_EMPLOYEE_PERMISSIONS[mod]);
+        }
+      }
     }
 
     if (!effectivePermissions.includes(permission)) {

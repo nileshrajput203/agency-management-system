@@ -6,6 +6,7 @@ import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
 import { requirePermission } from "../middleware/auth";
+import { isTaskManagerRole } from "../middleware/auth";
 
 const router = Router();
 
@@ -25,7 +26,13 @@ function sanitizeLead(body: any, isUpdate = false) {
 }
 
 router.get("/", requirePermission("sales.view"), asyncHandler(async (req, res) => {
-  const rows = await db.select().from(leadsTable);
+  const requesterId = (req as any).userId;
+  const isCompanySalesManager = isTaskManagerRole((req as any).userSystemRole) ||
+    ["ACCOUNT_MANAGER"].includes((req as any).userSystemRole);
+  const rows = await db
+    .select()
+    .from(leadsTable)
+    .where(isCompanySalesManager ? undefined : eq(leadsTable.createdBy, requesterId));
   const now = Date.now();
   const result = rows.map((lead) => ({
     ...lead,
@@ -37,12 +44,16 @@ router.get("/", requirePermission("sales.view"), asyncHandler(async (req, res) =
 }));
 
 router.get("/pipeline-summary", requirePermission("sales.view"), asyncHandler(async (req, res) => {
+  const requesterId = (req as any).userId;
+  const isCompanySalesManager = isTaskManagerRole((req as any).userSystemRole) ||
+    ["ACCOUNT_MANAGER"].includes((req as any).userSystemRole);
   const allLeads = await db
     .select({
       stage: leadsTable.stage,
       value: leadsTable.value,
     })
-    .from(leadsTable);
+    .from(leadsTable)
+    .where(isCompanySalesManager ? undefined : eq(leadsTable.createdBy, requesterId));
 
   const stageCounts: Record<string, number> = {};
   const stageValues: Record<string, number> = {};
@@ -65,9 +76,10 @@ router.get("/pipeline-summary", requirePermission("sales.view"), asyncHandler(as
 router.post("/", requirePermission("sales.create"), asyncHandler(async (req, res) => {
   const { id: _id, createdAt: _ts, ...body } = req.body;
   const sanitized = sanitizeLead(body, false);
+  const requesterId = (req as any).userId;
   const [row] = await db
     .insert(leadsTable)
-    .values({ ...sanitized, stageChangedAt: new Date() })
+    .values({ ...sanitized, createdBy: requesterId, updatedBy: requesterId, stageChangedAt: new Date() })
     .returning();
   return res.status(201).json(row);
 }));
@@ -75,7 +87,16 @@ router.post("/", requirePermission("sales.create"), asyncHandler(async (req, res
 router.patch("/:id", requirePermission("sales.edit"), asyncHandler(async (req, res) => {
   const { id: _id, createdAt: _ts, ...body } = req.body;
   const sanitized = sanitizeLead(body, true);
-  const updates: Record<string, unknown> = { ...sanitized };
+  const requesterId = (req as any).userId;
+  const isCompanySalesManager = isTaskManagerRole((req as any).userSystemRole) ||
+    ["ACCOUNT_MANAGER"].includes((req as any).userSystemRole);
+  if (!isCompanySalesManager) {
+    const [ownedLead] = await db.select({ id: leadsTable.id })
+      .from(leadsTable)
+      .where(eq(leadsTable.id, req.params.id as string));
+    if (!ownedLead) throw createError("Not found", 404);
+  }
+  const updates: Record<string, unknown> = { ...sanitized, updatedBy: requesterId };
   if (sanitized.stage) updates.stageChangedAt = new Date();
   const [row] = await db
     .update(leadsTable)
@@ -93,7 +114,11 @@ router.delete("/:id", requirePermission("sales.delete"), asyncHandler(async (req
 
 // Returns leads with a nextCallDate that is today or overdue (for Sales Tasks tab)
 router.get("/scheduled-calls", requirePermission("sales.view"), asyncHandler(async (req, res) => {
-  const rows = await db.select().from(leadsTable);
+  const requesterId = (req as any).userId;
+  const isCompanySalesManager = isTaskManagerRole((req as any).userSystemRole) ||
+    ["ACCOUNT_MANAGER"].includes((req as any).userSystemRole);
+  const rows = await db.select().from(leadsTable)
+    .where(isCompanySalesManager ? undefined : eq(leadsTable.createdBy, requesterId));
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const scheduled = rows

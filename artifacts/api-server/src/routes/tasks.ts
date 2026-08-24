@@ -295,8 +295,12 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
         sanitized.approvalStatus = sanitized.approvalStatus || "APPROVED";
         sanitized.approvedBy = requesterId;
         sanitized.approvedAt = new Date();
+        // A request submitted as Done/In Review is still awaiting approval.
+        // Approval activates it as To Do; otherwise it is counted as completed
+        // immediately even though the manager has only just approved it.
         if (task.approvalStatus === "PENDING" &&
-            (task.status === "DONE" || task.status === "COMPLETED" || task.status === "IN_REVIEW")) {
+            (task.status === "DONE" || task.status === "COMPLETED" || task.status === "IN_REVIEW" ||
+             sanitized.status === "DONE" || sanitized.status === "COMPLETED" || sanitized.status === "IN_REVIEW")) {
           sanitized.status = "TODO";
         }
       }

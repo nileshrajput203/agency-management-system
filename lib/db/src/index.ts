@@ -41,9 +41,10 @@ if (!envLoaded && fs.existsSync("/.env")) {
   dotenv.config({ path: "/.env", override: true });
 }
 
-const POPULATED_NEON_URL = "postgresql://postgres.dndbbrhkrffxkvqiiujw:agency_123management@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres";
-
-let databaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || POPULATED_NEON_URL;
+// Never ship a fallback connection string. If the configured Neon endpoint is
+// unavailable, using a local database makes the app appear to work while
+// silently writing data somewhere the user cannot see.
+let databaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "";
 if (databaseUrl) {
   let cleanUrl = databaseUrl.trim();
   if (cleanUrl.includes("agency@123management")) {
@@ -85,7 +86,7 @@ let isConnected = true;
 let checkDone = false;
 
 function isAlaSqlMode(): boolean {
-  return process.env.USE_ALASQL === "true" || !databaseUrl || forceAlaSqlFallback || (checkDone && !isConnected);
+  return process.env.USE_ALASQL === "true" || !databaseUrl;
 }
 
 const useAlaSql = isAlaSqlMode();
@@ -447,19 +448,16 @@ async function checkDatabaseConnection(): Promise<boolean> {
         console.log("[AI Studio] Real PostgreSQL database connected successfully on port", port);
       } catch (queryErr: any) {
         try { await testClient.end(); } catch (_) {}
-        console.warn("[AI Studio] Real PostgreSQL query test failed (" + (queryErr?.message || queryErr) + "). Falling back to local AlaSQL.");
+        console.error("[Database] PostgreSQL connection test failed (" + (queryErr?.message || queryErr) + "). The configured endpoint must be enabled and reachable.");
         isConnected = false;
-        forceAlaSqlFallback = true;
       }
     } else {
-      console.warn("[AI Studio] Real PostgreSQL database is not reachable. Falling back to local AlaSQL.");
+      console.error("[Database] PostgreSQL endpoint is not reachable. Check the Neon endpoint status and connection string.");
       isConnected = false;
-      forceAlaSqlFallback = true;
     }
   } catch (err) {
-    console.warn("[AI Studio] Database connection check failed. Falling back to local AlaSQL.");
+    console.error("[Database] PostgreSQL connection check failed. Check the Neon endpoint status and connection string.");
     isConnected = false;
-    forceAlaSqlFallback = true;
   }
 
   return isConnected;
@@ -560,11 +558,7 @@ pool.query = function(sql: any, params?: any, cb?: any) {
         if (err) {
           console.error("[PostgreSQL Query Error]:", err.message || err, "\nSQL:", typeof queryObj === "object" ? queryObj.text : queryObj);
           if (isConnOrAuthError(err)) {
-            console.warn("[AI Studio] Database auth/connection error detected. Activating AlaSQL fallback mode.");
-            forceAlaSqlFallback = true;
             isConnected = false;
-            runAlaSqlQuery(queryObj, actualParams);
-            return;
           }
         }
         actualCb(err, res);
@@ -580,12 +574,7 @@ pool.query = function(sql: any, params?: any, cb?: any) {
 
     return p.catch(async (err: any) => {
       console.error("[PostgreSQL Query Error]:", err.message || err, "\nSQL:", typeof queryObj === "object" ? queryObj.text : queryObj);
-      if (isConnOrAuthError(err)) {
-        console.warn("[AI Studio] Database auth/connection error detected. Activating AlaSQL fallback mode.");
-        forceAlaSqlFallback = true;
-        isConnected = false;
-        return runAlaSqlQuery(queryObj, actualParams);
-      }
+      if (isConnOrAuthError(err)) isConnected = false;
       throw err;
     });
   }
