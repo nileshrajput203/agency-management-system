@@ -281,6 +281,15 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
     }
   } else {
     // Admin / Manager is modifying/approving
+    // Completion is only valid for a task that has already been approved.
+    // This keeps a manager's approval action and completion action separate,
+    // so a pending request can never jump directly to Done.
+    if ((sanitized.status === "DONE" || sanitized.status === "COMPLETED") &&
+        task.approvalStatus !== "APPROVED" &&
+        task.approvalStatus !== "MODIFIED") {
+      throw createError("Approve this task request before marking it as done", 409, undefined, "status");
+    }
+
     if (sanitized.approvalStatus !== "REJECTED") {
       if (
         task.approvalStatus === "PENDING" ||

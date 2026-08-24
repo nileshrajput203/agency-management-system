@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useForm, Controller } from "react-hook-form";
-import { Plus, Trash2, UserCog, Mail, Pencil } from "lucide-react";
+import { Plus, Trash2, UserCog, Mail, Pencil, Search, ShieldCheck, UserCheck, UserX } from "lucide-react";
 import { useAuth } from "@/App";
 import { cn } from "@/lib/utils";
 import { ENABLE_PROPOSALS } from "@/lib/constants";
@@ -61,8 +61,24 @@ export default function UsersPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [failedEmail, setFailedEmail] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const { data: users, isLoading } = useListUsers();
+  const visibleUsers = (users ?? []).filter((member) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch = !query ||
+      member.name.toLowerCase().includes(query) ||
+      member.email.toLowerCase().includes(query) ||
+      (member.department ?? "").toLowerCase().includes(query);
+    const matchesRole = roleFilter === "ALL" || member.systemRole === roleFilter;
+    const matchesStatus = statusFilter === "ALL" ||
+      (statusFilter === "ACTIVE" ? member.isActive !== false : member.isActive === false);
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+  const activeCount = (users ?? []).filter((member) => member.isActive !== false).length;
+  const adminCount = (users ?? []).filter((member) => ["SUPER_ADMIN", "MANAGER"].includes(member.systemRole ?? "")).length;
 
   const { register, handleSubmit, control, reset, setValue, watch, setError, clearErrors, formState: { errors } } = useForm<UserInput>({
     defaultValues: { name: "", email: "", password: "", systemRole: "ACCOUNT_MANAGER", allowedModules: [] },
@@ -212,7 +228,7 @@ export default function UsersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <h1 className="text-2xl font-bold font-heading">Team & Roles</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">{users?.length ?? 0} team members</p>
+            <p className="text-sm text-muted-foreground mt-0.5">Manage people, roles, and module access from one place.</p>
           </div>
           <div className="flex items-center gap-3">
             <TabsList className="bg-muted p-1">
@@ -228,20 +244,73 @@ export default function UsersPage() {
         </div>
 
         <TabsContent value="directory" className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card className="bg-primary/[0.04] border-primary/15">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center"><UserCog className="h-4 w-4 text-primary" /></div>
+                <div><p className="text-xl font-bold leading-none">{users?.length ?? 0}</p><p className="text-xs text-muted-foreground mt-1">Total members</p></div>
+              </CardContent>
+            </Card>
+            <Card className="bg-emerald-500/[0.04] border-emerald-500/15">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center"><UserCheck className="h-4 w-4 text-emerald-600" /></div>
+                <div><p className="text-xl font-bold leading-none">{activeCount}</p><p className="text-xs text-muted-foreground mt-1">Active members</p></div>
+              </CardContent>
+            </Card>
+            <Card className="bg-violet-500/[0.04] border-violet-500/15">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg bg-violet-500/10 flex items-center justify-center"><ShieldCheck className="h-4 w-4 text-violet-600" /></div>
+                <div><p className="text-xl font-bold leading-none">{adminCount}</p><p className="text-xs text-muted-foreground mt-1">Managers & admins</p></div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="flex flex-col md:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search by name, email, or department…"
+                className="pl-9"
+                aria-label="Search team members"
+              />
+            </div>
+            <Select value={roleFilter} onValueChange={(value) => setRoleFilter(value ?? "ALL")}>
+              <SelectTrigger className="w-full md:w-48"><SelectValue placeholder="All roles" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All roles</SelectItem>
+                {Object.entries(ROLE_CONFIG).map(([key, value]) => <SelectItem key={key} value={key}>{value.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "ALL")}>
+              <SelectTrigger className="w-full md:w-36"><SelectValue placeholder="All status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">All status</SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="INACTIVE">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {(searchQuery || roleFilter !== "ALL" || statusFilter !== "ALL") && (
+            <p className="text-xs text-muted-foreground">
+              Showing {visibleUsers.length} of {users?.length ?? 0} members
+            </p>
+          )}
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Card key={i}><CardContent className="p-5"><Skeleton className="h-24" /></CardContent></Card>
               ))}
             </div>
-          ) : (users ?? []).length === 0 ? (
+          ) : visibleUsers.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
-              <UserCog className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No team members yet</p>
+              <UserX className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p className="font-medium">{users?.length ? "No members match these filters" : "No team members yet"}</p>
+              {users?.length ? <Button variant="link" className="text-xs" onClick={() => { setSearchQuery(""); setRoleFilter("ALL"); setStatusFilter("ALL"); }}>Clear filters</Button> : null}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {(users ?? []).map((u) => {
+              {visibleUsers.map((u) => {
                 const rc = ROLE_CONFIG[u.systemRole ?? "ACCOUNT_MANAGER"];
                 return (
                   <Card key={u.id} className="scale-hover">
@@ -290,7 +359,7 @@ export default function UsersPage() {
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Active</span>
+                         <span className="text-xs text-muted-foreground">{u.isActive === false ? "Inactive" : "Active"}</span>
                         <Switch
                           checked={u.isActive ?? true}
                           onCheckedChange={(v) => toggleActive(u.id, v)}

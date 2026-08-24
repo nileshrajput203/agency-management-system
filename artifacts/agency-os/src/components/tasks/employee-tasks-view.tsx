@@ -304,6 +304,11 @@ export function EmployeeTasksView() {
                                 Modified by Admin
                               </Badge>
                             )}
+                            {task.status === "IN_REVIEW" && (
+                              <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] px-1.5 py-0 dark:bg-amber-950/40 dark:text-amber-400">
+                                Awaiting manager approval
+                              </Badge>
+                            )}
                           </div>
                           <h3 className="text-base font-semibold leading-snug pt-1 text-foreground">{task.title}</h3>
                         </div>
@@ -329,7 +334,7 @@ export function EmployeeTasksView() {
                             <SelectContent>
                               {COLUMNS.map((c) => (
                                 <SelectItem key={c.key} value={c.key} className="text-xs">
-                                  {c.label}
+                                  {c.key === "DONE" ? "Submit for Review" : c.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
