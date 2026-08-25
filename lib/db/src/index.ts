@@ -45,8 +45,8 @@ if (!envLoaded && fs.existsSync("/.env")) {
 // unavailable, using a local database makes the app appear to work while
 // silently writing data somewhere the user cannot see.
 let databaseUrl =
-  process.env.SUPABASE_DATABASE_URL ||
   process.env.NEON_DATABASE_URL ||
+  process.env.SUPABASE_DATABASE_URL ||
   process.env.DATABASE_URL ||
   "";
 if (databaseUrl) {

@@ -5,8 +5,8 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 let dbUrl =
-  process.env.SUPABASE_DATABASE_URL ||
   process.env.NEON_DATABASE_URL ||
+  process.env.SUPABASE_DATABASE_URL ||
   process.env.DATABASE_URL ||
   "";
 if (dbUrl) {
