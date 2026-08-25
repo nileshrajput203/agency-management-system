@@ -10,7 +10,7 @@ All-in-one agency management platform for managing clients, projects, tasks, inv
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `NEON_DATABASE_URL` — Neon Postgres connection string (set as Replit Secret); takes priority over Replit-managed `DATABASE_URL`
+- Required env: `SUPABASE_DATABASE_URL` — Supabase Postgres direct connection string (set as a Replit Secret); takes priority over legacy `NEON_DATABASE_URL` and Replit-managed `DATABASE_URL`
 
 ## Stack
 

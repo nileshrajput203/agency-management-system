@@ -41,16 +41,24 @@ if (!envLoaded && fs.existsSync("/.env")) {
   dotenv.config({ path: "/.env", override: true });
 }
 
-// Never ship a fallback connection string. If the configured Neon endpoint is
+// Never ship a fallback connection string. If the configured PostgreSQL endpoint is
 // unavailable, using a local database makes the app appear to work while
 // silently writing data somewhere the user cannot see.
-let databaseUrl = process.env.NEON_DATABASE_URL || process.env.DATABASE_URL || "";
+let databaseUrl =
+  process.env.SUPABASE_DATABASE_URL ||
+  process.env.NEON_DATABASE_URL ||
+  process.env.DATABASE_URL ||
+  "";
 if (databaseUrl) {
   let cleanUrl = databaseUrl.trim();
   if (cleanUrl.includes("agency@123management")) {
     cleanUrl = cleanUrl.replace("agency@123management", "agency_123management");
   }
-  if (cleanUrl.startsWith("DATABASE_URL=") || cleanUrl.startsWith("NEON_DATABASE_URL=")) {
+  if (
+    cleanUrl.startsWith("DATABASE_URL=") ||
+    cleanUrl.startsWith("NEON_DATABASE_URL=") ||
+    cleanUrl.startsWith("SUPABASE_DATABASE_URL=")
+  ) {
     cleanUrl = cleanUrl.substring(cleanUrl.indexOf("=") + 1).trim();
   }
   if ((cleanUrl.startsWith('"') && cleanUrl.endsWith('"')) || (cleanUrl.startsWith("'") && cleanUrl.endsWith("'"))) {
@@ -79,6 +87,7 @@ if (databaseUrl) {
   databaseUrl = cleanUrl;
   process.env.DATABASE_URL = cleanUrl;
   process.env.NEON_DATABASE_URL = cleanUrl;
+  process.env.SUPABASE_DATABASE_URL = cleanUrl;
 }
 
 let forceAlaSqlFallback = false;
