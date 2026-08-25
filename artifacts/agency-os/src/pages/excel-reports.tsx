@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import {
   useListInvoices,
   useListQuotations,
@@ -42,28 +42,36 @@ type SheetDef = {
   loading: boolean;
 };
 
+async function downloadWorkbook(sheets: SheetDef[], filename: string) {
+  const workbook = new ExcelJS.Workbook();
+  for (const sheet of sheets) {
+    if (!sheet.rows.length) continue;
+    const worksheet = workbook.addWorksheet(sheet.name.slice(0, 31));
+    worksheet.addRow(sheet.headers);
+    for (const row of sheet.rows) worksheet.addRow(row);
+    worksheet.columns = sheet.headers.map((header, index) => ({
+      header,
+      key: `column_${index}`,
+      width: Math.max(header.length, ...sheet.rows.map((row) => String(row[index] ?? "").length)) + 2,
+    }));
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.autoFilter = { from: "A1", to: `${String.fromCharCode(65 + Math.min(sheet.headers.length - 1, 25))}1` };
+  }
+  const buffer = await workbook.xlsx.writeBuffer();
+  const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 function downloadSingle(sheetDef: SheetDef) {
-  const ws = XLSX.utils.aoa_to_sheet([sheetDef.headers, ...sheetDef.rows]);
-  const colWidths = sheetDef.headers.map((h, i) => ({
-    wch: Math.max(h.length, ...sheetDef.rows.map((r) => String(r[i] ?? "").length)) + 2,
-  }));
-  ws["!cols"] = colWidths;
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetDef.name.slice(0, 31));
-  XLSX.writeFile(wb, `${sheetDef.name.replace(/\s+/g, "_")}.xlsx`);
+  void downloadWorkbook([sheetDef], `${sheetDef.name.replace(/\s+/g, "_")}.xlsx`);
 }
 
 function downloadAll(sheets: SheetDef[]) {
-  const wb = XLSX.utils.book_new();
-  for (const s of sheets) {
-    if (!s.rows.length) continue;
-    const ws = XLSX.utils.aoa_to_sheet([s.headers, ...s.rows]);
-    ws["!cols"] = s.headers.map((h, i) => ({
-      wch: Math.max(h.length, ...s.rows.map((r) => String(r[i] ?? "").length)) + 2,
-    }));
-    XLSX.utils.book_append_sheet(wb, ws, s.name.slice(0, 31));
-  }
-  XLSX.writeFile(wb, `AgencyOS_Export_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  void downloadWorkbook(sheets, `AgencyOS_Export_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
 }
 
 function ExportCard({ sheet }: { sheet: SheetDef }) {
