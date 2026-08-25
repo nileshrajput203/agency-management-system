@@ -16,7 +16,7 @@ async function runFullCrudVerification() {
   const loginRes = await fetch('http://localhost:3000/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'admin@agencyos.com', password: 'Admin@123' })
+    body: JSON.stringify({ email: 'admin@agencyps.com', password: 'Admin@123' })
   });
   const loginData = await loginRes.json();
   if (!loginData.token) {

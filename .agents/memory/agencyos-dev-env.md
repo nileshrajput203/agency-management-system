@@ -18,7 +18,7 @@ description: Known quirks and fixes for the AgencyOS Replit development environm
 - Fill-form contexts supported: quotation, invoice, proposal, purchase-order, task, content-post, client, lead
 
 ## Admin credentials
-- Default admin: `admin@agencyos.com` / `Admin@123`
+- Default admin email is configured as `admin@agencyps.com`; the bootstrap password remains environment-overridable.
 - DB column is `password_hash` but Drizzle schema field is `password` — maps correctly via `text("password_hash")`
 
 ## DB schema gaps fixed
@@ -32,6 +32,11 @@ description: Known quirks and fixes for the AgencyOS Replit development environm
 - NEON_DATABASE_URL secret set and verified
 - Server logs `[Database Connection Audit] Provider: Neon PostgreSQL` and `Fallback Mode: FALSE` on startup
 - Bootstrap runs successfully and syncs users on every start
+
+## Supabase connection
+- Supabase direct database host resolves only to IPv6 in this Replit runtime; use the project's IPv4-compatible Supavisor Session pooler URL when direct connections fail with `ENOTFOUND`.
+**Why:** Replit's current runtime cannot reach the project's IPv6-only direct endpoint reliably.
+**How to apply:** Store the Session pooler PostgreSQL URL in the `SUPABASE_DATABASE_URL` secret, restart the workflow, then let bootstrap create missing tables and seed the initial admin.
 
 ## File upload pattern
 - POST multipart/form-data to `/api/uploads` with field `file`
