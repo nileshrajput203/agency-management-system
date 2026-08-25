@@ -15,7 +15,7 @@ interface AdminConfig {
  * Validates and retrieves initial admin configuration from environment variables.
  */
 export function getAdminConfig(): AdminConfig {
-  const email = process.env.DEFAULT_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "admin@agencyos.com";
+  const email = process.env.DEFAULT_ADMIN_EMAIL || process.env.ADMIN_EMAIL || "admin@agencyps.com";
   const password = process.env.DEFAULT_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD || "Admin@123";
   const name = process.env.DEFAULT_ADMIN_NAME || process.env.ADMIN_NAME || "Admin";
 

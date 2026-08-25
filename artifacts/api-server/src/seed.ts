@@ -8,20 +8,20 @@ async function seed() {
   console.log("Seeding database...");
 
   const existing = await db.query.users.findFirst({
-    where: eq(users.email, "admin@agencyos.com"),
+    where: eq(users.email, "admin@agencyps.com"),
   });
 
   if (!existing) {
     const passwordHash = await bcrypt.hash("Admin@123", 10);
     await db.insert(users).values({
       id: createId(),
-      email: "admin@agencyos.com",
+      email: "admin@agencyps.com",
       passwordHash,
       name: "Super Admin",
       systemRole: "SUPER_ADMIN",
       isActive: true,
     });
-    console.log("✓ Admin user created: admin@agencyos.com / Admin@123");
+    console.log("✓ Admin user created: admin@agencyps.com / Admin@123");
   } else {
     console.log("✓ Admin user already exists");
   }
