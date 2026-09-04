@@ -40,6 +40,9 @@ importers:
       p-retry:
         specifier: ^7.1.1
         version: 7.1.1
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0

@@ -447,7 +447,10 @@ async function checkDatabaseConnection(): Promise<boolean> {
     if (reachable) {
       const testClient = new pg.Client({
         ...poolConfig,
-        connectionTimeoutMillis: 1500,
+        // Neon may need several seconds to wake a suspended compute endpoint.
+        // Match the main pool timeout so the startup audit does not report a
+        // false failure while normal application queries can still connect.
+        connectionTimeoutMillis: 15000,
       });
       try {
         await testClient.connect();

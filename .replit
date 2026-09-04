@@ -57,3 +57,8 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
+ADMIN_EMAIL = "admin@agencyps.com"
+ADMIN_NAME = "Admin"
+DB_SSL = "true"
+DB_SSL_REJECT_UNAUTHORIZED = "false"
+SERVE_STATIC = "true"
