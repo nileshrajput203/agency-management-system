@@ -14,12 +14,31 @@ export type ModuleKey =
   | "team"
   | "reports"
   | "attendance"
+  | "leaves"
   | "settings"
   | "automation";
 
 export type PermissionAction = "view" | "create" | "edit" | "delete";
 
 type ModulePermissions = Partial<Record<PermissionAction, boolean>>;
+
+export const DEFAULT_EMPLOYEE_MODULES: ModuleKey[] = [
+  "tasks",
+  "attendance",
+  "leaves",
+  "reports",
+];
+
+export function getUserModules(allowedModules?: unknown): string[] {
+  if (Array.isArray(allowedModules) && allowedModules.length > 0) {
+    return allowedModules.map(String);
+  }
+  return DEFAULT_EMPLOYEE_MODULES;
+}
+
+export function hasModuleAccess(allowedModules: unknown, module: string): boolean {
+  return getUserModules(allowedModules).includes(module);
+}
 
 const ROLE_MODULES: Record<SystemRole, ModuleKey[]> = {
   SUPER_ADMIN: [

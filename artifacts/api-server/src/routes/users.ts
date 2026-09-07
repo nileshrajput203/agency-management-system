@@ -13,8 +13,12 @@ const router = Router();
 
 function sanitizeUser(body: any, isUpdate = false) {
   return sanitizeAndValidate(body, {
-    enums: {
-      systemRole: ["SUPER_ADMIN", "ACCOUNT_MANAGER", "CREATIVE_STRATEGIST", "DESIGNER", "DEVELOPER", "CONTENT_CREATOR", "CLIENT"],
+      enums: {
+        systemRole: [
+          "SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER",
+          "CREATIVE_STRATEGIST", "DESIGNER", "DEVELOPER", "CONTENT_CREATOR",
+          "SALES_EXECUTIVE", "FINANCE_EXECUTIVE", "HR", "EMPLOYEE", "CLIENT",
+        ],
       portalMode: ["MODE_1", "MODE_2"],
     }
   });

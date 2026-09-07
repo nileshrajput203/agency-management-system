@@ -407,6 +407,7 @@ import EmployeeLeavePage from "@/pages/employee/leave";
 import EmployeeNotificationsPage from "@/pages/employee/notifications";
 import EmployeeProfilePage from "@/pages/employee/profile";
 import EmployeeWorkReportsPage from "@/pages/employee/work-reports";
+import { getUserModules } from "@/lib/permissions";
 
 // ─── Protected route wrapper ────────────────────────────────────
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -442,10 +443,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       "/attendance": "attendance",
       "/leaves": "leaves",
     };
-    const module = Object.entries(moduleForPath).find(([path]) =>
+     const module = Object.entries(moduleForPath).find(([path]) =>
       location === path || location.startsWith(`${path}/`)
     )?.[1];
-    if (module && (user.allowedModules ?? []).includes(module)) {
+     if (module && getUserModules(user.allowedModules).includes(module)) {
       return <>{children}</>;
     }
     return <Redirect to="/employee/dashboard" />;
@@ -833,6 +834,15 @@ function AppRouter() {
           <EmployeeRoute>
             <EmployeeLayout>
               <EmployeeWorkReportsPage />
+            </EmployeeLayout>
+          </EmployeeRoute>
+        )}
+      </Route>
+      <Route path="/employee/performance-report">
+        {() => (
+          <EmployeeRoute>
+            <EmployeeLayout>
+              <PerformanceReportPage />
             </EmployeeLayout>
           </EmployeeRoute>
         )}

@@ -36,6 +36,11 @@ const ROLE_CONFIG: Record<string, { label: string; className: string }> = {
   DEVELOPER: { label: "Developer", className: "bg-cyan-100 text-cyan-700" },
   FINANCE_EXECUTIVE: { label: "Finance", className: "bg-amber-100 text-amber-700" },
   HR: { label: "HR", className: "bg-orange-100 text-orange-700" },
+  ADMIN: { label: "Admin", className: "bg-violet-100 text-violet-700" },
+  CREATIVE_STRATEGIST: { label: "Creative Strategist", className: "bg-fuchsia-100 text-fuchsia-700" },
+  CONTENT_CREATOR: { label: "Content Creator", className: "bg-rose-100 text-rose-700" },
+  EMPLOYEE: { label: "Employee", className: "bg-slate-100 text-slate-700" },
+  CLIENT: { label: "Client", className: "bg-slate-100 text-slate-700" },
 };
 
 const AVAILABLE_MODULES = [
@@ -64,6 +69,28 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
+  const [customRoles, setCustomRoles] = useState<Array<{ id: string; name: string; description?: string | null }>>([]);
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
+  const [newRoleDescription, setNewRoleDescription] = useState("");
+
+  const roleOptions = Array.from(new Set([
+    ...Object.keys(ROLE_CONFIG),
+    ...customRoles.map((role) => role.name),
+  ]));
+  const roleLabel = (role: string) =>
+    ROLE_CONFIG[role]?.label ||
+    customRoles.find((item) => item.name === role)?.name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) ||
+    role;
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
+    fetch("/api/roles", { headers: { Authorization: `Bearer ${token}` } })
+      .then((response) => response.ok ? response.json() : [])
+      .then((data) => setCustomRoles(Array.isArray(data) ? data : []))
+      .catch(() => setCustomRoles([]));
+  }, [isAdmin]);
 
   const { data: users, isLoading } = useListUsers();
   const visibleUsers = (users ?? []).filter((member) => {
@@ -279,7 +306,7 @@ export default function UsersPage() {
               <SelectTrigger className="w-full md:w-48"><SelectValue placeholder="All roles" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All roles</SelectItem>
-                {Object.entries(ROLE_CONFIG).map(([key, value]) => <SelectItem key={key} value={key}>{value.label}</SelectItem>)}
+                {roleOptions.map((key) => <SelectItem key={key} value={key}>{roleLabel(key)}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "ALL")}>
@@ -344,7 +371,7 @@ export default function UsersPage() {
 
                       <div className="flex items-center gap-2 mb-3">
                         <Badge variant="secondary" className={cn("text-[11px]", rc?.className)}>
-                          {rc?.label ?? u.systemRole}
+                          {roleLabel(u.systemRole ?? "ACCOUNT_MANAGER")}
                         </Badge>
                         {u.isDelegatedAdmin && (
                           <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
@@ -421,13 +448,20 @@ export default function UsersPage() {
             )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Role</Label>
+                 <div className="flex items-center justify-between">
+                   <Label>Role</Label>
+                   {isAdmin && (
+                     <Button type="button" variant="link" className="h-auto p-0 text-xs text-primary" onClick={() => setRoleDialogOpen(true)}>
+                       Add role
+                     </Button>
+                   )}
+                 </div>
                 <Controller control={control} name="systemRole" render={({ field }) => (
                   <Select value={field.value ?? "ACCOUNT_MANAGER"} onValueChange={field.onChange}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {Object.entries(ROLE_CONFIG).map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                       {roleOptions.map((k) => (
+                         <SelectItem key={k} value={k}>{roleLabel(k)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -480,6 +514,61 @@ export default function UsersPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add a role</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Role name</Label>
+              <Input
+                value={newRoleName}
+                onChange={(event) => setNewRoleName(event.target.value)}
+                placeholder="Project Coordinator"
+              />
+              <p className="text-[11px] text-muted-foreground">Role names are saved as a reusable role for future team members.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Input
+                value={newRoleDescription}
+                onChange={(event) => setNewRoleDescription(event.target.value)}
+                placeholder="Coordinates projects and tasks"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRoleDialogOpen(false)}>Cancel</Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
+                const response = await fetch("/api/roles", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                  body: JSON.stringify({ name: newRoleName, description: newRoleDescription }),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                  toast.error(data?.error || "Failed to add role");
+                  return;
+                }
+                setCustomRoles((current) => [...current, data]);
+                setValue("systemRole", data.name);
+                setNewRoleName("");
+                setNewRoleDescription("");
+                setRoleDialogOpen(false);
+                toast.success("Role added");
+              }}
+              disabled={!newRoleName.trim()}
+            >
+              Add role
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

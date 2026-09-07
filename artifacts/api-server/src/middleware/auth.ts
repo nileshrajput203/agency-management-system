@@ -22,6 +22,17 @@ export function isTaskManagerRole(systemRole?: string | null): boolean {
   return TASK_MANAGER_ROLES.includes(systemRole as any);
 }
 
+export function canManageTaskWorkspace(systemRole?: string | null, allowedModules?: unknown): boolean {
+  if (isTaskManagerRole(systemRole)) return true;
+  if (!Array.isArray(allowedModules) || allowedModules.length === 0) return false;
+  return allowedModules.includes("projects") && allowedModules.includes("tasks");
+}
+
+export function canManageProjectWorkspace(systemRole?: string | null, allowedModules?: unknown): boolean {
+  if (["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "")) return true;
+  return Array.isArray(allowedModules) && allowedModules.length > 0 && allowedModules.includes("projects");
+}
+
 export type UserRole = "ADMIN" | "EMPLOYEE";
 
 export type Permission =

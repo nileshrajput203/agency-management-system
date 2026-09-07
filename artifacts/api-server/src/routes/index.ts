@@ -28,6 +28,7 @@ import notificationsRouter from "./notifications";
 import employeesRouter from "./employees";
 import workReportsRouter from "./workReports";
 import performanceRouter from "./performance";
+import rolesRouter from "./roles";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -47,6 +48,7 @@ router.use("/invoices", invoicesRouter);
 router.use("/quotations", quotationsRouter);
 router.use("/proposals", proposalsRouter);
 router.use("/users", usersRouter);
+router.use("/roles", rolesRouter);
 router.use("/dashboard", dashboardRouter);
 router.use(attendanceRouter);
 router.use(leavesRouter);

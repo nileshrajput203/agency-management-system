@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { NotificationsPopover } from "@/components/common/NotificationsPopover";
 import { CompanyLogo } from "@/components/common/CompanyLogo";
+import { getUserModules } from "@/lib/permissions";
 
 import { ENABLE_HAWAN_HUB, ENABLE_PROPOSALS } from "@/lib/constants";
 
@@ -96,7 +97,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Full admins see everything; account managers are filtered by their allowedModules
   const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(userSystemRole);
   const isSuperAdmin = userSystemRole === "SUPER_ADMIN";
-  const userAllowedModules = user?.allowedModules ?? [];
+  const userAllowedModules = getUserModules(user?.allowedModules);
 
   // Module key each path requires (null = always visible to full admins)
   const PATH_MODULE_MAP: Record<string, string | string[] | null> = {
@@ -110,8 +111,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "/hawan":               null,
     "/attendance":          "attendance",
     "/leaves":              "leaves",
-    "/work-reports":        null,
-    "/performance-report":  null,
+    "/work-reports":        "reports",
+    "/performance-report":  "reports",
     "/invoices":            "invoices",
     "/quotations":          "quotations",
     "/proposals":           "proposals",
@@ -132,7 +133,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (isFullAdmin) return true;
 
       // ACCOUNT_MANAGER and other roles: filter strictly by allowedModules
-      if (required === null) return true; // dashboard, work-reports, performance-report always visible
+       if (required === null) return true; // dashboard is always visible
       if (Array.isArray(required)) return required.some(m => userAllowedModules.includes(m));
       return userAllowedModules.includes(required);
     });

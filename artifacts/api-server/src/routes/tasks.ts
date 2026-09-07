@@ -6,7 +6,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
-import { requirePermission, isTaskManagerRole } from "../middleware/auth";
+import { requirePermission, canManageTaskWorkspace } from "../middleware/auth";
 import { NotificationService } from "../services/notificationService";
 import { logger, notificationLogger } from "../lib/logger";
 import { hideItemForUser, getHiddenEntityIds, deleteHiddenItemsForEntity } from "../services/hiddenItemsService";
@@ -50,7 +50,7 @@ function sanitizeTask(body: any, isUpdate = false) {
 router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = isTaskManagerRole(requesterSystemRole);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
 
   let query = db
     .select({
@@ -107,7 +107,7 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
   const requesterRole = (req as any).userRole || requesterSystemRole;
-  const isPrivileged = isTaskManagerRole(requesterSystemRole);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
 
   if (!isPrivileged) {
     // Employees create a task request for themselves
@@ -182,7 +182,7 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
 router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = isTaskManagerRole(requesterSystemRole);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
 
   const [row] = await db
     .select({
@@ -239,7 +239,7 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
   const requesterRole = (req as any).userRole || requesterSystemRole;
-  const isPrivileged = isTaskManagerRole(requesterSystemRole);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
 
   if (!isPrivileged) {
     // Security check: task.assigneeId == currentUser.id
@@ -460,7 +460,7 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
             actionUrl: "/tasks",
           });
         }
-      } else if (!isTaskManagerRole(requesterSystemRole)) {
+      } else if (!canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules)) {
         // Employee updated status to something else (e.g., IN_PROGRESS, BLOCKED)
         await NotificationService.notifyAdminsAndManagers({
           title: "📝 Task Status Updated",
@@ -520,7 +520,7 @@ router.delete("/:id", requirePermission("tasks.delete"), asyncHandler(async (req
 
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = isTaskManagerRole(requesterSystemRole);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
 
   if (!isPrivileged) {
     if (task.assigneeId !== requesterId) {
@@ -541,7 +541,7 @@ router.delete("/:id", requirePermission("tasks.delete"), asyncHandler(async (req
 router.get("/:id/subtasks", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = isTaskManagerRole(requesterSystemRole);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
 
   if (!isPrivileged) {
     const [parentTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, req.params.id as string));

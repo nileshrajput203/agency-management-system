@@ -32,3 +32,11 @@ description: Features implemented — SearchBar, Finance tabbed page, Excel expo
 - These cause 500 errors on `/api/leads` and `/api/projects` — needs a DB migration to add columns.
 
 **Why important:** The Sales Pipeline widget on the dashboard shows empty because `/api/leads` returns 500. Running `pnpm -w drizzle-kit push` should add the missing columns.
+
+## Access model
+
+An empty `allowedModules` list represents the standard employee workspace (tasks, work reports/performance, attendance, and leave). Explicit module selections unlock the complete selected section; selecting both projects and tasks grants the company-wide task assignment workspace.
+
+**Why:** The access UI is section-level rather than action-level, and default employee workflows must remain available without requiring an administrator to toggle every basic module.
+
+**How to apply:** Keep frontend navigation guards and API permission checks aligned with these section-level rules; custom roles use their name as `systemRole` and still receive access through `allowedModules`.

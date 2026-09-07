@@ -5,7 +5,7 @@ import { eq, aliasedTable } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
-import { requirePermission } from "../middleware/auth";
+import { requirePermission, canManageProjectWorkspace } from "../middleware/auth";
 import { NotificationService } from "../services/notificationService";
 
 const router = Router();
@@ -199,7 +199,7 @@ router.patch("/:id", requirePermission("projects.edit"), asyncHandler(async (req
   const requesterRole = (req as any).userRole;
   const systemRole = (req as any).userSystemRole;
   const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "") || isDelegatedAdmin;
+   const isPrivileged = canManageProjectWorkspace(systemRole, (req as any).userAllowedModules) || isDelegatedAdmin;
 
   if (!isPrivileged) {
     // Employees can update assignmentStatus, status, completionNotes, completionPercentage, startedAt, completedAt, activityTimeline

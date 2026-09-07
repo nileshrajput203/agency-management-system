@@ -12,10 +12,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   LayoutDashboard, Users, TrendingUp, FolderKanban, CheckSquare,
-  Calendar, Clock, Umbrella, Bell, User, Sun, Moon, LogOut, ChevronRight, CalendarDays, FileCheck,
+  Calendar, Clock, Umbrella, Bell, User, Sun, Moon, LogOut, ChevronRight, CalendarDays, FileCheck, BarChart3,
 } from "lucide-react";
 import { NotificationsPopover } from "@/components/common/NotificationsPopover";
 import { CompanyLogo } from "@/components/common/CompanyLogo";
+import { getUserModules } from "@/lib/permissions";
 
 interface NavItem {
   label: string;
@@ -52,6 +53,7 @@ const ALL_EMPLOYEE_NAV_GROUPS: NavGroupDef[] = [
       { label: "My Projects",       href: "/employee/projects",         icon: <FolderKanban className="h-4 w-4" />,                         modules: ["projects"] },
       { label: "My Tasks",          href: "/employee/tasks",            icon: <CheckSquare className="h-4 w-4" />,                          modules: ["tasks"] },
       { label: "Work Reports",      href: "/employee/work-reports",     icon: <FileCheck className="h-4 w-4 text-emerald-500" /> },
+      { label: "Performance Report", href: "/employee/performance-report", icon: <BarChart3 className="h-4 w-4 text-violet-500" />, modules: ["reports"] },
       { label: "Meetings",          href: "/employee/meetings",         icon: <CalendarDays className="h-4 w-4 text-blue-500" />,           modules: ["clients", "projects"] },
       { label: "Content Calendar",  href: "/employee/content-calendar", icon: <Calendar className="h-4 w-4" />,                            modules: ["content"] },
     ],
@@ -86,7 +88,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "E";
 
-  const userAllowedModules: string[] = user?.allowedModules ?? [];
+  const userAllowedModules: string[] = getUserModules(user?.allowedModules);
   const employeeNavGroups = ALL_EMPLOYEE_NAV_GROUPS
     .map(group => ({
       ...group,
@@ -99,6 +101,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
 
   const getBreadcrumb = () => {
     if (location.includes("work-reports")) return "Work Reports";
+    if (location.includes("performance-report")) return "Performance Report";
     if (location.includes("clients")) return "My Clients";
     if (location.includes("leads")) return "Sales Funnel";
     if (location.includes("projects")) return "My Projects";
