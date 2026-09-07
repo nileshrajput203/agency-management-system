@@ -373,7 +373,7 @@ export function UserAccessManagement() {
                         <th className="py-2.5 px-4">Target User</th>
                         <th className="py-2.5 px-4">Action</th>
                         <th className="py-2.5 px-4">Permissions Modified</th>
-                        <th className="py-2.5 px-4">Reason</th>
+               <th className="py-2.5 px-4">Details</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -411,7 +411,22 @@ export function UserAccessManagement() {
                               )}
                             </div>
                           </td>
-                          <td className="py-2.5 px-4 text-muted-foreground">{log.reason || "—"}</td>
+                           <td className="py-2.5 px-4 text-muted-foreground">
+                             <div>{log.reason || "—"}</div>
+                             {log.details && (
+                               <div className="mt-1 max-w-sm text-[10px] font-mono whitespace-pre-wrap break-words text-muted-foreground/70">
+                                 {(() => {
+                                   try {
+                                     const details = JSON.parse(log.details);
+                                     const changed = details.changedFields?.join(", ");
+                                     return changed ? `Changed: ${changed}` : JSON.stringify(details);
+                                   } catch {
+                                     return log.details;
+                                   }
+                                 })()}
+                               </div>
+                             )}
+                           </td>
                         </tr>
                       ))}
                     </tbody>

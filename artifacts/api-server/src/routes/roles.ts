@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { rolesTable } from "@workspace/db/schema";
+import { rolesTable, auditLogsTable, usersTable } from "@workspace/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
@@ -35,6 +35,23 @@ router.post("/", requirePermission("users.manage"), asyncHandler(async (req, res
     .onConflictDoNothing()
     .returning({ id: rolesTable.id, name: rolesTable.name, description: rolesTable.description });
   if (!role) throw createError("A role with that name already exists", 409);
+  const [adminUser] = await db
+    .select({ name: usersTable.name })
+    .from(usersTable)
+    .where(eq(usersTable.id, (req as any).userId));
+  await db.insert(auditLogsTable).values({
+    adminUserId: (req as any).userId,
+    adminUserName: adminUser?.name || "Administrator",
+    // audit_logs targets users today; retain the required target id while
+    // identifying the newly-created role in the target name and details.
+    targetUserId: (req as any).userId,
+    targetUserName: `Role: ${role.name}`,
+    action: "ROLE_CREATED",
+    permissionsAdded: [],
+    permissionsRemoved: [],
+    reason: "Custom role created",
+    details: JSON.stringify({ roleId: role.id, roleName: role.name, description: role.description }),
+  });
   return res.status(201).json(role);
 }));
 

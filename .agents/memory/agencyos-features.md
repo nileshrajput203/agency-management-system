@@ -40,3 +40,9 @@ An empty `allowedModules` list represents the standard employee workspace (tasks
 **Why:** The access UI is section-level rather than action-level, and default employee workflows must remain available without requiring an administrator to toggle every basic module.
 
 **How to apply:** Keep frontend navigation guards and API permission checks aligned with these section-level rules; custom roles use their name as `systemRole` and still receive access through `allowedModules`.
+
+Access changes are surfaced through the Team & Roles audit trail; user role/module/delegation/activation changes and custom-role creation should remain auditable with actor, target, change details, and timestamp.
+
+**Why:** Administrators need to know who changed an employee's access, not only the employee's current state.
+
+**How to apply:** Add audit writes whenever access control or role records are created, updated, or removed, and keep the audit table view readable for role events as well as user events.

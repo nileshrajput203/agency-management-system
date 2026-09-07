@@ -33,6 +33,15 @@ export function getUserModules(allowedModules?: unknown): string[] {
   if (Array.isArray(allowedModules) && allowedModules.length > 0) {
     return allowedModules.map(String);
   }
+  if (typeof allowedModules === "string" && allowedModules.trim()) {
+    try {
+      const parsed = JSON.parse(allowedModules);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(String);
+    } catch {
+      const parsed = allowedModules.split(",").map((module) => module.trim()).filter(Boolean);
+      if (parsed.length > 0) return parsed;
+    }
+  }
   return DEFAULT_EMPLOYEE_MODULES;
 }
 

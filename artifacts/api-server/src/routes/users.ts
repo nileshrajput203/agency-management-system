@@ -101,6 +101,26 @@ router.post("/", requirePermission("users.manage"), asyncHandler(async (req, res
 
   await syncUserEmployeeAndRole(row);
 
+  const [adminUser] = await db
+    .select({ name: usersTable.name })
+    .from(usersTable)
+    .where(eq(usersTable.id, (req as any).userId));
+  await db.insert(auditLogsTable).values({
+    adminUserId: (req as any).userId,
+    adminUserName: adminUser?.name || "Administrator",
+    targetUserId: row.id,
+    targetUserName: row.name,
+    action: "USER_ACCESS_CREATED",
+    permissionsAdded: Array.isArray(row.allowedModules) ? row.allowedModules : [],
+    permissionsRemoved: [],
+    reason: "Team member created with initial role and access",
+    details: JSON.stringify({
+      role: row.systemRole,
+      allowedModules: row.allowedModules || [],
+      isActive: row.isActive,
+    }),
+  });
+
   return res.status(201).json(parseModules(row));
 }));
 
@@ -158,18 +178,21 @@ router.patch("/:id", requirePermission("users.manage"), asyncHandler(async (req,
 
   await syncUserEmployeeAndRole(row);
 
-  // Record Audit Log if delegated permissions or allowed modules were modified
+  // Record every access-related change so an administrator can identify the
+  // actor, target, exact module delta, and before/after state.
   const oldMods: string[] = Array.isArray(oldUser.allowedModules) ? (oldUser.allowedModules as string[]) : [];
   const newMods: string[] = Array.isArray(updateData.allowedModules) ? (updateData.allowedModules as string[]) : oldMods;
   const addedMods = newMods.filter(m => !oldMods.includes(m));
   const removedMods = oldMods.filter(m => !newMods.includes(m));
-
-  if (
+  const accessChanged =
+    body.isActive !== undefined ||
+    body.systemRole !== undefined ||
     body.isDelegatedAdmin !== undefined ||
     body.portalMode !== undefined ||
     body.viewAllClients !== undefined ||
-    body.allowedModules !== undefined
-  ) {
+    body.allowedModules !== undefined;
+
+  if (accessChanged) {
     const isRevocation = body.isDelegatedAdmin === false && oldUser.isDelegatedAdmin === true;
     const [adminUser] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, currentUserId));
 
@@ -178,11 +201,30 @@ router.patch("/:id", requirePermission("users.manage"), asyncHandler(async (req,
       adminUserName: adminUser?.name || "Administrator",
       targetUserId: targetId,
       targetUserName: oldUser.name,
-      action: isRevocation ? "DELEGATED_ACCESS_REVOKED" : "DELEGATED_ACCESS_UPDATED",
+      action: isRevocation ? "DELEGATED_ACCESS_REVOKED" : "USER_ACCESS_UPDATED",
       permissionsAdded: addedMods,
       permissionsRemoved: removedMods,
       reason: auditReason || (isRevocation ? "Delegated administrative access revoked" : "Delegated access & module permissions updated"),
       details: JSON.stringify({
+        changedFields: Object.keys(body).filter((key) =>
+          ["isActive", "systemRole", "isDelegatedAdmin", "portalMode", "viewAllClients", "allowedModules"].includes(key)
+        ),
+        before: {
+          role: oldUser.systemRole,
+          allowedModules: oldMods,
+          isActive: oldUser.isActive,
+          isDelegatedAdmin: oldUser.isDelegatedAdmin,
+          portalMode: oldUser.portalMode,
+          viewAllClients: oldUser.viewAllClients,
+        },
+        after: {
+          role: row.systemRole,
+          allowedModules: parseModules(row).allowedModules,
+          isActive: row.isActive,
+          isDelegatedAdmin: row.isDelegatedAdmin,
+          portalMode: row.portalMode,
+          viewAllClients: row.viewAllClients,
+        },
         isDelegatedAdmin: updateData.isDelegatedAdmin ?? oldUser.isDelegatedAdmin,
         portalMode: updateData.portalMode ?? oldUser.portalMode,
         viewAllClients: updateData.viewAllClients ?? oldUser.viewAllClients,
@@ -194,7 +236,28 @@ router.patch("/:id", requirePermission("users.manage"), asyncHandler(async (req,
 }));
 
 router.delete("/:id", requirePermission("users.manage"), asyncHandler(async (req, res) => {
-  await db.delete(usersTable).where(eq(usersTable.id, (req.params.id as string)));
+  const targetId = req.params.id as string;
+  const [target] = await db
+    .select({ id: usersTable.id, name: usersTable.name, systemRole: usersTable.systemRole, allowedModules: usersTable.allowedModules })
+    .from(usersTable)
+    .where(eq(usersTable.id, targetId));
+  if (!target) throw createError("User not found", 404);
+  const [adminUser] = await db
+    .select({ name: usersTable.name })
+    .from(usersTable)
+    .where(eq(usersTable.id, (req as any).userId));
+  await db.delete(usersTable).where(eq(usersTable.id, targetId));
+  await db.insert(auditLogsTable).values({
+    adminUserId: (req as any).userId,
+    adminUserName: adminUser?.name || "Administrator",
+    targetUserId: target.id,
+    targetUserName: target.name,
+    action: "USER_ACCESS_DELETED",
+    permissionsAdded: [],
+    permissionsRemoved: Array.isArray(target.allowedModules) ? target.allowedModules : [],
+    reason: "Team member deleted",
+    details: JSON.stringify({ role: target.systemRole, allowedModules: target.allowedModules || [] }),
+  });
   return res.status(204).send();
 }));
 

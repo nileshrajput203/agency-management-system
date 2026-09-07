@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { getUserModules, hasModuleAccess } from "../../artifacts/agency-os/src/lib/permissions";
 
 const PERMISSION_TO_MODULE: Record<string, string> = {
   "crm.view": "crm",
@@ -9,21 +10,6 @@ const PERMISSION_TO_MODULE: Record<string, string> = {
   "attendance.view": "attendance",
   "reports.view": "reports",
 };
-
-function hasModuleAccess(allowedModules: string[] | unknown, moduleKey: string): boolean {
-  let list: string[] = [];
-  if (Array.isArray(allowedModules)) {
-    list = allowedModules as string[];
-  } else if (typeof allowedModules === "string" && allowedModules) {
-    try {
-      const parsed = JSON.parse(allowedModules);
-      list = Array.isArray(parsed) ? parsed : [];
-    } catch {
-      list = (allowedModules as string).split(",").map((s) => s.trim()).filter(Boolean);
-    }
-  }
-  return list.includes(moduleKey);
-}
 
 describe("Permission Helpers Unit Tests", () => {
   it("should map permissions to modules accurately", () => {
@@ -48,9 +34,20 @@ describe("Permission Helpers Unit Tests", () => {
     expect(hasModuleAccess(csvStr, "attendance")).toBe(false);
   });
 
-  it("should return false for empty or invalid allowedModules", () => {
-    expect(hasModuleAccess(null, "crm")).toBe(false);
-    expect(hasModuleAccess(undefined, "crm")).toBe(false);
-    expect(hasModuleAccess([], "crm")).toBe(false);
+  it("should expose the default employee workspace when no modules are selected", () => {
+    expect(getUserModules([])).toEqual(["tasks", "attendance", "leaves", "reports"]);
+    expect(hasModuleAccess([], "tasks")).toBe(true);
+    expect(hasModuleAccess([], "attendance")).toBe(true);
+    expect(hasModuleAccess([], "leaves")).toBe(true);
+    expect(hasModuleAccess([], "reports")).toBe(true);
+    expect(hasModuleAccess([], "content")).toBe(false);
+  });
+
+  it("should treat explicit module selections as complete section access", () => {
+    const modules = ["content", "projects", "tasks"];
+    expect(getUserModules(modules)).toEqual(modules);
+    expect(hasModuleAccess(modules, "content")).toBe(true);
+    expect(hasModuleAccess(modules, "projects")).toBe(true);
+    expect(hasModuleAccess(modules, "attendance")).toBe(false);
   });
 });
