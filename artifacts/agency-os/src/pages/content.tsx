@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { SearchBar } from "@/components/common/SearchBar";
 import {
   useListContentPosts, useCreateContentPost, useUpdateContentPost, useDeleteContentPost,
-  useListClients, getListContentPostsQueryKey,
+  getListContentPostsQueryKey,
   useCreateCalendarShare, useListCalendarShares,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -37,11 +37,23 @@ export default function ContentPage() {
   const [showShareModal, setShowShareModal] = useState(false);
 
   const month = format(currentMonth, "yyyy-MM");
-  const { data: clients } = useListClients();
   const { data: posts, isLoading } = useListContentPosts({
     clientId: activeClientId || undefined,
     month,
   });
+  // Content access includes the calendar's client tabs, but does not require
+  // the separate Clients module. Derive tabs from the content records already
+  // visible to this user.
+  const clients = Array.from(
+    new Map(
+      (posts ?? [])
+        .filter((post: any) => post.clientId)
+        .map((post: any) => [
+          post.clientId,
+          { id: post.clientId, companyName: post.clientName || "Client" },
+        ])
+    ).values()
+  ) as Array<{ id: string; companyName: string }>;
   const { data: existingShares, refetch: refetchShares } = useListCalendarShares(
     activeClientId ? { clientId: activeClientId } : undefined,
   );

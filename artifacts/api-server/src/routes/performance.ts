@@ -12,7 +12,7 @@ const router = Router();
  * Returns per-employee performance metrics for the given calendar month.
  * Falls back to the current month if no param supplied.
  */
-router.get("/monthly", requirePermission("projects.view"), asyncHandler(async (req, res) => {
+router.get("/monthly", requirePermission("reports.view"), asyncHandler(async (req, res) => {
   const monthParam = (req.query.month as string) || new Date().toISOString().slice(0, 7);
   const [year, month] = monthParam.split("-").map(Number);
 

@@ -2,6 +2,19 @@ import { describe, it, expect } from "vitest";
 import request from "supertest";
 import app from "../../artifacts/api-server/src/app";
 import { signToken } from "../../artifacts/api-server/src/lib/jwt";
+import { db } from "@workspace/db";
+import { usersTable } from "@workspace/db/schema";
+import { eq } from "drizzle-orm";
+
+async function getCurrentAdminToken() {
+  const [admin] = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.systemRole, "SUPER_ADMIN"))
+    .limit(1);
+  if (!admin) throw new Error("No SUPER_ADMIN account is available for authorization tests");
+  return signToken(admin.id);
+}
 
 describe("Authorization & Access Control Tests", () => {
   it("should return 401 Unauthorized when requesting protected endpoints without token", async () => {
@@ -18,8 +31,7 @@ describe("Authorization & Access Control Tests", () => {
   });
 
   it("should allow access when valid superadmin JWT token is provided", async () => {
-    // Admin user ID in bootstrap seed: 9df7d339-addb-4f1f-9e72-ee9b29d21ada
-    const adminToken = signToken("9df7d339-addb-4f1f-9e72-ee9b29d21ada");
+    const adminToken = await getCurrentAdminToken();
 
     const res = await request(app)
       .get("/api/users")
@@ -33,7 +45,7 @@ describe("Authorization & Access Control Tests", () => {
     const res = await request(app).get("/api/v1/users");
     expect(res.status).toBe(401);
 
-    const adminToken = signToken("9df7d339-addb-4f1f-9e72-ee9b29d21ada");
+    const adminToken = await getCurrentAdminToken();
     const v1Res = await request(app)
       .get("/api/v1/users")
       .set("Authorization", `Bearer ${adminToken}`);

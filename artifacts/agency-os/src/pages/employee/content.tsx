@@ -51,12 +51,15 @@ export default function EmployeeContentPage() {
   const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(user?.systemRole || user?.role);
   const isDelegatedAdmin = Boolean(user?.isDelegatedAdmin);
   const userAllowedModules = Array.isArray(user?.allowedModules) ? user.allowedModules : [];
+  const hasExplicitContentAccess = userAllowedModules.length > 0 && userAllowedModules.includes("content");
 
   const canApprovePublishContent = isFullAdmin || (isDelegatedAdmin && (userAllowedModules.length === 0 || userAllowedModules.includes("content")));
 
-  const displayPosts = canApprovePublishContent
-    ? (posts ?? [])
-    : (myPosts.length > 0 ? myPosts : (posts ?? []).filter((p: any) => p.assigneeId === user?.id || p.authorId === user?.id || p.assignedTo === user?.id || p.assignedTo === user?.name));
+  // Explicit Content Ideation access exposes the complete Content Calendar.
+  // Users with only the default employee modules remain scoped to their own
+  // assigned posts.
+  const canViewEntireCalendar = isFullAdmin || hasExplicitContentAccess;
+  const displayPosts = canViewEntireCalendar ? (posts ?? []) : myPosts;
 
   const updatePostMutation = useUpdateContentPost({
     mutation: {

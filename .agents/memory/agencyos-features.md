@@ -46,3 +46,9 @@ Access changes are surfaced through the Team & Roles audit trail; user role/modu
 **Why:** Administrators need to know who changed an employee's access, not only the employee's current state.
 
 **How to apply:** Add audit writes whenever access control or role records are created, updated, or removed, and keep the audit table view readable for role events as well as user events.
+
+Existing accounts can carry their role in either `systemRole` or the legacy `role` field; privileged frontend checks must support both.
+
+**Why:** Imported/older users may not have been synchronized into the newer role column, which otherwise hides manager-only navigation while the API still recognizes the account.
+
+**How to apply:** Prefer `systemRole ?? role` for frontend role gates and keep API role resolution consistent.

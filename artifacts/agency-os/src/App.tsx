@@ -472,6 +472,18 @@ function EmployeeRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function EmployeeContentCalendarPage() {
+  const { user } = useAuth();
+  const hasExplicitContentAccess =
+    Array.isArray(user?.allowedModules) &&
+    user.allowedModules.length > 0 &&
+    user.allowedModules.includes("content");
+
+  // Content Ideation is the section-level permission for the full calendar.
+  // Employees with only the default workspace stay on assigned-content view.
+  return hasExplicitContentAccess ? <ContentPage /> : <EmployeeContentPage />;
+}
+
 // ─── Access Denied fallback ─────────────────────────────────────
 function AccessDeniedPage() {
   return (
@@ -770,7 +782,7 @@ function AppRouter() {
         {() => (
           <EmployeeRoute>
             <EmployeeLayout>
-              <EmployeeTasksPage />
+              <TasksPage />
             </EmployeeLayout>
           </EmployeeRoute>
         )}
@@ -788,7 +800,7 @@ function AppRouter() {
         {() => (
           <EmployeeRoute>
             <EmployeeLayout>
-              <EmployeeContentPage />
+              <EmployeeContentCalendarPage />
             </EmployeeLayout>
           </EmployeeRoute>
         )}

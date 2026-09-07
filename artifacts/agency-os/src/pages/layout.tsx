@@ -93,7 +93,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
 
-  const userSystemRole = user?.systemRole ?? "";
+  // Older accounts may have the role stored in `role` while newer accounts
+  // use `systemRole`; both must drive privileged navigation consistently.
+  const userSystemRole = user?.systemRole ?? user?.role ?? "";
   // Full admins see everything; account managers are filtered by their allowedModules
   const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(userSystemRole);
   const isSuperAdmin = userSystemRole === "SUPER_ADMIN";
