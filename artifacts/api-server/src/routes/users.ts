@@ -12,16 +12,17 @@ import { syncUserEmployeeAndRole } from "../services/userService";
 const router = Router();
 
 function sanitizeUser(body: any, isUpdate = false) {
-  return sanitizeAndValidate(body, {
-      enums: {
-        systemRole: [
-          "SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER",
-          "CREATIVE_STRATEGIST", "DESIGNER", "DEVELOPER", "CONTENT_CREATOR",
-          "SALES_EXECUTIVE", "FINANCE_EXECUTIVE", "HR", "EMPLOYEE", "CLIENT",
-        ],
-      portalMode: ["MODE_1", "MODE_2"],
-    }
+  const result = sanitizeAndValidate(body, {
+    portalMode: ["MODE_1", "MODE_2"],
   });
+  if (result.systemRole !== undefined && result.systemRole !== null) {
+    const normalizedRole = String(result.systemRole).trim().toUpperCase().replace(/[\s-]+/g, "_");
+    if (!/^[A-Z][A-Z0-9_]{1,63}$/.test(normalizedRole)) {
+      throw createError("Role name must contain 2-64 letters, numbers, or underscores", 400, undefined, "systemRole");
+    }
+    result.systemRole = normalizedRole;
+  }
+  return result;
 }
 
 const USER_SAFE_COLS = {
