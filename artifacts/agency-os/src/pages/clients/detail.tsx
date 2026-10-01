@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import { useGetClient, useGetClientContracts, useListProjects, useListInvoices, useUpdateClient, getGetClientQueryKey } from "@workspace/api-client-react";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -76,10 +77,9 @@ interface ActivityLog {
 export default function ClientDetailPage({ id }: { id: string }) {
   const qc = useQueryClient();
   const { user, token } = useAuth();
-  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(user?.systemRole || user?.role || "");
-  const isDelegatedAdmin = Boolean(user?.isDelegatedAdmin);
-  const userAllowedModules = Array.isArray(user?.allowedModules) ? user.allowedModules : [];
-  const isAdmin = isFullAdmin || (isDelegatedAdmin && (userAllowedModules.length === 0 || userAllowedModules.includes("clients")));
+  const isAdmin = canManageModule(user, "clients");
+  const canViewProjects = canManageModule(user, "projects");
+  const canViewFinance = canManageModule(user, "finance");
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [activityDialogOpen, setActivityDialogOpen] = useState(false);
@@ -102,9 +102,15 @@ export default function ClientDetailPage({ id }: { id: string }) {
   const [editSocialHandles, setEditSocialHandles] = useState("");
 
   const { data: client, isLoading } = useGetClient(id);
-  const { data: contracts } = useGetClientContracts(id);
-  const { data: allProjects } = useListProjects();
-  const { data: allInvoices } = useListInvoices();
+  const { data: contracts } = useGetClientContracts(id, {
+    query: { enabled: canViewFinance },
+  });
+  const { data: allProjects } = useListProjects({
+    query: { enabled: canViewProjects },
+  });
+  const { data: allInvoices } = useListInvoices({
+    query: { enabled: canViewFinance },
+  });
 
   const { data: activityLogs, refetch: refetchActivity } = useQuery<ActivityLog[]>({
     queryKey: ["client-activity", id],
@@ -489,7 +495,7 @@ export default function ClientDetailPage({ id }: { id: string }) {
 
         {/* Right: Projects + invoices + contracts */}
         <div className="lg:col-span-2 space-y-5">
-          {isAdmin && contracts && contracts.length > 0 && (
+          {canViewFinance && contracts && contracts.length > 0 && (
             <Card>
               <CardHeader><CardTitle className="text-base">Content Contracts</CardTitle></CardHeader>
               <CardContent>
@@ -510,30 +516,32 @@ export default function ClientDetailPage({ id }: { id: string }) {
             </Card>
           )}
 
-          <Card>
-            <CardHeader><CardTitle className="text-base">Projects</CardTitle></CardHeader>
-            <CardContent>
-              {!projects || projects.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">No projects linked</p>
-              ) : (
-                <div className="divide-y divide-border">
-                  {projects.map((p) => (
-                    <div key={p.id} className="py-2.5 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{STATUS_MAP[p.status ?? "NOT_STARTED"]}</p>
+          {canViewProjects && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Projects</CardTitle></CardHeader>
+              <CardContent>
+                {!projects || projects.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No projects linked</p>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {projects.map((p) => (
+                      <div key={p.id} className="py-2.5 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">{STATUS_MAP[p.status ?? "NOT_STARTED"]}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          Due: {p.dueDate ? format(new Date(p.dueDate), "PP") : "—"}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="text-xs">
-                        Due: {p.dueDate ? format(new Date(p.dueDate), "PP") : "—"}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-          {isAdmin && (
+          {canViewFinance && (
             <Card>
               <CardHeader><CardTitle className="text-base">Recent Invoices</CardTitle></CardHeader>
               <CardContent>

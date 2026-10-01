@@ -97,7 +97,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // use `systemRole`; both must drive privileged navigation consistently.
   const userSystemRole = user?.systemRole ?? user?.role ?? "";
   // Full admins see everything; account managers are filtered by their allowedModules
-  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(userSystemRole);
   const isSuperAdmin = userSystemRole === "SUPER_ADMIN";
   const userAllowedModules = getUserModules(user?.allowedModules);
 
@@ -108,34 +107,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "/sales":               "sales",
     "/projects":            "projects",
     "/tasks":               "tasks",
-    "/meetings":            ["clients", "projects"],
+    "/meetings":            "meetings",
     "/content":             "content",
     "/hawan":               null,
     "/attendance":          "attendance",
     "/leaves":              "leaves",
     "/work-reports":        "reports",
     "/performance-report":  "reports",
-    "/invoices":            "invoices",
-    "/quotations":          "quotations",
-    "/proposals":           "proposals",
-    "/purchase-orders":     "__superadmin__",
-    "/excel-reports":       ["invoices", "quotations", "proposals"],
-    "/settings":            "__superadmin__",
-    "/users":               "__superadmin__",
+    "/invoices":            "finance",
+    "/quotations":          "finance",
+    "/proposals":           "finance",
+    "/purchase-orders":     "finance",
+    "/excel-reports":       "finance",
+    "/settings":            "settings",
+    "/users":               "team",
+    "/notifications":       null,
   };
 
   const filteredNavGroups = navGroups.map(group => {
     const filteredItems = group.items.filter(item => {
       const required = PATH_MODULE_MAP[item.href];
 
-      // Super-admin-only paths
-      if (required === "__superadmin__") return isSuperAdmin;
-
-      // Full admins (SUPER_ADMIN/ADMIN/MANAGER) see everything else
-      if (isFullAdmin) return true;
-
-      // ACCOUNT_MANAGER and other roles: filter strictly by allowedModules
-       if (required === null) return true; // dashboard is always visible
+      if (isSuperAdmin) return true;
+      if (required === null) return true;
       if (Array.isArray(required)) return required.some(m => userAllowedModules.includes(m));
       return userAllowedModules.includes(required);
     });

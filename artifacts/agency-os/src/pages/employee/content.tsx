@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useListContentPosts, useUpdateContentPost, getListContentPostsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,17 +49,12 @@ export default function EmployeeContentPage() {
     p.assignedTo === user?.name
   );
 
-  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(user?.systemRole || user?.role);
-  const isDelegatedAdmin = Boolean(user?.isDelegatedAdmin);
-  const userAllowedModules = Array.isArray(user?.allowedModules) ? user.allowedModules : [];
-  const hasExplicitContentAccess = userAllowedModules.length > 0 && userAllowedModules.includes("content");
-
-  const canApprovePublishContent = isFullAdmin || (isDelegatedAdmin && (userAllowedModules.length === 0 || userAllowedModules.includes("content")));
+  const canApprovePublishContent = canManageModule(user, "content");
 
   // Explicit Content Ideation access exposes the complete Content Calendar.
   // Users with only the default employee modules remain scoped to their own
   // assigned posts.
-  const canViewEntireCalendar = isFullAdmin || hasExplicitContentAccess;
+  const canViewEntireCalendar = canManageModule(user, "content");
   const displayPosts = canViewEntireCalendar ? (posts ?? []) : myPosts;
 
   const updatePostMutation = useUpdateContentPost({

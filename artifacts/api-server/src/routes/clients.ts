@@ -52,17 +52,18 @@ function calcHealthScore(invoices: { status: string | null; dueDate: string | nu
 
 const router = Router();
 
+function canManageClientSection(req: any): boolean {
+  return req.userSystemRole === "SUPER_ADMIN" ||
+    (Array.isArray(req.userConfiguredModules) && req.userConfiguredModules.includes("clients"));
+}
+
 router.get("/", requirePermission("clients.view"), asyncHandler(async (req, res) => {
   const { search, category } = req.query as Record<string, string>;
   const userId = (req as any).userId;
-  const systemRole = (req as any).userSystemRole;
-  const isDelegatedAdmin = (req as any).userIsDelegatedAdmin;
   const userAllowedModules = (req as any).userAllowedModules ?? [];
   const userViewAllClients = (req as any).userViewAllClients;
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "");
-  const hasDelegatedClients = Boolean(isDelegatedAdmin) && (userAllowedModules.length === 0 || userAllowedModules.includes("clients"));
-
-  const canViewAllClients = isPrivileged || Boolean(userViewAllClients) || hasDelegatedClients;
+  const hasClientModuleAccess = canManageClientSection(req);
+  const canViewAllClients = hasClientModuleAccess || Boolean(userViewAllClients);
 
   const conditions = [];
   if (search) {
@@ -104,7 +105,7 @@ router.get("/", requirePermission("clients.view"), asyncHandler(async (req, res)
     .where(conditions.length ? and(...conditions) : undefined);
 
   // If not privileged and not delegated admin, strip sensitive fields
-  if (!isPrivileged && !hasDelegatedClients) {
+  if (!hasClientModuleAccess) {
     const sanitizedRows = rows.map(client => ({
       ...client,
       budgetRange: undefined,
@@ -116,13 +117,7 @@ router.get("/", requirePermission("clients.view"), asyncHandler(async (req, res)
 }));
 
 router.post("/", requirePermission("clients.create"), asyncHandler(async (req, res) => {
-  const systemRole = (req as any).userSystemRole;
-  const isDelegatedAdmin = (req as any).userIsDelegatedAdmin;
-  const userAllowedModules = (req as any).userAllowedModules ?? [];
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "");
-  const hasDelegatedClients = Boolean(isDelegatedAdmin) && (userAllowedModules.length === 0 || userAllowedModules.includes("clients"));
-
-  if (!isPrivileged && !hasDelegatedClients) {
+  if (!canManageClientSection(req)) {
     throw createError("Forbidden: Employees cannot create clients", 403);
   }
 
@@ -134,14 +129,8 @@ router.post("/", requirePermission("clients.create"), asyncHandler(async (req, r
 
 router.get("/:id", requirePermission("clients.view"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
-  const systemRole = (req as any).userSystemRole;
-  const isDelegatedAdmin = (req as any).userIsDelegatedAdmin;
-  const userAllowedModules = (req as any).userAllowedModules ?? [];
   const userViewAllClients = (req as any).userViewAllClients;
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "");
-  const hasDelegatedClients = Boolean(isDelegatedAdmin) && (userAllowedModules.length === 0 || userAllowedModules.includes("clients"));
-
-  const canViewAllClients = isPrivileged || Boolean(userViewAllClients) || hasDelegatedClients;
+  const canViewAllClients = canManageClientSection(req) || Boolean(userViewAllClients);
 
   const [row] = await db.select().from(clientsTable).where(eq(clientsTable.id, (req.params.id as string)));
   if (!row) throw createError("Not found", 404);
@@ -168,13 +157,7 @@ router.get("/:id", requirePermission("clients.view"), asyncHandler(async (req, r
 }));
 
 router.patch("/:id", requirePermission("clients.edit"), asyncHandler(async (req, res) => {
-  const systemRole = (req as any).userSystemRole;
-  const isDelegatedAdmin = (req as any).userIsDelegatedAdmin;
-  const userAllowedModules = (req as any).userAllowedModules ?? [];
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "");
-  const hasDelegatedClients = Boolean(isDelegatedAdmin) && (userAllowedModules.length === 0 || userAllowedModules.includes("clients"));
-
-  if (!isPrivileged && !hasDelegatedClients) {
+  if (!canManageClientSection(req)) {
     throw createError("Forbidden: Employees cannot edit clients", 403);
   }
 
@@ -190,13 +173,7 @@ router.patch("/:id", requirePermission("clients.edit"), asyncHandler(async (req,
 }));
 
 router.delete("/:id", requirePermission("clients.delete"), asyncHandler(async (req, res) => {
-  const systemRole = (req as any).userSystemRole;
-  const isDelegatedAdmin = (req as any).userIsDelegatedAdmin;
-  const userAllowedModules = (req as any).userAllowedModules ?? [];
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "");
-  const hasDelegatedClients = Boolean(isDelegatedAdmin) && (userAllowedModules.length === 0 || userAllowedModules.includes("clients"));
-
-  if (!isPrivileged && !hasDelegatedClients) {
+  if (!canManageClientSection(req)) {
     throw createError("Forbidden: Employees cannot delete clients", 403);
   }
 
@@ -205,13 +182,7 @@ router.delete("/:id", requirePermission("clients.delete"), asyncHandler(async (r
 }));
 
 router.post("/:id/recalculate-health", requirePermission("clients.edit"), asyncHandler(async (req, res) => {
-  const systemRole = (req as any).userSystemRole;
-  const isDelegatedAdmin = (req as any).userIsDelegatedAdmin;
-  const userAllowedModules = (req as any).userAllowedModules ?? [];
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "");
-  const hasDelegatedClients = Boolean(isDelegatedAdmin) && (userAllowedModules.length === 0 || userAllowedModules.includes("clients"));
-
-  if (!isPrivileged && !hasDelegatedClients) {
+  if (!canManageClientSection(req)) {
     throw createError("Forbidden: Employees cannot perform health calculation", 403);
   }
 
@@ -234,12 +205,11 @@ router.post("/:id/recalculate-health", requirePermission("clients.edit"), asyncH
   return res.json({ health, client: updated });
 }));
 
-router.get("/:id/contracts", requirePermission("clients.view"), asyncHandler(async (req, res) => {
-  const systemRole = (req as any).userSystemRole;
-  if (!["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "")) {
-    return res.json([]); // Hide contract/billing info from non-admin employees
-  }
-
+router.get(
+  "/:id/contracts",
+  requirePermission("clients.view"),
+  requirePermission("invoices.view"),
+  asyncHandler(async (req, res) => {
   const invoices = await db
     .select()
     .from(invoicesTable)
@@ -252,7 +222,8 @@ router.get("/:id/contracts", requirePermission("clients.view"), asyncHandler(asy
     startDate: inv.invoiceDate,
     endDate: inv.dueDate,
   }));
-  return res.json(contracts);
-}));
+    return res.json(contracts);
+  }),
+);
 
 export default router;

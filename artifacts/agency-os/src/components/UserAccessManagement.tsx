@@ -44,6 +44,7 @@ const ALL_MODULES = [
 export function UserAccessManagement() {
   const qc = useQueryClient();
   const { user: currentUser } = useAuth();
+  const isRootAdmin = currentUser?.systemRole === "SUPER_ADMIN";
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
 
@@ -75,6 +76,10 @@ export function UserAccessManagement() {
   });
 
   const handleToggleDelegation = (user: any, enabled: boolean) => {
+    if (!isRootAdmin) {
+      toast.error("Only a Super Admin can change delegated access.");
+      return;
+    }
     if (user.id === currentUser?.id) {
       toast.error("Security Rule: You cannot modify your own delegated administrative privileges.");
       return;
@@ -93,6 +98,10 @@ export function UserAccessManagement() {
   };
 
   const handleModeChange = (user: any, mode: "MODE_1" | "MODE_2") => {
+    if (!isRootAdmin) {
+      toast.error("Only a Super Admin can change portal access mode.");
+      return;
+    }
     if (user.id === currentUser?.id) {
       toast.error("You cannot modify your own portal mode.");
       return;
@@ -108,6 +117,10 @@ export function UserAccessManagement() {
   };
 
   const handleToggleViewAllClients = (user: any, enabled: boolean) => {
+    if (!isRootAdmin) {
+      toast.error("Only a Super Admin can change client access scope.");
+      return;
+    }
     updateMutation.mutate({
       id: user.id,
       data: {
@@ -118,6 +131,10 @@ export function UserAccessManagement() {
   };
 
   const handleToggleModule = (user: any, moduleId: string) => {
+    if (!isRootAdmin) {
+      toast.error("Only a Super Admin can change module access.");
+      return;
+    }
     const currentMods: string[] = user.allowedModules || [];
     const nextMods = currentMods.includes(moduleId)
       ? currentMods.filter((m) => m !== moduleId)
@@ -217,7 +234,7 @@ export function UserAccessManagement() {
                           <Switch
                             checked={Boolean(u.isDelegatedAdmin)}
                             onCheckedChange={(val) => handleToggleDelegation(u, val)}
-                            disabled={isSelf || isPrimaryAdmin || updateMutation.isPending}
+                            disabled={!isRootAdmin || isSelf || isPrimaryAdmin || updateMutation.isPending}
                             data-testid={`toggle-delegation-${u.id}`}
                           />
                         </div>
@@ -245,7 +262,7 @@ export function UserAccessManagement() {
                                 variant={u.portalMode === "MODE_1" || !u.portalMode ? "default" : "outline"}
                                 className="h-7 text-xs"
                                 onClick={() => handleModeChange(u, "MODE_1")}
-                                disabled={isSelf}
+                                disabled={!isRootAdmin || isSelf}
                               >
                                 Mode 1: Employee Portal
                               </Button>
@@ -254,7 +271,7 @@ export function UserAccessManagement() {
                                 variant={u.portalMode === "MODE_2" ? "default" : "outline"}
                                 className="h-7 text-xs"
                                 onClick={() => handleModeChange(u, "MODE_2")}
-                                disabled={isSelf}
+                                disabled={!isRootAdmin || isSelf}
                               >
                                 Mode 2: Full Admin Portal
                               </Button>
@@ -278,7 +295,7 @@ export function UserAccessManagement() {
                           <Switch
                             checked={Boolean(u.viewAllClients)}
                             onCheckedChange={(val) => handleToggleViewAllClients(u, val)}
-                            disabled={isSelf}
+                            disabled={!isRootAdmin || isSelf}
                           />
                         </div>
 
@@ -309,7 +326,7 @@ export function UserAccessManagement() {
                                   <Switch
                                     checked={isEnabled}
                                     onCheckedChange={() => handleToggleModule(u, m.id)}
-                                    disabled={isSelf}
+                                    disabled={!isRootAdmin || isSelf}
                                   />
                                 </div>
                               );
@@ -335,7 +352,7 @@ export function UserAccessManagement() {
                             </Badge>
                           ))}
                           {(!u.allowedModules || u.allowedModules.length === 0) && (
-                            <span className="text-[11px] text-muted-foreground italic">Standard Employee View — no module restrictions</span>
+                            <span className="text-[11px] text-muted-foreground italic">Standard employee modules apply because no modules are selected.</span>
                           )}
                         </div>
                       </div>

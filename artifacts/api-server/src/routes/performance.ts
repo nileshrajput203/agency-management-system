@@ -18,9 +18,24 @@ router.get("/monthly", requirePermission("reports.view"), asyncHandler(async (re
 
   const start = new Date(year, month - 1, 1);
   const end   = new Date(year, month, 1); // exclusive upper bound
+  const configuredModules: string[] = (req as any).userConfiguredModules ?? [];
+  const canViewAllReports =
+    (req as any).userSystemRole === "SUPER_ADMIN" || configuredModules.includes("reports");
+  const canViewProjects =
+    (req as any).userSystemRole === "SUPER_ADMIN" || configuredModules.includes("projects");
 
   // All tasks assigned to an employee that fall within the month
   // (tasks due in the month OR updated/completed in the month)
+  const filters = [
+    isNotNull(tasksTable.assigneeId),
+    sql`(
+      (${tasksTable.dueDate} >= ${start.toISOString()} AND ${tasksTable.dueDate} < ${end.toISOString()})
+      OR
+      (${tasksTable.createdAt} >= ${start.toISOString()} AND ${tasksTable.createdAt} < ${end.toISOString()})
+    )`,
+  ];
+  if (!canViewAllReports) filters.push(eq(tasksTable.assigneeId, (req as any).userId));
+
   const rows = await db
     .select({
       employeeId:   tasksTable.assigneeId,
@@ -37,17 +52,7 @@ router.get("/monthly", requirePermission("reports.view"), asyncHandler(async (re
     .from(tasksTable)
     .leftJoin(usersTable, eq(tasksTable.assigneeId, usersTable.id))
     .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
-    .where(
-      and(
-        isNotNull(tasksTable.assigneeId),
-        // include tasks that were due in this month OR created in this month
-        sql`(
-          (${tasksTable.dueDate} >= ${start.toISOString()} AND ${tasksTable.dueDate} < ${end.toISOString()})
-          OR
-          (${tasksTable.createdAt} >= ${start.toISOString()} AND ${tasksTable.createdAt} < ${end.toISOString()})
-        )`
-      )
-    );
+    .where(and(...filters));
 
   // Aggregate per employee
   const byEmployee: Record<string, {
@@ -109,7 +114,7 @@ router.get("/monthly", requirePermission("reports.view"), asyncHandler(async (re
       status:      r.status,
       priority:    r.priority,
       dueDate:     r.dueDate,
-      projectName: r.projectName,
+      projectName: canViewProjects ? r.projectName : null,
       isOverdue:   !done && due && due < now,
       isDelayed:   done && due && new Date(r.updatedAt) > due,
     });

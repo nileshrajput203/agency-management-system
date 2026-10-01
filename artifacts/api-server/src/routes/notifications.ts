@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { notifications } from "@workspace/db/schema";
 import { eq, and, sql, ilike, or } from "drizzle-orm";
-import { requireAuth, isPrivilegedRole } from "../middleware/auth";
+import { requireAuth, requirePermission } from "../middleware/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { isValidUUID } from "../lib/validation";
@@ -137,14 +137,8 @@ router.delete("/:id", requireAuth, asyncHandler(async (req, res) => {
 }));
 
 // POST /notifications/announcement - Broadcast announcement (Admin/Manager only)
-router.post("/announcement", requireAuth, asyncHandler(async (req, res) => {
+router.post("/announcement", requirePermission("users.manage"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
-  const userRole = (req as any).userRole;
-  const userSystemRole = (req as any).userSystemRole;
-
-  if (!isPrivilegedRole(userSystemRole)) {
-    throw createError("Forbidden: Only Admins or Managers can broadcast announcements", 403);
-  }
 
   const { title, message, priority = "HIGH", targetRole = null } = req.body;
 

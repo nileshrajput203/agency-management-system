@@ -5,7 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate, isValidUUID } from "../lib/validation";
-import { requirePermission, requireRole } from "../middleware/auth";
+import { requirePermission } from "../middleware/auth";
 
 const router = Router();
 
@@ -50,7 +50,7 @@ router.post("/clients/:clientId/activity", requirePermission("clients.edit"), as
   return res.status(201).json(row);
 }));
 
-router.delete("/clients/:clientId/activity/:id", requireRole("ADMIN"), asyncHandler(async (req, res) => {
+router.delete("/clients/:clientId/activity/:id", requirePermission("clients.edit"), asyncHandler(async (req, res) => {
   const { clientId, id } = req.params as { clientId: string; id: string };
   if (!isValidUUID(clientId)) {
     throw createError("Invalid clientId format", 400);

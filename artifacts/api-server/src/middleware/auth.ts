@@ -4,8 +4,16 @@ import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
+import {
+  getEffectiveModules,
+  getModulePermissions,
+  hasConfiguredModule,
+  parseConfiguredModules,
+  canManageModuleSection,
+  canManageTaskWorkspace as canManageTaskWorkspaceFromModules,
+} from "./moduleAccess";
 
-export const PRIVILEGED_ROLES = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"] as const;
+export const PRIVILEGED_ROLES = ["SUPER_ADMIN"] as const;
 
 export function isPrivilegedRole(systemRole?: string | null): boolean {
   if (!systemRole) return false;
@@ -15,22 +23,24 @@ export function isPrivilegedRole(systemRole?: string | null): boolean {
 // Account managers have delegated access to modules such as Sales, but they
 // are still employees for the task workspace. Only these roles can see and
 // manage the company-wide task board.
-export const TASK_MANAGER_ROLES = ["SUPER_ADMIN", "ADMIN", "MANAGER"] as const;
-
-export function isTaskManagerRole(systemRole?: string | null): boolean {
-  if (!systemRole) return false;
-  return TASK_MANAGER_ROLES.includes(systemRole as any);
+export function canManageTaskWorkspace(systemRole?: string | null, allowedModules?: unknown): boolean {
+  return canManageTaskWorkspaceFromModules(systemRole, allowedModules);
 }
 
-export function canManageTaskWorkspace(systemRole?: string | null, allowedModules?: unknown): boolean {
-  if (isTaskManagerRole(systemRole)) return true;
-  if (!Array.isArray(allowedModules) || allowedModules.length === 0) return false;
-  return allowedModules.includes("projects") && allowedModules.includes("tasks");
+export function canManageEnabledSection(
+  systemRole: string | null | undefined,
+  module: string,
+  allowedModules: unknown,
+): boolean {
+  return canManageModuleSection(systemRole, module, allowedModules);
 }
 
 export function canManageProjectWorkspace(systemRole?: string | null, allowedModules?: unknown): boolean {
-  if (["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "")) return true;
-  return Array.isArray(allowedModules) && allowedModules.length > 0 && allowedModules.includes("projects");
+  return canManageEnabledSection(systemRole, "projects", allowedModules);
+}
+
+export function canManageMeetingWorkspace(systemRole?: string | null, allowedModules?: unknown): boolean {
+  return canManageEnabledSection(systemRole, "meetings", allowedModules);
 }
 
 export type UserRole = "ADMIN" | "EMPLOYEE";
@@ -47,6 +57,10 @@ export type Permission =
   | "attendance.manage"
   | "time.log"
   | "time.view"
+  | "meetings.create"
+  | "meetings.edit"
+  | "meetings.delete"
+  | "meetings.view"
   | "attachments.upload"
   | "attachments.view"
   | "projects.create"
@@ -100,6 +114,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "attendance.manage",
     "time.log",
     "time.view",
+    "meetings.create",
+    "meetings.edit",
+    "meetings.delete",
+    "meetings.view",
     "attachments.upload",
     "attachments.view",
     "projects.create",
@@ -226,121 +244,28 @@ export function requirePermission(permission: Permission) {
       return res.status(401).json({ error: "Your account is inactive or pending approval." });
     }
 
-    const isPrivileged = isPrivilegedRole(user.systemRole);
+    const isSuperAdmin = user.systemRole === "SUPER_ADMIN";
     const isDelegated = Boolean(user.isDelegatedAdmin);
-    const role: UserRole = isPrivileged ? "ADMIN" : "EMPLOYEE";
-
-    const getModulesList = (val: unknown): string[] => {
-      if (Array.isArray(val)) return val as string[];
-      if (typeof val === "string" && val) {
-        try {
-          const parsed = JSON.parse(val);
-          return Array.isArray(parsed) ? parsed : [];
-        } catch {
-          return val.split(",").map((s) => s.trim()).filter(Boolean);
-        }
-      }
-      return [];
-    };
-
-    const allowedModulesList = getModulesList(user.allowedModules);
-
-    let effectivePermissions: string[] = isPrivileged ? [...ROLE_PERMISSIONS.ADMIN] : [...ROLE_PERMISSIONS.EMPLOYEE];
-
-    if (!isPrivileged && isDelegated) {
-      // Map allowedModules to administrative permissions for delegated employees
-      if (allowedModulesList.length === 0) {
-        effectivePermissions = [...ROLE_PERMISSIONS.ADMIN];
-      } else {
-        const MODULE_DELEGATED_PERMISSIONS: Record<string, string[]> = {
-          clients: ["clients.view", "clients.create", "clients.edit", "clients.delete"],
-          sales: ["sales.view", "sales.create", "sales.edit", "sales.delete"],
-          projects: ["projects.view", "projects.create", "projects.edit", "projects.delete"],
-          tasks: ["tasks.view", "tasks.create", "tasks.edit", "tasks.delete"],
-          content: ["content.view", "content.create", "content.edit", "content.delete"],
-          invoices: ["invoices.view", "invoices.create", "invoices.edit", "invoices.delete"],
-          quotations: ["quotations.view", "quotations.create", "quotations.edit", "quotations.delete"],
-          proposals: ["proposals.view", "proposals.create", "proposals.edit", "proposals.delete"],
-          purchaseOrders: ["purchase_orders.view", "purchase_orders.create", "purchase_orders.edit", "purchase_orders.delete"],
-          purchase_orders: ["purchase_orders.view", "purchase_orders.create", "purchase_orders.edit", "purchase_orders.delete"],
-          finance: [
-            "invoices.view", "invoices.create", "invoices.edit", "invoices.delete",
-            "quotations.view", "quotations.create", "quotations.edit", "quotations.delete",
-            "proposals.view", "proposals.create", "proposals.edit", "proposals.delete",
-            "purchase_orders.view", "purchase_orders.create", "purchase_orders.edit", "purchase_orders.delete"
-          ],
-          leaves: ["leave.view", "leave.apply", "leave.approve"],
-          leave: ["leave.view", "leave.apply", "leave.approve"],
-          attendance: ["attendance.view", "attendance.manage"],
-          team: ["users.view", "users.manage"],
-          users: ["users.view", "users.manage"],
-          userManagement: ["users.view", "users.manage"],
-          settings: ["settings.view", "settings.update"],
-          reports: ["reports.view"],
-        };
-
-        for (const mod of allowedModulesList) {
-          if (MODULE_DELEGATED_PERMISSIONS[mod]) {
-            effectivePermissions.push(...MODULE_DELEGATED_PERMISSIONS[mod]);
-          }
-        }
-      }
-    } else if (!isPrivileged && allowedModulesList.length > 0) {
-      // An explicitly enabled module is a complete employee-facing section.
-      // Keep task data scoped to the employee below, but allow the section's
-      // normal create/edit actions instead of showing a page that can only be
-      // read.
-      const MODULE_EMPLOYEE_PERMISSIONS: Record<string, string[]> = {
-        sales: ["sales.view", "sales.create", "sales.edit", "sales.delete"],
-        clients: ["clients.view", "clients.create", "clients.edit"],
-        projects: ["projects.view", "projects.create", "projects.edit"],
-        tasks: ["tasks.view", "tasks.create", "tasks.edit"],
-        content: ["content.view", "content.create", "content.edit"],
-        attendance: ["attendance.view", "attendance.manage"],
-        leaves: ["leave.view", "leave.apply"],
-      };
-      for (const mod of allowedModulesList) {
-        if (MODULE_EMPLOYEE_PERMISSIONS[mod]) {
-          effectivePermissions.push(...MODULE_EMPLOYEE_PERMISSIONS[mod]);
-        }
-      }
-    }
+    const allowedModulesList = getEffectiveModules(user.allowedModules);
+    const configuredModulesList = parseConfiguredModules(user.allowedModules);
+    const role: UserRole = isSuperAdmin || canManageTaskWorkspace(user.systemRole, configuredModulesList)
+      ? "ADMIN"
+      : "EMPLOYEE";
+    const effectivePermissions: string[] = isSuperAdmin
+      ? [...ROLE_PERMISSIONS.ADMIN]
+      : getModulePermissions(user.allowedModules);
 
     if (!effectivePermissions.includes(permission)) {
       return res.status(403).json({ error: `Forbidden: Missing required permission ${permission}` });
-    }
-
-    // Enforce allowedModules restriction on base permissions only when explicit allowedModules are configured on account
-    if (!isPrivileged && !isDelegated && allowedModulesList.length > 0) {
-      const PERMISSION_TO_MODULE: Record<string, string[]> = {
-        "clients.create": ["clients"], "clients.edit": ["clients"], "clients.delete": ["clients"], "clients.view": ["clients"],
-        "projects.create": ["projects"], "projects.edit": ["projects"], "projects.delete": ["projects"], "projects.view": ["projects"],
-        "tasks.create": ["tasks"], "tasks.edit": ["tasks"], "tasks.delete": ["tasks"], "tasks.view": ["tasks"],
-        "content.create": ["content"], "content.edit": ["content"], "content.delete": ["content"], "content.view": ["content"],
-        "invoices.create": ["invoices", "finance"], "invoices.edit": ["invoices", "finance"], "invoices.delete": ["invoices", "finance"], "invoices.view": ["invoices", "finance"],
-        "quotations.create": ["quotations", "finance"], "quotations.edit": ["quotations", "finance"], "quotations.delete": ["quotations", "finance"], "quotations.view": ["quotations", "finance"],
-        "proposals.create": ["proposals", "finance"], "proposals.edit": ["proposals", "finance"], "proposals.delete": ["proposals", "finance"], "proposals.view": ["proposals", "finance"],
-        "leave.apply": ["leaves", "leave"], "leave.approve": ["leaves", "leave"], "leave.view": ["leaves", "leave"],
-        "attendance.view": ["attendance"], "attendance.manage": ["attendance"],
-        "sales.create": ["sales"], "sales.edit": ["sales"], "sales.delete": ["sales"], "sales.view": ["sales"],
-        "purchase_orders.create": ["purchaseOrders", "purchase_orders", "finance"], "purchase_orders.edit": ["purchaseOrders", "purchase_orders", "finance"], "purchase_orders.delete": ["purchaseOrders", "purchase_orders", "finance"], "purchase_orders.view": ["purchaseOrders", "purchase_orders", "finance"],
-        "users.manage": ["team", "users", "userManagement"], "settings.view": ["settings"], "settings.update": ["settings"],
-        "attachments.upload": ["attachments"], "attachments.view": ["attachments"],
-        "reports.view": ["reports"],
-      };
-
-      const acceptableModules = PERMISSION_TO_MODULE[permission];
-      if (acceptableModules && !acceptableModules.some((m) => allowedModulesList.includes(m))) {
-        return res.status(403).json({ error: `Forbidden: Module for permission ${permission} is disabled for your account.` });
-      }
     }
 
     (req as any).userRole = role;
     (req as any).userSystemRole = user.systemRole;
     (req as any).userIsDelegatedAdmin = isDelegated;
     (req as any).userPortalMode = user.portalMode || "MODE_1";
-    (req as any).userViewAllClients = Boolean(user.viewAllClients) || isPrivileged;
+    (req as any).userViewAllClients = Boolean(user.viewAllClients) || isSuperAdmin;
     (req as any).userAllowedModules = allowedModulesList;
+    (req as any).userConfiguredModules = configuredModulesList ?? [];
 
     next();
   });
@@ -371,10 +296,10 @@ export function requireRole(allowedRole: UserRole) {
       return res.status(403).json({ error: "Your account is inactive or pending approval." });
     }
 
-    const isPrivileged = isPrivilegedRole(user.systemRole);
+    const isSuperAdmin = user.systemRole === "SUPER_ADMIN";
     const isDelegatedAdmin = Boolean(user.isDelegatedAdmin);
 
-    const role: UserRole = (isPrivileged || isDelegatedAdmin) ? "ADMIN" : "EMPLOYEE";
+    const role: UserRole = isSuperAdmin ? "ADMIN" : "EMPLOYEE";
     if (allowedRole === "ADMIN" && role !== "ADMIN") {
       return res.status(403).json({ error: `Forbidden: ${allowedRole} role required` });
     }

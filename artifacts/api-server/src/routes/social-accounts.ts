@@ -37,10 +37,6 @@ router.get("/", requirePermission("clients.view"), asyncHandler(async (req, res)
 }));
 
 router.post("/", requirePermission("clients.create"), asyncHandler(async (req, res) => {
-  const systemRole = (req as any).userSystemRole;
-  if (!["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "")) {
-    throw createError("Forbidden: Employees cannot manage social accounts", 403);
-  }
   const sanitized = sanitizeSocialAccount(req.body, false);
   const [row] = await db
     .insert(clientSocialAccountsTable)
@@ -50,10 +46,6 @@ router.post("/", requirePermission("clients.create"), asyncHandler(async (req, r
 }));
 
 router.patch("/:id", requirePermission("clients.edit"), asyncHandler(async (req, res) => {
-  const systemRole = (req as any).userSystemRole;
-  if (!["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "")) {
-    throw createError("Forbidden: Employees cannot edit social accounts", 403);
-  }
   const sanitized = sanitizeSocialAccount(req.body, true);
   const [row] = await db
     .update(clientSocialAccountsTable)
@@ -65,10 +57,6 @@ router.patch("/:id", requirePermission("clients.edit"), asyncHandler(async (req,
 }));
 
 router.delete("/:id", requirePermission("clients.delete"), asyncHandler(async (req, res) => {
-  const systemRole = (req as any).userSystemRole;
-  if (!["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "")) {
-    throw createError("Forbidden: Employees cannot delete social accounts", 403);
-  }
   await db.delete(clientSocialAccountsTable).where(eq(clientSocialAccountsTable.id, (req.params.id as string)));
   return res.status(204).send();
 }));

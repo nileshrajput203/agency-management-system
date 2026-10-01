@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { meetings, meetingAttendees, notifications, users, clients, projects } from "@workspace/db/schema";
 import { eq, and, sql, inArray, or } from "drizzle-orm";
-import { requirePermission } from "../middleware/auth";
+import { requirePermission, canManageMeetingWorkspace } from "../middleware/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { isValidUUID } from "../lib/validation";
@@ -10,9 +10,18 @@ import { NotificationService } from "../services/notificationService";
 import { meetingLogger } from "../lib/logger";
 
 const router = Router();
+router.use((req, res, next) => {
+  if (!canManageMeetingWorkspace(
+    (req as any).userSystemRole,
+    (req as any).userConfiguredModules,
+  )) {
+    return res.status(403).json({ error: "Forbidden: Enable the Meetings section to continue" });
+  }
+  next();
+});
 
 // GET /meetings - List meetings with filters
-router.get("/", requirePermission("time.view"), asyncHandler(async (req, res) => {
+router.get("/", requirePermission("meetings.view"), asyncHandler(async (req, res) => {
   const { clientId, projectId } = req.query as Record<string, string>;
   const userId = (req as any).userId;
   const userRole = (req as any).userSystemRole;
@@ -27,7 +36,7 @@ router.get("/", requirePermission("time.view"), asyncHandler(async (req, res) =>
     conditions.push(eq(meetings.projectId, projectId));
   }
 
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(userRole);
+  const isPrivileged = canManageMeetingWorkspace(userRole, (req as any).userConfiguredModules);
 
   let allMeetings;
   if (isPrivileged) {
@@ -98,7 +107,7 @@ router.get("/", requirePermission("time.view"), asyncHandler(async (req, res) =>
 }));
 
 // GET /meetings/:id - Get single meeting details
-router.get("/:id", requirePermission("time.view"), asyncHandler(async (req, res) => {
+router.get("/:id", requirePermission("meetings.view"), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = (req as any).userId;
   const userRole = (req as any).userSystemRole;
@@ -110,7 +119,7 @@ router.get("/:id", requirePermission("time.view"), asyncHandler(async (req, res)
 
   const attendeesList = await db.select().from(meetingAttendees).where(eq(meetingAttendees.meetingId, id));
   const [currentUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId));
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(userRole);
+  const isPrivileged = canManageMeetingWorkspace(userRole, (req as any).userConfiguredModules);
   const isAttendee = attendeesList.some((a) => a.userId === userId || (currentUser?.email && a.email === currentUser.email));
   const isOrganizer = m.organizerId === userId || m.createdBy === userId;
 
@@ -149,7 +158,7 @@ router.get("/:id", requirePermission("time.view"), asyncHandler(async (req, res)
 }));
 
 // POST /meetings - Schedule a new meeting
-router.post("/", requirePermission("time.log"), asyncHandler(async (req, res) => {
+router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
 
   const {
@@ -283,7 +292,7 @@ router.post("/", requirePermission("time.log"), asyncHandler(async (req, res) =>
 }));
 
 // PUT /meetings/:id - Update an existing meeting
-router.put("/:id", requirePermission("time.log"), asyncHandler(async (req, res) => {
+router.put("/:id", requirePermission("meetings.edit"), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = (req as any).userId;
   const userRole = (req as any).userSystemRole;
@@ -293,7 +302,7 @@ router.put("/:id", requirePermission("time.log"), asyncHandler(async (req, res) 
   const [existing] = await db.select().from(meetings).where(eq(meetings.id, id));
   if (!existing) throw createError("Meeting not found", 404);
 
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(userRole);
+  const isPrivileged = canManageMeetingWorkspace(userRole, (req as any).userConfiguredModules);
   if (!isPrivileged && existing.organizerId !== userId && existing.createdBy !== userId) {
     throw createError("Forbidden: You do not have permission to edit this meeting", 403);
   }
@@ -405,7 +414,7 @@ router.put("/:id", requirePermission("time.log"), asyncHandler(async (req, res) 
 }));
 
 // PATCH /meetings/:id/status - Quick status change (e.g. COMPLETED, CANCELLED)
-router.patch("/:id/status", requirePermission("time.log"), asyncHandler(async (req, res) => {
+router.patch("/:id/status", requirePermission("meetings.edit"), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   const userId = (req as any).userId;
@@ -417,7 +426,7 @@ router.patch("/:id/status", requirePermission("time.log"), asyncHandler(async (r
   const [existing] = await db.select().from(meetings).where(eq(meetings.id, id));
   if (!existing) throw createError("Meeting not found", 404);
 
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(userRole);
+  const isPrivileged = canManageMeetingWorkspace(userRole, (req as any).userConfiguredModules);
   if (!isPrivileged && existing.organizerId !== userId && existing.createdBy !== userId) {
     throw createError("Forbidden: You do not have permission to modify this meeting", 403);
   }
@@ -466,7 +475,7 @@ router.patch("/:id/status", requirePermission("time.log"), asyncHandler(async (r
 }));
 
 // DELETE /meetings/:id - Delete / cancel meeting
-router.delete("/:id", requirePermission("time.log"), asyncHandler(async (req, res) => {
+router.delete("/:id", requirePermission("meetings.delete"), asyncHandler(async (req, res) => {
   const { id } = req.params;
   const userId = (req as any).userId;
   const userRole = (req as any).userSystemRole;
@@ -476,7 +485,7 @@ router.delete("/:id", requirePermission("time.log"), asyncHandler(async (req, re
   const [existing] = await db.select().from(meetings).where(eq(meetings.id, id));
   if (!existing) throw createError("Meeting not found", 404);
 
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(userRole);
+  const isPrivileged = canManageMeetingWorkspace(userRole, (req as any).userConfiguredModules);
   if (!isPrivileged && existing.organizerId !== userId && existing.createdBy !== userId) {
     throw createError("Forbidden: You do not have permission to delete this meeting", 403);
   }

@@ -4,7 +4,7 @@ import {
   quotationsTable, purchaseOrdersTable, leaveRequestsTable, usersTable,
 } from "@workspace/db/schema";
 import { eq, gte, sql, and } from "drizzle-orm";
-import { isTaskManagerRole } from "../middleware/auth";
+import { getEffectiveModules } from "../middleware/moduleAccess";
 
 function toIso(val: any): string | null {
   if (!val) return null;
@@ -20,15 +20,21 @@ export async function getDashboardStatsService(userId: string) {
     .select({
       name: usersTable.name,
       systemRole: usersTable.systemRole,
+      allowedModules: usersTable.allowedModules,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
 
   const now = new Date();
 
-  if (!isTaskManagerRole(user?.systemRole)) {
+  if (user?.systemRole !== "SUPER_ADMIN") {
+    const modules = getEffectiveModules(user?.allowedModules);
+    const canViewTasks = modules.includes("tasks");
+    const canViewProjects = modules.includes("projects");
+    const canViewLeaves = modules.includes("leaves") || modules.includes("leave");
+
     // 1. Employee Work Summary
-    const employeeTasks = await db
+    const employeeTasks = canViewTasks ? await db
       .select({
         id: tasksTable.id,
         title: tasksTable.title,
@@ -44,9 +50,9 @@ export async function getDashboardStatsService(userId: string) {
         approvedAt: tasksTable.approvedAt,
       })
       .from(tasksTable)
-      .where(eq(tasksTable.assigneeId, userId));
+      .where(eq(tasksTable.assigneeId, userId)) : [];
 
-    const employeeTaskRequests = await db
+    const employeeTaskRequests = canViewTasks ? await db
       .select({
         id: tasksTable.id,
         title: tasksTable.title,
@@ -63,7 +69,7 @@ export async function getDashboardStatsService(userId: string) {
         approvedAt: tasksTable.approvedAt,
       })
       .from(tasksTable)
-      .where(eq(tasksTable.requestedBy, userId));
+      .where(eq(tasksTable.requestedBy, userId)) : [];
 
     const activeEmployeeTasks = employeeTasks.filter((t) =>
       t.approvalStatus === "APPROVED" ||
@@ -71,7 +77,7 @@ export async function getDashboardStatsService(userId: string) {
       !t.approvalStatus
     );
 
-    const allProjects = await db
+    const allProjects = canViewProjects ? await db
       .select({
         id: projectsTable.id,
         name: projectsTable.name,
@@ -86,19 +92,19 @@ export async function getDashboardStatsService(userId: string) {
         assignmentActionAt: projectsTable.assignmentActionAt,
         createdAt: projectsTable.createdAt,
       })
-      .from(projectsTable);
+      .from(projectsTable) : [];
 
     const assignedProjectIds = Array.from(new Set(activeEmployeeTasks.map((t) => t.projectId).filter(Boolean))) as string[];
     const myProjects = allProjects.filter((p) => p.createdBy === userId || p.assignedTo === userId || assignedProjectIds.includes(p.id));
 
-    const allProjectTasks = await db
+    const allProjectTasks = canViewProjects ? await db
       .select({
         id: tasksTable.id,
         status: tasksTable.status,
         projectId: tasksTable.projectId,
       })
       .from(tasksTable)
-      .where(sql`${tasksTable.projectId} is not null`);
+      .where(sql`${tasksTable.projectId} is not null`) : [];
 
     const myProjectsWithCompletion = myProjects.map((p) => {
       const projectTasks = allProjectTasks.filter((t) => t.projectId === p.id);
@@ -190,10 +196,10 @@ export async function getDashboardStatsService(userId: string) {
       }
     }
 
-    const myLeaves = await db
+    const myLeaves = canViewLeaves ? await db
       .select()
       .from(leaveRequestsTable)
-      .where(eq(leaveRequestsTable.userId, userId));
+      .where(eq(leaveRequestsTable.userId, userId)) : [];
 
     for (const lv of myLeaves) {
       if (lv.startDate) {
@@ -215,7 +221,7 @@ export async function getDashboardStatsService(userId: string) {
     upcomingDeadlines.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // My Tasks
-    const myTasksList = await db
+    const myTasksList = canViewTasks ? await db
       .select({
         id: tasksTable.id,
         title: tasksTable.title,
@@ -227,7 +233,7 @@ export async function getDashboardStatsService(userId: string) {
         rejectionReason: tasksTable.rejectionReason,
       })
       .from(tasksTable)
-      .where(eq(tasksTable.assigneeId, userId));
+      .where(eq(tasksTable.assigneeId, userId)) : [];
 
     const approvedMyTasks = myTasksList.filter((t) =>
       t.approvalStatus === "APPROVED" || t.approvalStatus === "MODIFIED" || !t.approvalStatus

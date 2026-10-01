@@ -29,24 +29,52 @@ export const DEFAULT_EMPLOYEE_MODULES: ModuleKey[] = [
   "reports",
 ];
 
-export function getUserModules(allowedModules?: unknown): string[] {
+export function getExplicitUserModules(allowedModules?: unknown): string[] {
   if (Array.isArray(allowedModules) && allowedModules.length > 0) {
-    return allowedModules.map(String);
+    return allowedModules.map(String).map((module) => module.trim()).filter(Boolean);
   }
   if (typeof allowedModules === "string" && allowedModules.trim()) {
     try {
       const parsed = JSON.parse(allowedModules);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed.map(String);
+      if (Array.isArray(parsed)) {
+        return parsed.map(String).map((module) => module.trim()).filter(Boolean);
+      }
     } catch {
       const parsed = allowedModules.split(",").map((module) => module.trim()).filter(Boolean);
       if (parsed.length > 0) return parsed;
     }
   }
+  return [];
+}
+
+export function getUserModules(allowedModules?: unknown): string[] {
+  const configured = getExplicitUserModules(allowedModules);
+  if (configured.length > 0) return configured;
   return DEFAULT_EMPLOYEE_MODULES;
 }
 
 export function hasModuleAccess(allowedModules: unknown, module: string): boolean {
   return getUserModules(allowedModules).includes(module);
+}
+
+export function hasExplicitModuleAccess(allowedModules: unknown, module: string): boolean {
+  return getExplicitUserModules(allowedModules).includes(module);
+}
+
+export function isSuperAdminRole(role?: string | null): boolean {
+  return role === "SUPER_ADMIN";
+}
+
+export function canManageModule(user: any, module: string): boolean {
+  const role = user?.systemRole ?? user?.role;
+  return isSuperAdminRole(role) || hasExplicitModuleAccess(user?.allowedModules, module);
+}
+
+export function canManageTaskWorkspaceForUser(user: any): boolean {
+  const role = user?.systemRole ?? user?.role;
+  return isSuperAdminRole(role) ||
+    (hasExplicitModuleAccess(user?.allowedModules, "projects") &&
+      hasExplicitModuleAccess(user?.allowedModules, "tasks"));
 }
 
 const ROLE_MODULES: Record<SystemRole, ModuleKey[]> = {
@@ -63,6 +91,7 @@ const ROLE_MODULES: Record<SystemRole, ModuleKey[]> = {
     "team",
     "reports",
     "attendance",
+    "leaves",
     "settings",
     "automation",
   ],
@@ -85,12 +114,19 @@ const ROLE_MODULES: Record<SystemRole, ModuleKey[]> = {
   CUSTOM: ["dashboard"],
 };
 
-export function canAccessModule(role: SystemRole, module: ModuleKey): boolean {
-  return ROLE_MODULES[role]?.includes(module) ?? false;
+export function canAccessModule(
+  role: SystemRole,
+  module: ModuleKey,
+  allowedModules?: unknown,
+): boolean {
+  return module === "dashboard" ||
+    isSuperAdminRole(role) ||
+    getUserModules(allowedModules).includes(module);
 }
 
-export function getAccessibleModules(role: SystemRole): ModuleKey[] {
-  return ROLE_MODULES[role] ?? ["dashboard"];
+export function getAccessibleModules(role: SystemRole, allowedModules?: unknown): ModuleKey[] {
+  if (isSuperAdminRole(role)) return [...ROLE_MODULES.SUPER_ADMIN];
+  return [...new Set(["dashboard", ...getUserModules(allowedModules)])] as ModuleKey[];
 }
 
 export function isAdmin(role: SystemRole): boolean {

@@ -73,7 +73,11 @@ router.post("/", requirePermission("users.manage"), asyncHandler(async (req, res
   const { name, email, password, systemRole, department, isActive, allowedModules, isDelegatedAdmin, portalMode, viewAllClients } = req.body;
   if (!name || !email) throw createError("Name and email are required", 400);
 
+  const isRootAdmin = (req as any).userSystemRole === "SUPER_ADMIN";
   const sanitized = sanitizeUser({ systemRole, department, isActive, portalMode }, false);
+  if (!isRootAdmin && sanitized.systemRole === "SUPER_ADMIN") {
+    throw createError("Only a Super Admin can create another Super Admin account", 403);
+  }
 
   const [existing] = await db
     .select({ id: usersTable.id })
@@ -93,10 +97,10 @@ router.post("/", requirePermission("users.manage"), asyncHandler(async (req, res
       role: sanitized.systemRole || "ACCOUNT_MANAGER",
       department: sanitized.department || null,
       isActive: sanitized.isActive !== undefined ? sanitized.isActive : true,
-      allowedModules: Array.isArray(allowedModules) ? allowedModules : [],
-      isDelegatedAdmin: Boolean(isDelegatedAdmin),
-      portalMode: sanitized.portalMode || "MODE_1",
-      viewAllClients: Boolean(viewAllClients),
+      allowedModules: isRootAdmin && Array.isArray(allowedModules) ? allowedModules : [],
+      isDelegatedAdmin: isRootAdmin && Boolean(isDelegatedAdmin),
+      portalMode: isRootAdmin ? sanitized.portalMode || "MODE_1" : "MODE_1",
+      viewAllClients: isRootAdmin && Boolean(viewAllClients),
     })
     .returning(USER_SAFE_COLS);
 
@@ -131,11 +135,15 @@ router.patch("/:id", requirePermission("users.manage"), asyncHandler(async (req,
   const targetId = req.params.id as string;
   const currentUserId = (req as any).userId;
   const performingUserRole = (req as any).userSystemRole;
+  const isRootAdmin = performingUserRole === "SUPER_ADMIN";
 
-  const isPerformingAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(performingUserRole ?? "");
-
-  if (!isPerformingAdmin && (body.isDelegatedAdmin !== undefined || body.portalMode !== undefined || body.viewAllClients !== undefined)) {
-    throw createError("Forbidden: Only Administrators can modify delegated administrative privileges.", 403);
+  if (!isRootAdmin && (
+    body.allowedModules !== undefined ||
+    body.isDelegatedAdmin !== undefined ||
+    body.portalMode !== undefined ||
+    body.viewAllClients !== undefined
+  )) {
+    throw createError("Forbidden: Only a Super Admin can change module or delegated access.", 403);
   }
 
   if (targetId === currentUserId) {
@@ -162,6 +170,9 @@ router.patch("/:id", requirePermission("users.manage"), asyncHandler(async (req,
   if (!oldUser) throw createError("User not found", 404);
 
   const sanitized = sanitizeUser(body, true);
+  if (!isRootAdmin && sanitized.systemRole === "SUPER_ADMIN") {
+    throw createError("Only a Super Admin can assign the Super Admin role", 403);
+  }
   const updateData: Record<string, unknown> = { ...sanitized };
   if (sanitized.systemRole) updateData.role = sanitized.systemRole;
   if (body.allowedModules !== undefined) updateData.allowedModules = Array.isArray(body.allowedModules) ? body.allowedModules : [];

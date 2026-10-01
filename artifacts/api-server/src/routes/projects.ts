@@ -57,8 +57,6 @@ function sanitizeProject(body: any, isUpdate = false) {
 
 router.get("/", requirePermission("projects.view"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
-  const systemRole = (req as any).userSystemRole;
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "");
 
   const query = db
     .select({
@@ -96,8 +94,7 @@ router.get("/", requirePermission("projects.view"), asyncHandler(async (req, res
 
 router.post("/", requirePermission("projects.create"), asyncHandler(async (req, res) => {
   const systemRole = (req as any).userSystemRole;
-  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
-  if (!["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "") && !isDelegatedAdmin) {
+  if (!canManageProjectWorkspace(systemRole, (req as any).userConfiguredModules)) {
     throw createError("Forbidden: Employees cannot create projects", 403);
   }
 
@@ -198,8 +195,7 @@ router.patch("/:id", requirePermission("projects.edit"), asyncHandler(async (req
   const requesterId = (req as any).userId;
   const requesterRole = (req as any).userRole;
   const systemRole = (req as any).userSystemRole;
-  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
-   const isPrivileged = canManageProjectWorkspace(systemRole, (req as any).userAllowedModules) || isDelegatedAdmin;
+  const isPrivileged = canManageProjectWorkspace(systemRole, (req as any).userConfiguredModules);
 
   if (!isPrivileged) {
     // Employees can update assignmentStatus, status, completionNotes, completionPercentage, startedAt, completedAt, activityTimeline
@@ -563,8 +559,7 @@ router.patch("/:id", requirePermission("projects.edit"), asyncHandler(async (req
 
 router.delete("/:id", requirePermission("projects.delete"), asyncHandler(async (req, res) => {
   const systemRole = (req as any).userSystemRole;
-  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
-  if (!["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "") && !isDelegatedAdmin) {
+  if (!canManageProjectWorkspace(systemRole, (req as any).userConfiguredModules)) {
     throw createError("Forbidden: Employees cannot delete projects", 403);
   }
 
@@ -724,8 +719,10 @@ router.delete("/:projectId/subprojects/:subprojectId", requirePermission("projec
 // Get all project requests (for Admins / Managers) or filtered
 router.get("/requests/all", requirePermission("projects.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
-  const systemRole = (req as any).userSystemRole;
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "");
+  const isPrivileged = canManageProjectWorkspace(
+    (req as any).userSystemRole,
+    (req as any).userConfiguredModules,
+  );
 
   const requesterUserTable = aliasedTable(usersTable, "requesterUser");
 
@@ -826,7 +823,7 @@ router.patch("/requests/:requestId/status", requirePermission("projects.view"), 
   const { requestId } = req.params;
   const { status, adminNotes } = req.body || {};
   const systemRole = (req as any).userSystemRole;
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "") || Boolean((req as any).userIsDelegatedAdmin);
+  const isPrivileged = canManageProjectWorkspace(systemRole, (req as any).userConfiguredModules);
 
   if (!isPrivileged) {
     throw createError("Forbidden: Only administrators can approve or reject project requests", 403);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useListClients, useListProjects } from "@workspace/api-client-react";
 import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,7 +33,9 @@ export default function EmployeeClientsPage() {
   const { data: clients, isLoading } = useListClients({
     search: search || undefined,
   });
-  const { data: projects } = useListProjects();
+  const { data: projects } = useListProjects({
+    query: { enabled: canManageModule(user, "projects") },
+  });
 
   // Find projects assigned to this employee to get assigned client IDs
   const myAssignedProjectClientIds = (projects ?? [])
@@ -52,11 +55,7 @@ export default function EmployeeClientsPage() {
     return isDirectlyAssigned || isAssignedViaProject;
   });
 
-  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(user?.systemRole || user?.role);
-  const isDelegatedAdmin = Boolean(user?.isDelegatedAdmin);
-  const userAllowedModules = Array.isArray(user?.allowedModules) ? user.allowedModules : [];
-
-  const canManageClients = isFullAdmin || (isDelegatedAdmin && (userAllowedModules.length === 0 || userAllowedModules.includes("clients")));
+  const canManageClients = canManageModule(user, "clients");
 
   // Display clients list (if privileged / canManageClients, show all workspace clients; otherwise show strictly assigned clients)
   const displayClients = canManageClients ? (clients ?? []) : myClients;

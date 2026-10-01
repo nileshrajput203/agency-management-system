@@ -177,18 +177,20 @@ export default function SettingsPage() {
                   <span className="lg:hidden whitespace-nowrap">Integrations</span>
                 </TabsTrigger>
 
-                <TabsTrigger
-                  value="access"
-                  className="justify-start gap-3 px-3 py-2.5 w-full text-left rounded-lg text-xs lg:text-sm font-medium transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-xs hover:bg-muted/60"
-                  data-testid="tab-user-access"
-                >
-                  <Shield className="h-4 w-4 shrink-0 text-amber-500" />
-                  <div className="hidden lg:block text-left truncate">
-                    <div className="font-semibold text-xs leading-none">User Access Management</div>
-                    <div className="text-[10px] opacity-80 font-normal mt-1 truncate">Delegated admin & permissions</div>
-                  </div>
-                  <span className="lg:hidden whitespace-nowrap">User Access</span>
-                </TabsTrigger>
+                {isSuperAdmin && (
+                  <TabsTrigger
+                    value="access"
+                    className="justify-start gap-3 px-3 py-2.5 w-full text-left rounded-lg text-xs lg:text-sm font-medium transition-all data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-xs hover:bg-muted/60"
+                    data-testid="tab-user-access"
+                  >
+                    <Shield className="h-4 w-4 shrink-0 text-amber-500" />
+                    <div className="hidden lg:block text-left truncate">
+                      <div className="font-semibold text-xs leading-none">User Access Management</div>
+                      <div className="text-[10px] opacity-80 font-normal mt-1 truncate">Delegated admin & permissions</div>
+                    </div>
+                    <span className="lg:hidden whitespace-nowrap">User Access</span>
+                  </TabsTrigger>
+                )}
 
                 <TabsTrigger
                   value="notifications"
@@ -623,9 +625,11 @@ export default function SettingsPage() {
               </TabsContent>
 
               {/* User Access Management Section */}
-              <TabsContent value="access" className="mt-0 space-y-6">
-                <UserAccessManagement />
-              </TabsContent>
+              {isSuperAdmin && (
+                <TabsContent value="access" className="mt-0 space-y-6">
+                  <UserAccessManagement />
+                </TabsContent>
+              )}
 
             </div>
           </Tabs>

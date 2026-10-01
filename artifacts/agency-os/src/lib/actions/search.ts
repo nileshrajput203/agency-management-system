@@ -2,6 +2,11 @@
 
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/access";
+import {
+  canManageTaskWorkspaceForUser,
+  hasModuleAccess,
+  isSuperAdminRole,
+} from "@/lib/permissions";
 
 export interface SearchResultItem {
   id: string;
@@ -17,10 +22,13 @@ export async function globalSearch(query: string): Promise<SearchResultItem[]> {
 
   try {
     const user = await getCurrentUser();
-    const isPrivileged = user ? ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(user.systemRole) : false;
+    if (!user) return [];
+    const canAccessModule = (module: string) =>
+      isSuperAdminRole(user.systemRole ?? user.role) || hasModuleAccess(user.allowedModules, module);
+    const isTaskManager = canManageTaskWorkspaceForUser(user);
 
     // Clients
-    const clients = await prisma.client.findMany({
+    const clients = canAccessModule("clients") ? await prisma.client.findMany({
       where: {
         OR: [
           { companyName: { contains: q } },
@@ -29,15 +37,15 @@ export async function globalSearch(query: string): Promise<SearchResultItem[]> {
         ]
       },
       take: 5
-    });
+    }) : [];
 
     // Projects
-    const projects = await prisma.project.findMany({
+    const projects = canAccessModule("projects") ? await prisma.project.findMany({
       where: {
         name: { contains: q }
       },
       take: 5
-    });
+    }) : [];
 
     // Tasks
     const taskWhere: any = {
@@ -46,17 +54,19 @@ export async function globalSearch(query: string): Promise<SearchResultItem[]> {
         { description: { contains: q } }
       ]
     };
-    if (user && !isPrivileged) {
-      taskWhere.assigneeId = user.id;
-    }
-
-    const tasks = await prisma.task.findMany({
-      where: taskWhere,
+    const taskScope = isTaskManager ? {} : {
+      OR: [
+        { assigneeId: user.id },
+        { requestedBy: user.id, approvalStatus: "PENDING" },
+      ],
+    };
+    const tasks = canAccessModule("tasks") ? await prisma.task.findMany({
+      where: { AND: [taskWhere, taskScope] },
       take: 5
-    });
+    }) : [];
 
     // Leads
-    const leads = await prisma.lead.findMany({
+    const leads = canAccessModule("sales") ? await prisma.lead.findMany({
       where: {
         OR: [
           { title: { contains: q } },
@@ -64,7 +74,7 @@ export async function globalSearch(query: string): Promise<SearchResultItem[]> {
         ]
       },
       take: 5
-    });
+    }) : [];
 
     const results: SearchResultItem[] = [];
 

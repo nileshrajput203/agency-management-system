@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -55,15 +56,14 @@ export default function MeetingsPage() {
   // Delete Confirmation Dialog
   const [deleteMeetingId, setDeleteMeetingId] = useState<string | null>(null);
 
-  const { data: clients } = useListClients();
-  const { data: projects } = useListProjects();
-  const { data: usersList } = useListUsers();
+  const canViewClients = canManageModule(user, "clients");
+  const canViewProjects = canManageModule(user, "projects");
+  const canViewTeam = canManageModule(user, "team");
+  const { data: clients } = useListClients({ query: { enabled: canViewClients } });
+  const { data: projects } = useListProjects({ query: { enabled: canViewProjects } });
+  const { data: usersList } = useListUsers({ query: { enabled: canViewTeam } });
 
-  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(user?.systemRole || user?.role);
-  const isDelegatedAdmin = Boolean(user?.isDelegatedAdmin);
-  const userAllowedModules = Array.isArray(user?.allowedModules) ? user.allowedModules : [];
-
-  const isUserAdminOrManager = isFullAdmin || (isDelegatedAdmin && (userAllowedModules.length === 0 || userAllowedModules.includes("meetings")));
+  const isUserAdminOrManager = canManageModule(user, "meetings");
 
   const canManageMeeting = (m: MeetingItem) => {
     if (!m) return false;

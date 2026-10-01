@@ -11,8 +11,11 @@ import {
 import { eq, desc, and, or, inArray } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
+import { requirePermission } from "../middleware/auth";
+import { parseConfiguredModules } from "../middleware/moduleAccess";
 
 const router = Router();
+router.use(requirePermission("reports.view"));
 
 // Hydrate req.user from req.userId
 router.use(asyncHandler(async (req: any, _res, next) => {
@@ -25,6 +28,7 @@ router.use(asyncHandler(async (req: any, _res, next) => {
         email: usersTable.email,
         role: usersTable.role,
         systemRole: usersTable.systemRole,
+        allowedModules: usersTable.allowedModules,
       })
       .from(usersTable)
       .where(eq(usersTable.id, userId));
@@ -39,11 +43,18 @@ router.use(asyncHandler(async (req: any, _res, next) => {
   next();
 }));
 
-// Helper to check if user is Manager or Admin
+// Reports are company-wide only for root or accounts explicitly granted the
+// Reports module. Empty module selections keep the standard personal view.
 function isManagerOrAdmin(user: any): boolean {
   if (!user) return false;
-  const role = String(user.role || user.systemRole || "").toUpperCase();
-  return ["ADMIN", "SUPER_ADMIN", "MANAGER", "DIRECTOR", "LEAD"].includes(role);
+  return user.systemRole === "SUPER_ADMIN" ||
+    parseConfiguredModules(user.allowedModules).includes("reports");
+}
+
+function assertReportAccess(report: any, user: any): void {
+  if (!isManagerOrAdmin(user) && report.userId !== user?.id) {
+    throw createError(403, "You do not have permission to access this report.");
+  }
 }
 
 // Helper to log audit events
@@ -160,18 +171,17 @@ async function notifyManagers({
   reportId: string;
 }) {
   try {
-    const managers = await db
-      .select({ id: usersTable.id })
-      .from(usersTable)
-      .where(
-        or(
-          eq(usersTable.role, "SUPER_ADMIN"),
-          eq(usersTable.role, "ADMIN"),
-          eq(usersTable.role, "MANAGER"),
-          eq(usersTable.systemRole, "SUPER_ADMIN"),
-          eq(usersTable.systemRole, "ADMIN")
-        )
-      );
+    const recipients = await db
+      .select({
+        id: usersTable.id,
+        systemRole: usersTable.systemRole,
+        allowedModules: usersTable.allowedModules,
+      })
+      .from(usersTable);
+    const managers = recipients.filter((recipient) =>
+      recipient.systemRole === "SUPER_ADMIN" ||
+      parseConfiguredModules(recipient.allowedModules).includes("reports")
+    );
 
     for (const m of managers) {
       if (m.id !== senderId) {
@@ -546,6 +556,8 @@ router.post(
       throw createError(404, "Work report not found");
     }
 
+    assertReportAccess(existing, user);
+
     const [updated] = await db
       .update(workReportsTable)
       .set({
@@ -915,6 +927,8 @@ router.post(
       throw createError(404, "Work report not found");
     }
 
+    assertReportAccess(existing, user);
+
     const restoredStatus = existing.approvedAt ? "Approved" : "Draft";
 
     const [updated] = await db
@@ -959,8 +973,9 @@ router.delete(
     }
 
     const isManager = isManagerOrAdmin(user);
+    assertReportAccess(existing, user);
     if (!isManager && existing.status !== "Draft") {
-      throw createError(400, "Only Draft reports can be deleted by employees.");
+      throw createError(400, "Only your own Draft reports can be deleted.");
     }
 
     await db.delete(workReportsTable).where(eq(workReportsTable.id, id));
@@ -977,6 +992,7 @@ router.get(
   "/:id/pdf",
   asyncHandler(async (req: any, res) => {
     const { id } = req.params;
+    const user = req.user;
 
     const [report] = await db
       .select({
@@ -991,6 +1007,8 @@ router.get(
     if (!report) {
       return res.status(404).send("Work report not found");
     }
+
+    assertReportAccess(report.report, user);
 
     const r = report.report;
     const projects = Array.isArray(r.projects) ? (r.projects as any[]) : [];

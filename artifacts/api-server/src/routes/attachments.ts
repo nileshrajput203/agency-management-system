@@ -1,11 +1,95 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
+import { tasksTable } from "@workspace/db/schema";
+import { eq } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate, isValidUUID } from "../lib/validation";
-import { requirePermission } from "../middleware/auth";
+import {
+  requirePermission,
+  canManageEnabledSection,
+  canManageTaskWorkspace,
+} from "../middleware/auth";
+import { canEmployeeAccessTask } from "../middleware/taskAccess";
 
 const router = Router();
+
+const ENTITY_MODULES: Record<string, string> = {
+  client: "clients",
+  clients: "clients",
+  project: "projects",
+  projects: "projects",
+  task: "tasks",
+  tasks: "tasks",
+  content: "content",
+  invoice: "finance",
+  invoices: "finance",
+  quotation: "finance",
+  quotations: "finance",
+  proposal: "finance",
+  proposals: "finance",
+  purchase_order: "finance",
+  "purchase-order": "finance",
+  "work-report": "reports",
+  leave: "leaves",
+  attendance: "attendance",
+};
+
+function normalizeEntityType(entityType: unknown): string {
+  const normalized = String(entityType ?? "").trim().toLowerCase();
+  if (!ENTITY_MODULES[normalized]) {
+    throw createError("Unsupported attachment entity type", 400);
+  }
+  return normalized;
+}
+
+function aliasesForEntity(entityType: string): string[] {
+  const pairs: Record<string, string[]> = {
+    client: ["client", "clients"],
+    clients: ["client", "clients"],
+    project: ["project", "projects"],
+    projects: ["project", "projects"],
+    task: ["task", "tasks"],
+    tasks: ["task", "tasks"],
+    invoice: ["invoice", "invoices"],
+    invoices: ["invoice", "invoices"],
+    quotation: ["quotation", "quotations"],
+    quotations: ["quotation", "quotations"],
+    proposal: ["proposal", "proposals"],
+    proposals: ["proposal", "proposals"],
+    purchase_order: ["purchase_order", "purchase-order"],
+    "purchase-order": ["purchase_order", "purchase-order"],
+  };
+  return pairs[entityType] ?? [entityType];
+}
+
+async function assertEntityAccess(
+  req: any,
+  entityType: string,
+  entityId: string,
+): Promise<boolean> {
+  const module = ENTITY_MODULES[entityType];
+  if (module === "tasks") {
+    if (canManageTaskWorkspace(req.userSystemRole, req.userConfiguredModules)) return true;
+    const [task] = await db
+      .select({
+        assigneeId: tasksTable.assigneeId,
+        requestedBy: tasksTable.requestedBy,
+        approvalStatus: tasksTable.approvalStatus,
+      })
+      .from(tasksTable)
+      .where(eq(tasksTable.id, entityId));
+    if (!task || !canEmployeeAccessTask(task, req.userId)) {
+      throw createError("Forbidden: You do not have access to this task's attachments", 403);
+    }
+    return false;
+  }
+
+  if (!canManageEnabledSection(req.userSystemRole, module, req.userConfiguredModules)) {
+    throw createError(`Forbidden: Enable the ${module} section to access these attachments`, 403);
+  }
+  return true;
+}
 
 // GET /api/attachments?entityType=task&entityId=xxx
 router.get("/", requirePermission("attachments.view"), asyncHandler(async (req, res) => {
@@ -16,9 +100,11 @@ router.get("/", requirePermission("attachments.view"), asyncHandler(async (req, 
     throw createError("Invalid entityId format", 400);
   }
 
+  const normalizedType = normalizeEntityType(entityType);
+  await assertEntityAccess(req, normalizedType, entityId);
   const result = await db.execute(
-    `SELECT * FROM file_attachments WHERE entity_type = $1 AND entity_id = $2 ORDER BY created_at DESC`,
-    [entityType, entityId]
+    `SELECT * FROM file_attachments WHERE entity_type = ANY($1::text[]) AND entity_id = $2 ORDER BY created_at DESC`,
+    [aliasesForEntity(normalizedType), entityId]
   );
   return res.json(result.rows ?? result);
 }));
@@ -35,17 +121,13 @@ router.post("/", requirePermission("attachments.upload"), asyncHandler(async (re
     throw createError("entityType, entityId, filename, and url are required", 400);
   }
 
-  const systemRole = (req as any).userSystemRole;
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "");
-  if ((entityType === "client" || entityType === "clients") && !isPrivileged) {
-    throw createError("Forbidden: Employees cannot upload documents for clients", 403);
-  }
-
   if (!isValidUUID(entityId)) {
     throw createError("Invalid entityId format", 400);
   }
 
-  const sanitized = sanitizeAndValidate({ entityType, entityId, filename, url });
+  const normalizedType = normalizeEntityType(entityType);
+  await assertEntityAccess(req, normalizedType, entityId);
+  const sanitized = sanitizeAndValidate({ entityType: normalizedType, entityId, filename, url });
 
   const uploadedBy = (req as any).userId ?? null;
 
@@ -74,16 +156,10 @@ router.delete("/:id", requirePermission("attachments.upload"), asyncHandler(asyn
     throw createError("Attachment not found", 404);
   }
 
-  const systemRole = (req as any).userSystemRole;
-  const isPrivileged = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(systemRole ?? "");
-  if ((attachment.entity_type === "client" || attachment.entity_type === "clients") && !isPrivileged) {
-    throw createError("Forbidden: Employees cannot delete documents for clients", 403);
-  }
-
   const userId = (req as any).userId;
-  const userRole = (req as any).userRole;
-
-  if (userRole !== "ADMIN" && attachment.uploaded_by && attachment.uploaded_by !== userId) {
+  const normalizedType = normalizeEntityType(attachment.entity_type);
+  const canManageAttachment = await assertEntityAccess(req, normalizedType, attachment.entity_id);
+  if (!canManageAttachment && attachment.uploaded_by !== userId) {
     throw createError("Forbidden: You can only delete attachments you uploaded", 403);
   }
 

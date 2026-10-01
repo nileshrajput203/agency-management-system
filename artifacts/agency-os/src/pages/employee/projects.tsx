@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useListProjects, useUpdateProject, getListProjectsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,11 +46,7 @@ export default function EmployeeProjectsPage() {
     (Array.isArray(p.teamMembers) && p.teamMembers.includes(user?.id))
   );
 
-  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(user?.systemRole || user?.role);
-  const isDelegatedAdmin = Boolean(user?.isDelegatedAdmin);
-  const userAllowedModules = Array.isArray(user?.allowedModules) ? user.allowedModules : [];
-
-  const canManageProjects = isFullAdmin || (isDelegatedAdmin && (userAllowedModules.length === 0 || userAllowedModules.includes("projects")));
+  const canManageProjects = canManageModule(user, "projects");
 
   const displayProjects = canManageProjects
     ? (projects ?? [])

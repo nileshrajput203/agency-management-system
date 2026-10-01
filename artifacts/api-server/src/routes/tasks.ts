@@ -1,12 +1,17 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { tasksTable, projectsTable, usersTable } from "@workspace/db/schema";
-import { eq, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
-import { requirePermission, canManageTaskWorkspace } from "../middleware/auth";
+import {
+  requirePermission,
+  canManageTaskWorkspace,
+  canManageProjectWorkspace,
+} from "../middleware/auth";
+import { canEmployeeAccessTask } from "../middleware/taskAccess";
 import { NotificationService } from "../services/notificationService";
 import { logger, notificationLogger } from "../lib/logger";
 import { hideItemForUser, getHiddenEntityIds, deleteHiddenItemsForEntity } from "../services/hiddenItemsService";
@@ -50,7 +55,7 @@ function sanitizeTask(body: any, isUpdate = false) {
 router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
 
   let query = db
     .select({
@@ -91,12 +96,23 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
     .leftJoin(approvedByTable, eq(tasksTable.approvedBy, approvedByTable.id));
 
   if (!isPrivileged) {
-    query = query.where(eq(tasksTable.assigneeId, requesterId));
+    query = query.where(or(
+      eq(tasksTable.assigneeId, requesterId),
+      and(
+        eq(tasksTable.requestedBy, requesterId),
+        eq(tasksTable.approvalStatus, "PENDING"),
+      ),
+    ));
   }
 
   const rows = await query;
   const hiddenIds = await getHiddenEntityIds(requesterId, "tasks");
-  const visibleRows = hiddenIds.length > 0 ? rows.filter((r) => !hiddenIds.includes(r.id)) : rows;
+  const canViewProjects = requesterSystemRole === "SUPER_ADMIN" ||
+    (req as any).userConfiguredModules.includes("projects");
+  const scopedRows = canViewProjects
+    ? rows
+    : rows.map((row) => ({ ...row, projectId: null, projectName: null }));
+  const visibleRows = hiddenIds.length > 0 ? scopedRows.filter((r) => !hiddenIds.includes(r.id)) : scopedRows;
 
   return res.json(visibleRows);
 }));
@@ -107,9 +123,15 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
   const requesterRole = (req as any).userRole || requesterSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
 
   if (!isPrivileged) {
+    if (
+      !canManageProjectWorkspace(requesterSystemRole, (req as any).userConfiguredModules) &&
+      sanitized.projectId
+    ) {
+      throw createError("Enable the Projects section before linking a task to a project", 403);
+    }
     // Employees create a task request for themselves
     sanitized.approvalStatus = "PENDING";
     // A request always starts as work to be done. Completion must happen
@@ -182,7 +204,7 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
 router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
 
   const [row] = await db
     .select({
@@ -222,11 +244,13 @@ router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res
 
   if (!row) throw createError("Not found", 404);
 
-  if (!isPrivileged && row.assigneeId !== requesterId) {
+  if (!isPrivileged && !canEmployeeAccessTask(row, requesterId)) {
     throw createError("Forbidden: You can only view tasks assigned to you", 403);
   }
 
-  return res.json(row);
+  const canViewProjects = requesterSystemRole === "SUPER_ADMIN" ||
+    (req as any).userConfiguredModules.includes("projects");
+  return res.json(canViewProjects ? row : { ...row, projectId: null, projectName: null });
 }));
 
 router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, res) => {
@@ -239,27 +263,34 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
   const requesterRole = (req as any).userRole || requesterSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
+  const canManageProjects = canManageProjectWorkspace(
+    requesterSystemRole,
+    (req as any).userConfiguredModules,
+  );
 
   if (!isPrivileged) {
-    // Security check: task.assigneeId == currentUser.id
-    if (task.assigneeId !== requesterId) {
+    const isPending = task.approvalStatus === "PENDING";
+
+    // Pending requests belong to their requester, even if a legacy row has
+    // no assignee yet. Active work remains limited to the assigned employee.
+    if (!canEmployeeAccessTask(task, requesterId)) {
       throw createError("Forbidden: You do not have permission to access or modify this task", 403);
     }
 
-    const isPending = task.approvalStatus === "PENDING";
     const isApprovedOrModified = task.approvalStatus === "APPROVED" || task.approvalStatus === "MODIFIED" || !task.approvalStatus;
 
     if (isPending) {
       if (task.requestedBy !== requesterId) {
         throw createError("Forbidden: You can only edit your own pending requests", 403);
       }
-      // Pending request: employee can edit title, description, priority, projectId, dueDate
-      const forbiddenKeys = ["approvalStatus", "assigneeId", "approvedBy", "approvedAt", "requestedBy", "requestedAt"];
-      const updateKeys = Object.keys(sanitized).filter(k => sanitized[k] !== undefined && sanitized[k] !== null);
-      const hasForbiddenChanges = updateKeys.some(k => forbiddenKeys.includes(k) && sanitized[k] !== task[k as keyof typeof task]);
-      if (hasForbiddenChanges) {
-        throw createError("Forbidden: You cannot modify approval status or assignees", 403);
+      // Pending requests allow only request fields; project assignment requires
+      // access to the Projects section.
+      const allowedKeys = new Set(["title", "description", "priority", "dueDate"]);
+      if (canManageProjects) allowedKeys.add("projectId");
+      const updateKeys = Object.keys(sanitized).filter((key) => sanitized[key] !== undefined);
+      if (updateKeys.some((key) => !allowedKeys.has(key))) {
+        throw createError("Forbidden: Pending requests allow edits to title, description, priority, due date, and enabled project assignment only", 403);
       }
     } else if (isApprovedOrModified) {
       if (task.assigneeId !== requesterId) {
@@ -267,11 +298,9 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
       }
       // Active task: employees can only update status or description.
       // Completing a task is a manager decision; employees submit it for review.
-      const forbiddenKeys = ["approvalStatus", "assigneeId", "approvedBy", "approvedAt", "requestedBy", "requestedAt"];
-      const updateKeys = Object.keys(sanitized).filter(k => sanitized[k] !== undefined && sanitized[k] !== null);
-      const hasForbiddenChanges = updateKeys.some(k => forbiddenKeys.includes(k) && sanitized[k] !== task[k as keyof typeof task]);
-      if (hasForbiddenChanges) {
-        throw createError("Forbidden: Employees cannot approve tasks or modify assignees", 403);
+      const updateKeys = Object.keys(sanitized).filter((key) => sanitized[key] !== undefined);
+      if (updateKeys.some((key) => key !== "status" && key !== "description")) {
+        throw createError("Forbidden: Active tasks allow status and description updates only", 403);
       }
       if (sanitized.status === "DONE" || sanitized.status === "COMPLETED") {
         sanitized.status = "IN_REVIEW";
@@ -460,7 +489,7 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
             actionUrl: "/tasks",
           });
         }
-      } else if (!canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules)) {
+      } else if (!canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules)) {
         // Employee updated status to something else (e.g., IN_PROGRESS, BLOCKED)
         await NotificationService.notifyAdminsAndManagers({
           title: "📝 Task Status Updated",
@@ -520,10 +549,10 @@ router.delete("/:id", requirePermission("tasks.delete"), asyncHandler(async (req
 
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
 
   if (!isPrivileged) {
-    if (task.assigneeId !== requesterId) {
+    if (!canEmployeeAccessTask(task, requesterId)) {
       throw createError("Forbidden: You do not have permission to delete this task", 403);
     }
     // Only allow deletion when PENDING
@@ -541,11 +570,11 @@ router.delete("/:id", requirePermission("tasks.delete"), asyncHandler(async (req
 router.get("/:id/subtasks", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userAllowedModules);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
 
   if (!isPrivileged) {
     const [parentTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, req.params.id as string));
-    if (!parentTask || parentTask.assigneeId !== requesterId) {
+    if (!parentTask || !canEmployeeAccessTask(parentTask, requesterId)) {
       throw createError("Forbidden: You do not have permission to view subtasks for this task", 403);
     }
   }

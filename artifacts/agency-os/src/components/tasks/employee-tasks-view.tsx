@@ -28,13 +28,21 @@ import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "@/components/common/SearchBar";
 import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import {
   Tooltip, TooltipTrigger, TooltipContent
 } from "@/components/ui/tooltip";
 import { COLUMNS, PRIORITY_CONFIG, isCompletedTask, sortTasksByDueDate } from "./task-constants";
 
+function getMutationErrorMessage(error: any, fallback: string): string {
+  const responseMessage = error?.data?.error ?? error?.data?.message;
+  if (typeof responseMessage === "string" && responseMessage.trim()) return responseMessage;
+  return typeof error?.message === "string" && error.message.trim() ? error.message : fallback;
+}
+
 export function EmployeeTasksView() {
   const { user } = useAuth();
+  const canViewProjects = canManageModule(user, "projects");
   const qc = useQueryClient();
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,7 +81,9 @@ export function EmployeeTasksView() {
 
   const { data: tasks, isLoading } = useListTasks();
   const selectedTaskForAction = selectedTaskForActionState ? (tasks ?? []).find((t: any) => t.id === selectedTaskForActionState.id) || selectedTaskForActionState : null;
-  const { data: projects } = useListProjects();
+  const { data: projects } = useListProjects({
+    query: { enabled: canViewProjects },
+  });
 
   const createRequestMutation = useCreateTask({
     mutation: {
@@ -83,7 +93,7 @@ export function EmployeeTasksView() {
         reset({ title: "", status: "TODO", priority: "MEDIUM", description: "" });
         setRequestDialogOpen(false);
       },
-      onError: () => toast.error("Failed to submit task request"),
+      onError: (error) => toast.error(getMutationErrorMessage(error, "Failed to submit task request")),
     },
   });
 
@@ -92,7 +102,7 @@ export function EmployeeTasksView() {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getListTasksQueryKey() });
       },
-      onError: () => toast.error("Failed to update task request"),
+      onError: (error) => toast.error(getMutationErrorMessage(error, "Failed to update task request")),
     },
   });
 
@@ -102,7 +112,7 @@ export function EmployeeTasksView() {
         toast.success("Task request deleted successfully");
         qc.invalidateQueries({ queryKey: getListTasksQueryKey() });
       },
-      onError: () => toast.error("Failed to delete task request"),
+      onError: (error) => toast.error(getMutationErrorMessage(error, "Failed to delete task request")),
     },
   });
 
@@ -155,7 +165,7 @@ export function EmployeeTasksView() {
         title,
         description,
         priority,
-        projectId,
+        ...(canViewProjects ? { projectId } : {}),
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
       } as any,
     }, {
@@ -561,18 +571,20 @@ export function EmployeeTasksView() {
                   </Select>
                 )} />
               </div>
-              <div className="space-y-1.5">
-                <Label>Project</Label>
-                <Controller control={control} name="projectId" render={({ field }) => (
-                  <Select value={field.value || "none"} onValueChange={(val) => field.onChange(val === "none" ? "" : val)}>
-                    <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No project</SelectItem>
-                      {(projects ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )} />
-              </div>
+              {canViewProjects && (
+                <div className="space-y-1.5">
+                  <Label>Project</Label>
+                  <Controller control={control} name="projectId" render={({ field }) => (
+                    <Select value={field.value || "none"} onValueChange={(val) => field.onChange(val === "none" ? "" : val)}>
+                      <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No project</SelectItem>
+                        {(projects ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )} />
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -624,16 +636,18 @@ export function EmployeeTasksView() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>Project</Label>
-                <Select name="projectId" defaultValue={selectedTaskForAction?.projectId || "none"}>
-                  <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No project</SelectItem>
-                    {(projects ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+              {canViewProjects && (
+                <div className="space-y-1.5">
+                  <Label>Project</Label>
+                  <Select name="projectId" defaultValue={selectedTaskForAction?.projectId || "none"}>
+                    <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No project</SelectItem>
+                      {(projects ?? []).map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Due Date</Label>
@@ -671,7 +685,13 @@ export function EmployeeTasksView() {
               </div>
               <div className="space-y-1.5">
                 <Label>Project (Locked)</Label>
-                <Input value={selectedTaskForAction?.projectName || "No Project"} disabled className="bg-muted text-muted-foreground cursor-not-allowed" />
+                <Input
+                  value={selectedTaskForAction?.projectId && !canViewProjects
+                    ? "Linked project"
+                    : selectedTaskForAction?.projectName || "No Project"}
+                  disabled
+                  className="bg-muted text-muted-foreground cursor-not-allowed"
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { attendance, users, leaveRequests, agencySettings } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { requirePermission } from "../middleware/auth";
+import { requirePermission, canManageEnabledSection } from "../middleware/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { isValidUUID } from "../lib/validation";
@@ -111,10 +111,12 @@ export async function processAutomaticAbsentMarking(targetDateStr?: string) {
 router.get("/attendance", requirePermission("attendance.view"), asyncHandler(async (req, res) => {
   const { userId, month } = req.query as Record<string, string>;
   const requesterId = (req as any).userId;
-  const requesterRole = (req as any).userRole;
-
   const requesterSystemRole = (req as any).userSystemRole;
-  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(requesterSystemRole);
+  const isFullAdmin = canManageEnabledSection(
+    requesterSystemRole,
+    "attendance",
+    (req as any).userConfiguredModules,
+  );
 
   const conditions = [];
   if (!isFullAdmin) {

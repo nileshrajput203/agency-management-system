@@ -24,7 +24,7 @@ export default async function DashboardLayout({
   if (!user) redirect("/login");
 
   const [accessibleModules, settings] = await Promise.all([
-    getAccessibleModules(user.systemRole),
+    getAccessibleModules(user.systemRole, user.allowedModules),
     prisma.agencySettings.findUnique({ where: { id: "default" } }),
   ]);
 

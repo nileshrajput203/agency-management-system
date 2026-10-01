@@ -20,6 +20,7 @@ import {
 } from "@/components/dashboard/dashboard-admin-sections";
 
 import { getPostDateKey } from "@/components/content/content-constants";
+import { canManageModule, isSuperAdminRole } from "@/lib/permissions";
 
 export default function DashboardPage() {
   const { user, token } = useAuth();
@@ -33,9 +34,8 @@ export default function DashboardPage() {
       refetchOnWindowFocus: false,
     },
   });
-  // Full admins (SUPER_ADMIN/ADMIN/MANAGER) see the BI console; everyone else sees the employee view
-  const adminRoles = ["SUPER_ADMIN", "ADMIN", "MANAGER"];
-  const isEmployee = !adminRoles.includes(user?.systemRole ?? "");
+  // Only the root account can see cross-section company-wide metrics.
+  const isEmployee = !isSuperAdminRole(user?.systemRole ?? user?.role);
 
   const { data: revenueChart, isLoading: chartLoading } = useQuery<{ month: string; amount: number }[]>({
     queryKey: ["revenue-chart", chartRange],
@@ -56,8 +56,13 @@ export default function DashboardPage() {
   const weekEndMonthStr = format(weekEnd, "yyyy-MM");
   const needsBothMonths = currentMonthStr !== weekEndMonthStr;
 
-  const { data: weekPosts } = useListContentPosts({ month: currentMonthStr } as any);
-  const { data: weekPostsNext } = useListContentPosts({ month: weekEndMonthStr } as any);
+  const canViewContent = canManageModule(user, "content");
+  const { data: weekPosts } = useListContentPosts({ month: currentMonthStr } as any, {
+    query: { enabled: canViewContent },
+  });
+  const { data: weekPostsNext } = useListContentPosts({ month: weekEndMonthStr } as any, {
+    query: { enabled: canViewContent },
+  });
   const allWeekPosts = needsBothMonths ? [...(weekPosts ?? []), ...(weekPostsNext ?? [])] : (weekPosts ?? []);
 
   const greeting = () => {

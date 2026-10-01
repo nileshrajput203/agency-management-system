@@ -26,6 +26,7 @@ import { Plus, Phone, Mail, Building2, Trash2, Pencil, Users, AlertTriangle, Hea
 import { SearchBar } from "@/components/common/SearchBar";
 import { cn, extractClientFields } from "@/lib/utils";
 import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 
 const HEALTH_MAP: Record<string, { label: string; className: string }> = {
   GREEN: { label: "Healthy", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
@@ -42,10 +43,7 @@ const CATEGORY_MAP: Record<string, string> = {
 
 export default function ClientsPage() {
   const { user } = useAuth();
-  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(user?.systemRole || user?.role || "");
-  const isDelegatedAdmin = Boolean(user?.isDelegatedAdmin);
-  const userAllowedModules = Array.isArray(user?.allowedModules) ? user.allowedModules : [];
-  const isAdmin = isFullAdmin || (isDelegatedAdmin && (userAllowedModules.length === 0 || userAllowedModules.includes("clients")));
+  const isAdmin = canManageModule(user, "clients");
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("ALL");
@@ -58,7 +56,9 @@ export default function ClientsPage() {
     search: search || undefined,
     category: category !== "ALL" ? category : undefined,
   });
-  const { data: users } = useListUsers();
+  const { data: users } = useListUsers({
+    query: { enabled: canManageModule(user, "team") },
+  });
 
   const editClient = editClientState ? (clients ?? []).find((c) => c.id === editClientState.id) as any || editClientState : null;
 

@@ -6,8 +6,14 @@ import {
 } from "@workspace/db/schema";
 import { eq, gte, sql, and } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
-import { requirePermission, requireAuth, isPrivilegedRole } from "../middleware/auth";
+import {
+  requirePermission,
+  requireAuth,
+  canManageProjectWorkspace,
+  isPrivilegedRole,
+} from "../middleware/auth";
 import { getDashboardStatsService } from "../services/dashboardService";
+import { getEffectiveModules } from "../middleware/moduleAccess";
 
 const router = Router();
 
@@ -22,17 +28,7 @@ router.get("/stats", requireAuth, asyncHandler(async (req, res) => {
   }
 }));
 
-router.get("/revenue-chart", requirePermission("reports.view"), asyncHandler(async (req, res) => {
-  const userId = (req as any).userId;
-  const [user] = await db
-    .select({ systemRole: usersTable.systemRole })
-    .from(usersTable)
-    .where(eq(usersTable.id, userId));
-
-  if (!isPrivilegedRole(user?.systemRole)) {
-    return res.status(403).json({ error: "Forbidden: Employees cannot access financial charts." });
-  }
-
+router.get("/revenue-chart", requirePermission("invoices.view"), asyncHandler(async (req, res) => {
   const now = new Date();
   const range = (req.query.range as string) ?? "6m";
 
@@ -75,14 +71,14 @@ router.get("/revenue-chart", requirePermission("reports.view"), asyncHandler(asy
   return res.json(Object.entries(months).map(([month, amount]) => ({ month, amount })));
 }));
 
-router.get("/project-health", asyncHandler(async (req, res) => {
+router.get("/project-health", requirePermission("projects.view"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
   const [user] = await db
-    .select({ systemRole: usersTable.systemRole })
+    .select({ systemRole: usersTable.systemRole, allowedModules: usersTable.allowedModules })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
 
-  if (!isPrivilegedRole(user?.systemRole)) {
+  if (!canManageProjectWorkspace(user?.systemRole, user?.allowedModules)) {
     const employeeTasks = await db
       .select({ projectId: tasksTable.projectId })
       .from(tasksTable)
@@ -236,14 +232,21 @@ router.get("/project-health", asyncHandler(async (req, res) => {
   return res.json({ onTrack, atRisk, delayed, completed, total: projects.length });
 }));
 
-router.get("/recent-activity", asyncHandler(async (req, res) => {
+router.get("/recent-activity", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
   const [user] = await db
-    .select({ systemRole: usersTable.systemRole })
+    .select({
+      systemRole: usersTable.systemRole,
+      allowedModules: usersTable.allowedModules,
+    })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
 
   if (!isPrivilegedRole(user?.systemRole)) {
+    const userModules = getEffectiveModules(user?.allowedModules);
+    const canViewLeaves = userModules.includes("leaves") || userModules.includes("leave");
+    const canViewProjects = userModules.includes("projects");
+
     const employeeTasks = await db
       .select({
         id: tasksTable.id,
@@ -271,19 +274,19 @@ router.get("/recent-activity", asyncHandler(async (req, res) => {
       .from(tasksTable)
       .where(eq(tasksTable.requestedBy, userId));
 
-    const myLeaves = await db
+    const myLeaves = canViewLeaves ? await db
       .select()
       .from(leaveRequestsTable)
-      .where(eq(leaveRequestsTable.userId, userId));
+      .where(eq(leaveRequestsTable.userId, userId)) : [];
 
-    const allProjects = await db
+    const allProjects = canViewProjects ? await db
       .select({
         id: projectsTable.id,
         name: projectsTable.name,
         createdBy: projectsTable.createdBy,
         createdAt: projectsTable.createdAt,
       })
-      .from(projectsTable);
+      .from(projectsTable) : [];
 
     const assignedProjectIds = Array.from(new Set(employeeTasks.map((t) => t.projectId).filter(Boolean))) as string[];
     const myProjects = allProjects.filter((p) => p.createdBy === userId || assignedProjectIds.includes(p.id));

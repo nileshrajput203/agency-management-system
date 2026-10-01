@@ -407,9 +407,57 @@ import EmployeeLeavePage from "@/pages/employee/leave";
 import EmployeeNotificationsPage from "@/pages/employee/notifications";
 import EmployeeProfilePage from "@/pages/employee/profile";
 import EmployeeWorkReportsPage from "@/pages/employee/work-reports";
-import { getUserModules } from "@/lib/permissions";
+import {
+  getUserModules,
+  hasModuleAccess,
+  hasExplicitModuleAccess,
+  isSuperAdminRole,
+} from "@/lib/permissions";
 
 // ─── Protected route wrapper ────────────────────────────────────
+const ROUTE_MODULES: Record<string, string | null> = {
+  "/dashboard": null,
+  "/employee/dashboard": null,
+  "/employee/notifications": null,
+  "/employee/profile": null,
+  "/notifications": null,
+  "/clients": "clients",
+  "/employee/clients": "clients",
+  "/sales": "sales",
+  "/employee/leads": "sales",
+  "/projects": "projects",
+  "/employee/projects": "projects",
+  "/tasks": "tasks",
+  "/employee/tasks": "tasks",
+  "/meetings": "meetings",
+  "/employee/meetings": "meetings",
+  "/content": "content",
+  "/employee/content-calendar": "content",
+  "/hawan": "content",
+  "/attendance": "attendance",
+  "/employee/attendance": "attendance",
+  "/leaves": "leaves",
+  "/employee/leave": "leaves",
+  "/work-reports": "reports",
+  "/employee/work-reports": "reports",
+  "/performance-report": "reports",
+  "/employee/performance-report": "reports",
+  "/invoices": "finance",
+  "/quotations": "finance",
+  "/proposals": "finance",
+  "/purchase-orders": "finance",
+  "/excel-reports": "finance",
+  "/users": "team",
+  "/settings": "settings",
+};
+
+function getRequiredModule(path: string): string | null | undefined {
+  const route = Object.keys(ROUTE_MODULES)
+    .sort((a, b) => b.length - a.length)
+    .find((candidate) => path === candidate || path.startsWith(`${candidate}/`));
+  return route ? ROUTE_MODULES[route] : undefined;
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const [location] = useLocation();
@@ -425,39 +473,19 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   if (!user) return <Redirect to="/login" />;
 
-  const adminRoles = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"];
-  const isEmployee = !adminRoles.includes(user.systemRole) && !adminRoles.includes(user.role);
-
-  if (isEmployee) {
-    if (user.isDelegatedAdmin && user.portalMode === "MODE_2") {
-      return <>{children}</>;
-    }
-    // A delegated employee with an explicitly enabled module can use the
-    // complete module page, not just the limited employee dashboard.
-    const moduleForPath: Record<string, string> = {
-      "/sales": "sales",
-      "/clients": "clients",
-      "/projects": "projects",
-      "/content": "content",
-      "/tasks": "tasks",
-      "/attendance": "attendance",
-      "/leaves": "leaves",
-    };
-     const module = Object.entries(moduleForPath).find(([path]) =>
-      location === path || location.startsWith(`${path}/`)
-    )?.[1];
-     if (module && getUserModules(user.allowedModules).includes(module)) {
-      return <>{children}</>;
-    }
-    return <Redirect to="/employee/dashboard" />;
+  if (isSuperAdminRole(user.systemRole ?? user.role)) return <>{children}</>;
+  const requiredModule = getRequiredModule(location);
+  if (requiredModule === null) return <>{children}</>;
+  if (requiredModule && hasModuleAccess(user.allowedModules, requiredModule)) {
+    return <>{children}</>;
   }
-
-  return <>{children}</>;
+  return <AccessDeniedPage />;
 }
 
 // ─── Employee route wrapper ─────────────────────────────────────
 function EmployeeRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const [location] = useLocation();
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -469,15 +497,18 @@ function EmployeeRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Redirect to="/login" />;
-  return <>{children}</>;
+  if (isSuperAdminRole(user.systemRole ?? user.role)) return <>{children}</>;
+  const requiredModule = getRequiredModule(location);
+  if (requiredModule === null) return <>{children}</>;
+  if (requiredModule && hasModuleAccess(user.allowedModules, requiredModule)) {
+    return <>{children}</>;
+  }
+  return <AccessDeniedPage />;
 }
 
 function EmployeeContentCalendarPage() {
   const { user } = useAuth();
-  const hasExplicitContentAccess =
-    Array.isArray(user?.allowedModules) &&
-    user.allowedModules.length > 0 &&
-    user.allowedModules.includes("content");
+  const hasExplicitContentAccess = hasExplicitModuleAccess(user?.allowedModules, "content");
 
   // Content Ideation is the section-level permission for the full calendar.
   // Employees with only the default workspace stay on assigned-content view.
@@ -510,7 +541,7 @@ function AccessDeniedPage() {
 }
 
 // ─── Admin route wrapper ────────────────────────────────────────
-function AdminRoute({ children }: { children: React.ReactNode }) {
+function AdminRoute({ children, module }: { children: React.ReactNode; module: string }) {
   const { user, loading } = useAuth();
   if (loading) {
     return (
@@ -523,10 +554,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Redirect to="/login" />;
-  const isPrivilegedAdmin =
-    ["SUPER_ADMIN", "ADMIN", "MANAGER"].includes(user.systemRole) ||
-    (user.isDelegatedAdmin && (user.portalMode === "MODE_2" || user.allowedModules?.includes("team") || user.allowedModules?.includes("settings")));
-  if (!isPrivilegedAdmin) {
+  if (!isSuperAdminRole(user.systemRole ?? user.role) && !hasModuleAccess(user.allowedModules, module)) {
     return <AccessDeniedPage />;
   }
   return <>{children}</>;
@@ -634,7 +662,7 @@ function AppRouter() {
       </Route>
       <Route path="/purchase-orders">
         {() => (
-          <AdminRoute>
+          <AdminRoute module="finance">
             <DashboardLayout>
               <PurchaseOrdersPage />
             </DashboardLayout>
@@ -652,7 +680,7 @@ function AppRouter() {
       </Route>
       <Route path="/users">
         {() => (
-          <AdminRoute>
+          <AdminRoute module="team">
             <DashboardLayout>
               <UsersPage />
             </DashboardLayout>
@@ -733,7 +761,7 @@ function AppRouter() {
       </Route>
       <Route path="/settings">
         {() => (
-          <AdminRoute>
+          <AdminRoute module="settings">
             <DashboardLayout>
               <SettingsPage />
             </DashboardLayout>

@@ -9,6 +9,7 @@ import {
 import type { LeaveRequestInput } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,11 +50,7 @@ export default function LeavesPage() {
   const { user } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const isFullAdmin = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"].includes(user?.systemRole || user?.role);
-  const isDelegatedAdmin = Boolean(user?.isDelegatedAdmin);
-  const userAllowedModules = Array.isArray(user?.allowedModules) ? user.allowedModules : [];
-
-  const isUserAdminOrManager = isFullAdmin || (isDelegatedAdmin && (userAllowedModules.length === 0 || userAllowedModules.includes("leaves") || userAllowedModules.includes("leave")));
+  const isUserAdminOrManager = canManageModule(user, "leaves") || canManageModule(user, "leave");
 
   // List of current user's leave requests
   const { data: myLeaves, isLoading: myLeavesLoading } = useListLeaveRequests(
