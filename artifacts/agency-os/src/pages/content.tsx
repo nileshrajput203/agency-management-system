@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { SearchBar } from "@/components/common/SearchBar";
 import {
   useListContentPosts, useCreateContentPost, useUpdateContentPost, useDeleteContentPost,
-  getListContentPostsQueryKey,
+  getListContentPostsQueryKey, useListClients,
   useCreateCalendarShare, useListCalendarShares,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Plus, ChevronLeft, ChevronRight, Calendar, Trash2, Link2,
   Share2, Copy, Check, FileText, CheckCircle2, Clock, AlertTriangle, RotateCcw, Building2,
-  Download, FileX, Sheet,
+   Download, FileX, Sheet, Printer,
 } from "lucide-react";
 import { format, addMonths, subMonths, getDaysInMonth, startOfMonth, getDay } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -23,11 +25,14 @@ import {
 } from "@/components/content/content-constants";
 import { ContentShareDialog } from "@/components/content/content-share-dialog";
 import { ContentPostDrawer } from "@/components/content/content-post-drawer";
+import { esc, openPrintWindow } from "@/lib/pdf-print";
 
 export default function ContentPage() {
+  const { user } = useAuth();
   const qc = useQueryClient();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [activeClientId, setActiveClientId] = useState<string>("");
+  const [shareClientId, setShareClientId] = useState("");
   const [view, setView] = useState<"calendar" | "list">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [panel, setPanel] = useState<PanelState>({ mode: "closed" });
@@ -37,29 +42,41 @@ export default function ContentPage() {
   const [showShareModal, setShowShareModal] = useState(false);
 
   const month = format(currentMonth, "yyyy-MM");
+  const canViewClientDirectory = canManageModule(user, "clients");
+  const { data: clientDirectory, isLoading: isLoadingClientDirectory } = useListClients(undefined, {
+    query: { enabled: Boolean(user) && canViewClientDirectory },
+  });
+  const { data: contentHistory, isLoading: isLoadingContentHistory } = useListContentPosts(undefined, {
+    query: { enabled: Boolean(user) && !canViewClientDirectory },
+  });
   const { data: posts, isLoading } = useListContentPosts({
     clientId: activeClientId || undefined,
     month,
   });
-  // Content access includes the calendar's client tabs, but does not require
-  // the separate Clients module. Derive tabs from the content records already
-  // visible to this user.
-  const clients = Array.from(
-    new Map(
-      (posts ?? [])
-        .filter((post: any) => post.clientId)
-        .map((post: any) => [
-          post.clientId,
-          { id: post.clientId, companyName: post.clientName || "Client" },
-        ])
-    ).values()
-  ) as Array<{ id: string; companyName: string }>;
+  // Use the full client list only when the account has Clients access. Content
+  // users without it can still choose clients already represented in content.
+  const clientHistory = contentHistory ?? posts ?? [];
+  const clients = canViewClientDirectory
+    ? (clientDirectory ?? [])
+    : Array.from(
+        new Map(
+          clientHistory
+            .filter((post: any) => post.clientId)
+            .map((post: any) => [
+              post.clientId,
+              { id: post.clientId, companyName: post.clientName || "Client" },
+            ])
+        ).values()
+      ) as Array<{ id: string; companyName: string }>;
+  const isLoadingClients = canViewClientDirectory
+    ? isLoadingClientDirectory
+    : Boolean(user) && isLoadingContentHistory;
   const { data: existingShares, refetch: refetchShares } = useListCalendarShares(
-    activeClientId ? { clientId: activeClientId } : undefined,
+    shareClientId ? { clientId: shareClientId } : undefined,
+    { query: { enabled: showShareModal && Boolean(shareClientId) } },
   );
 
-  const activeClientObj = (clients ?? []).find((c: any) => c.id === activeClientId);
-  const activeClientName = activeClientObj?.companyName || "Client";
+  const shareClientName = (clients ?? []).find((c: any) => c.id === shareClientId)?.companyName || "";
 
   const activePost = panel.mode === "edit" && panel.post ? (posts ?? []).find(p => p.id === panel.post.id) || panel.post : null;
 
@@ -209,6 +226,11 @@ export default function ContentPage() {
     });
   }
 
+  function openShareDialog() {
+    setShareClientId(activeClientId);
+    setShowShareModal(true);
+  }
+
   const daysInMonth = getDaysInMonth(currentMonth);
   const firstDayOfWeek = getDay(startOfMonth(currentMonth));
 
@@ -237,6 +259,51 @@ export default function ContentPage() {
 
   const isPending = createMutation.isPending || updateMutation.isPending;
   const activeClient = clients?.find((c) => c.id === activeClientId);
+
+  function printCurrentMonth() {
+    const showClientColumn = !activeClientId;
+    const rows = filteredPosts
+      .slice()
+      .sort((a, b) => (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? ""))
+      .map((post) => {
+        const dateKey = post.scheduledAt ? getPostDateKey(post.scheduledAt) : null;
+        const dateLabel = dateKey
+          ? format(new Date(`${dateKey}T12:00:00`), "EEE, MMM d")
+          : "Unscheduled";
+        const statusLabel = STATUS_CONFIG[post.status ?? "IDEA"]?.label ?? post.status ?? "Idea";
+        const content = [
+          post.title ? `<strong>${esc(post.title)}</strong>` : "",
+          post.caption ? `<div style="margin-top:4px;color:#475569">${esc(post.caption)}</div>` : "",
+        ].filter(Boolean).join("");
+        return `<tr>
+          <td>${esc(dateLabel)}</td>
+          ${showClientColumn ? `<td>${esc(post.clientName || "—")}</td>` : ""}
+          <td>${esc(post.platform || "—")}</td>
+          <td>${esc(post.format || post.contentType || "—")}</td>
+          <td>${esc(statusLabel)}</td>
+          <td>${content || "—"}</td>
+        </tr>`;
+      })
+      .join("");
+    const columnCount = showClientColumn ? 6 : 5;
+    const clientLabel = showClientColumn ? "All clients" : activeClient?.companyName || "Selected client";
+    const html = `<div class="page-container" style="padding:32px">
+      <h1 style="font-size:24px;color:#1e1b4b">Content Calendar</h1>
+      <p style="margin:8px 0 22px;color:#64748b">${esc(format(currentMonth, "MMMM yyyy"))} · ${esc(clientLabel)} · ${filteredPosts.length} post${filteredPosts.length === 1 ? "" : "s"}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="background:#f1f5f9;text-align:left">
+          <th style="padding:9px;border:1px solid #cbd5e1">Date</th>
+          ${showClientColumn ? '<th style="padding:9px;border:1px solid #cbd5e1">Client</th>' : ""}
+          <th style="padding:9px;border:1px solid #cbd5e1">Platform</th>
+          <th style="padding:9px;border:1px solid #cbd5e1">Format</th>
+          <th style="padding:9px;border:1px solid #cbd5e1">Status</th>
+          <th style="padding:9px;border:1px solid #cbd5e1">Content</th>
+        </tr></thead>
+        <tbody>${rows || `<tr><td colspan="${columnCount}" style="padding:18px;border:1px solid #cbd5e1;text-align:center;color:#64748b">No posts match this month and filter.</td></tr>`}</tbody>
+      </table>
+    </div>`;
+    openPrintWindow(html, `Content Calendar - ${format(currentMonth, "MMMM yyyy")}`);
+  }
 
   const totalPublished   = (posts ?? []).filter((p) => p.status === "PUBLISHED").length;
   const totalScheduled   = (posts ?? []).filter((p) => p.status === "SCHEDULED").length;
@@ -272,18 +339,19 @@ export default function ContentPage() {
               className={cn("px-3 py-1 rounded-md text-sm font-medium transition-colors", view === "calendar" ? "bg-card shadow text-foreground" : "text-muted-foreground")}
             >Calendar</button>
           </div>
-          {/* Share button — only when a client is selected */}
-          {activeClientId && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
-              onClick={() => setShowShareModal(true)}
-            >
-              <Share2 className="h-3.5 w-3.5" />
-              Share Calendar
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+            onClick={openShareDialog}
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Share Calendar
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={printCurrentMonth}>
+            <Printer className="h-3.5 w-3.5" />
+            Print
+          </Button>
           <Button onClick={() => openCreate()} className="gap-2 btn-micro-anim">
             <Plus className="h-4 w-4" /> Add Post
           </Button>
@@ -533,6 +601,7 @@ export default function ContentPage() {
         activePost={activePost as PostRecord | null}
         activeClient={activeClient}
         clients={clients}
+        clientsLoading={isLoadingClients}
         isPending={isPending}
         savePost={savePost}
         deleteMutation={deleteMutation}
@@ -544,8 +613,11 @@ export default function ContentPage() {
       <ContentShareDialog
         open={showShareModal}
         onOpenChange={setShowShareModal}
-        activeClientId={activeClientId}
-        activeClientName={activeClientName}
+        clientId={shareClientId}
+        onClientIdChange={setShareClientId}
+        clients={clients ?? []}
+        clientsLoading={isLoadingClients}
+        clientName={shareClientName}
         existingShares={existingShares}
         shareMutation={shareMutation}
         refetchShares={refetchShares}

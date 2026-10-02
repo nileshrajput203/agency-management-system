@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -13,8 +14,11 @@ import { buildShareUrl } from "./content-constants";
 interface ContentShareDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  activeClientId: string;
-  activeClientName: string;
+  clientId: string;
+  onClientIdChange: (clientId: string) => void;
+  clients: Array<{ id: string; companyName: string }>;
+  clientsLoading: boolean;
+  clientName: string;
   existingShares: any[] | undefined;
   shareMutation: any;
   refetchShares: () => void;
@@ -23,8 +27,11 @@ interface ContentShareDialogProps {
 export function ContentShareDialog({
   open,
   onOpenChange,
-  activeClientId,
-  activeClientName,
+  clientId,
+  onClientIdChange,
+  clients,
+  clientsLoading,
+  clientName,
   existingShares,
   shareMutation,
   refetchShares,
@@ -35,11 +42,14 @@ export function ContentShareDialog({
   const [isRegeneratingShareId, setIsRegeneratingShareId] = useState<string | null>(null);
 
   const handleGenerateShare = () => {
-    if (!activeClientId) return;
+    if (!clientId) {
+      toast.error("Choose a client first");
+      return;
+    }
     shareMutation.mutate({
       data: {
-        clientId: activeClientId,
-        label: shareFormLabel.trim() || `${activeClientName} Content Calendar`,
+        clientId,
+        label: shareFormLabel.trim() || `${clientName || "Client"} Content Calendar`,
         expiresAt: shareFormExpiry ? shareFormExpiry : undefined,
       },
     });
@@ -97,9 +107,38 @@ export function ContentShareDialog({
         <DialogHeader className="pr-6">
           <DialogTitle className="text-base sm:text-xl font-bold flex items-center gap-2 text-foreground break-words leading-snug">
             <Share2 className="h-5 w-5 text-primary shrink-0" />
-            <span className="break-words min-w-0">Calendar Sharing — {activeClientName}</span>
+            <span className="break-words min-w-0">Calendar Sharing{clientName ? ` — ${clientName}` : ""}</span>
           </DialogTitle>
         </DialogHeader>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs font-semibold">Client calendar</Label>
+          <Select
+            value={clientId || "__none__"}
+            onValueChange={(value) => {
+              onClientIdChange(value === "__none__" ? "" : value);
+              setShareFormLabel("");
+            }}
+          >
+            <SelectTrigger disabled={clientsLoading || clients.length === 0}>
+              <SelectValue placeholder={clientsLoading ? "Loading clients…" : "Choose a client"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Choose a client</SelectItem>
+              {clients.map((client) => (
+                <SelectItem key={client.id} value={client.id}>{client.companyName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground">
+            Each secure link is limited to one client’s calendar.
+          </p>
+          {!clientsLoading && clients.length === 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              No clients are available to share. Enable Clients access or add existing client content first.
+            </p>
+          )}
+        </div>
 
         {/* New Share Form */}
         <div className="bg-slate-50 dark:bg-slate-900/80 border border-border rounded-xl p-3.5 sm:p-4 space-y-3.5 w-full min-w-0 overflow-hidden">
@@ -114,7 +153,7 @@ export function ContentShareDialog({
               <Label className="text-xs font-semibold">Link Label</Label>
               <Input
                 className="text-xs w-full"
-                placeholder={`${activeClientName} Content Calendar`}
+                placeholder={`${clientName || "Client"} Content Calendar`}
                 value={shareFormLabel}
                 onChange={(e) => setShareFormLabel(e.target.value)}
               />
@@ -131,7 +170,7 @@ export function ContentShareDialog({
           </div>
           <Button
             onClick={handleGenerateShare}
-            disabled={shareMutation.isPending || !activeClientId}
+            disabled={shareMutation.isPending || !clientId}
             className="w-full sm:w-auto gap-1.5 btn-micro-anim text-xs font-semibold"
           >
             <Link2 className="h-4 w-4 shrink-0" />
@@ -146,7 +185,9 @@ export function ContentShareDialog({
             <span className="text-[10px] text-muted-foreground font-normal">No login required for clients</span>
           </h3>
 
-          {existingShares && existingShares.length > 0 ? (
+          {!clientId ? (
+            <p className="text-xs text-muted-foreground italic py-2">Choose a client above to view or create its share link.</p>
+          ) : existingShares && existingShares.length > 0 ? (
             <div className="space-y-3 max-h-[360px] overflow-y-auto overflow-x-hidden pr-1 w-full">
               {existingShares.map((share: any) => {
                 const shareUrl = buildShareUrl(share.shareToken);
@@ -248,7 +289,7 @@ export function ContentShareDialog({
               })}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground italic py-2">No active share link generated yet for this client.</p>
+            <p className="text-xs text-muted-foreground italic py-2">No share link generated yet for this client.</p>
           )}
         </div>
 

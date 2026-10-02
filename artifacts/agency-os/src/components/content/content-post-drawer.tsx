@@ -29,6 +29,7 @@ interface ContentPostDrawerProps {
   activePost: PostRecord | null;
   activeClient: any;
   clients: any[] | undefined;
+  clientsLoading: boolean;
   isPending: boolean;
   savePost: (overridePayload?: any) => void;
   deleteMutation: any;
@@ -44,6 +45,7 @@ export function ContentPostDrawer({
   activePost,
   activeClient,
   clients,
+  clientsLoading,
   isPending,
   savePost,
   deleteMutation,
@@ -376,12 +378,19 @@ export function ContentPostDrawer({
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Client</Label>
                 <Select value={draft.clientId || "__none__"} onValueChange={(v) => setField("clientId", v === "__none__" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                  <SelectTrigger disabled={clientsLoading}>
+                    <SelectValue placeholder={clientsLoading ? "Loading clients…" : "Select client"} />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">No client</SelectItem>
                     {(clients ?? []).map((c) => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {!clientsLoading && !(clients ?? []).length && (
+                  <p className="text-[11px] text-muted-foreground">
+                    No clients are available to this account. Enable Clients access to assign a new client, or ask an administrator to add an existing client to Content.
+                  </p>
+                )}
               </div>
             </div>
           </div>

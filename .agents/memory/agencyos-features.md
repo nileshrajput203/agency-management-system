@@ -41,6 +41,12 @@ An empty `allowedModules` list represents the standard employee workspace (tasks
 
 **How to apply:** Keep frontend navigation guards and API permission checks aligned with these section-level rules; custom roles use their name as `systemRole` and still receive access through `allowedModules`.
 
+Content Calendar client choices use the full client directory only when Clients access is enabled; otherwise show clients already represented in the user's content history. Public calendar shares remain scoped to one client.
+
+**Why:** The content editor needs useful client choices without silently granting access to the Clients section, and a public link should not mix separate clients' calendars.
+
+**How to apply:** Gate full client-list queries on Clients access, derive limited choices from Content data otherwise, and keep share tokens tied to one client.
+
 Pending task requests remain editable only by their requester even when a legacy request has no assignee. Active tasks remain assignee-scoped, and employees must submit completion for review rather than bypassing approval.
 
 **Why:** Employees need to correct their own requests without gaining access to other people's work or skipping the task approval process.
