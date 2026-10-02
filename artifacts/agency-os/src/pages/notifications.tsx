@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
+import { canManageModule } from "@/lib/permissions";
 
 interface NotificationItem {
   id: string;
@@ -58,7 +59,7 @@ export default function NotificationsPage() {
 
   const [, setLocation] = useLocation();
   const currentUser = getUser();
-  const isManagerOrAdmin = currentUser?.role === "SUPER_ADMIN" || currentUser?.systemRole === "SUPER_ADMIN" || currentUser?.systemRole === "MANAGER" || currentUser?.role === "ADMIN";
+  const canBroadcastAnnouncement = canManageModule(currentUser, "team");
 
   const fetchNotifications = async () => {
     const token = getToken();
@@ -275,7 +276,7 @@ export default function NotificationsPage() {
             </Button>
           )}
 
-          {isManagerOrAdmin && (
+          {canBroadcastAnnouncement && (
             <Dialog open={announcementOpen} onOpenChange={setAnnouncementOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" className="gap-1.5 text-xs bg-primary text-primary-foreground">

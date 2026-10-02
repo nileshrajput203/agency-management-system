@@ -102,7 +102,7 @@ router.delete("/clear-all", requireAuth, asyncHandler(async (req, res) => {
 // PATCH /notifications/:id/read - Mark single notification as read
 router.patch("/:id/read", requireAuth, asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = String(req.params.id ?? "");
 
   if (!isValidUUID(id)) throw createError("Invalid notification ID", 400);
 
@@ -125,7 +125,7 @@ router.patch("/:id/read", requireAuth, asyncHandler(async (req, res) => {
 // DELETE /notifications/:id - Delete single notification
 router.delete("/:id", requireAuth, asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
-  const { id } = req.params;
+  const id = String(req.params.id ?? "");
 
   if (!isValidUUID(id)) throw createError("Invalid notification ID", 400);
 

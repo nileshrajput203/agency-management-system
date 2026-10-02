@@ -23,6 +23,8 @@ describe("module access policy", () => {
     ]));
     expect(getModulePermissions([])).not.toContain("invoices.view");
     expect(getModulePermissions([])).not.toContain("projects.view");
+    expect(getModulePermissions([])).not.toContain("users.view");
+    expect(getModulePermissions([])).not.toContain("meetings.view");
   });
 
   it("keeps every non-root role limited to its configured modules", () => {
@@ -43,6 +45,15 @@ describe("module access policy", () => {
     ]));
     expect(canManageModuleSection("SUPER_ADMIN", "finance", [])).toBe(true);
     expect(canManageModuleSection("MANAGER", "finance", [])).toBe(false);
+  });
+
+  it("keeps Meetings separate from Time and requires an explicit Meetings selection", () => {
+    expect(getModulePermissions(["meetings"])).toContain("meetings.view");
+    expect(getModulePermissions(["meetings"])).not.toContain("time.view");
+    expect(getModulePermissions(["time"])).toContain("time.view");
+    expect(getModulePermissions(["time"])).not.toContain("meetings.view");
+    expect(canManageModuleSection("MANAGER", "meetings", ["time"])).toBe(false);
+    expect(canManageModuleSection("SUPER_ADMIN", "meetings", [])).toBe(true);
   });
 
   it("requires both Projects and Tasks for company-wide task workspace access", () => {

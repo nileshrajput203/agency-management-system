@@ -24,6 +24,7 @@ import {
 import { useForm, Controller } from "react-hook-form";
 import { CompanyLogo } from "@/components/common/CompanyLogo";
 import { UserAccessManagement } from "@/components/UserAccessManagement";
+import { canManageModule } from "@/lib/permissions";
 
 export default function SettingsPage() {
   const qc = useQueryClient();
@@ -32,6 +33,7 @@ export default function SettingsPage() {
   const { data: settings, isLoading } = useGetSettings();
 
   const isSuperAdmin = user?.systemRole === "SUPER_ADMIN";
+  const canUpdateSettings = canManageModule(user, "settings");
 
   const updateMutation = useUpdateSettings({
     mutation: {
@@ -66,8 +68,8 @@ export default function SettingsPage() {
   }, [settings, reset]);
 
   const onSubmit = (data: AgencySettingsUpdate) => {
-    if (!isSuperAdmin) {
-      toast.error("Only Super Admins can update settings");
+    if (!canUpdateSettings) {
+      toast.error("Only users with the Settings section enabled can update settings.");
       return;
     }
     // Convert taxPercent to number
@@ -227,7 +229,7 @@ export default function SettingsPage() {
                         <Label className="text-xs font-medium">Agency Name *</Label>
                         <Input
                           {...register("agencyName", { required: "Required" })}
-                          disabled={!isSuperAdmin}
+                          disabled={!canUpdateSettings}
                           placeholder="Blink Beyond"
                           data-testid="agency-name-input"
                           className="h-10"
@@ -238,7 +240,7 @@ export default function SettingsPage() {
                         <Label className="text-xs font-medium">Website URL</Label>
                         <Input
                           {...register("website")}
-                          disabled={!isSuperAdmin}
+                          disabled={!canUpdateSettings}
                           placeholder="https://blinkbeyond.com"
                           data-testid="agency-website-input"
                           className="h-10"
@@ -251,7 +253,7 @@ export default function SettingsPage() {
                         <Label className="text-xs font-medium">Contact Email</Label>
                         <Input
                           {...register("email")}
-                          disabled={!isSuperAdmin}
+                          disabled={!canUpdateSettings}
                           type="email"
                           placeholder="hello@blinkbeyond.com"
                           data-testid="agency-email-input"
@@ -262,7 +264,7 @@ export default function SettingsPage() {
                         <Label className="text-xs font-medium">Contact Phone</Label>
                         <Input
                           {...register("phone")}
-                          disabled={!isSuperAdmin}
+                          disabled={!canUpdateSettings}
                           placeholder="+91 98765 43210"
                           data-testid="agency-phone-input"
                           className="h-10"
@@ -274,7 +276,7 @@ export default function SettingsPage() {
                       <Label className="text-xs font-medium">Business Address</Label>
                       <Input
                         {...register("address")}
-                        disabled={!isSuperAdmin}
+                        disabled={!canUpdateSettings}
                         placeholder="123 Creative Studio, Bangalore, India"
                         data-testid="agency-address-input"
                         className="h-10"
@@ -291,7 +293,7 @@ export default function SettingsPage() {
                           <Label className="text-xs font-medium">Work Day Start Time</Label>
                           <Input
                             {...register("workDayStart")}
-                            disabled={!isSuperAdmin}
+                            disabled={!canUpdateSettings}
                             type="time"
                             data-testid="agency-work-start"
                             className="h-10"
@@ -301,7 +303,7 @@ export default function SettingsPage() {
                           <Label className="text-xs font-medium">Work Day End Time</Label>
                           <Input
                             {...register("workDayEnd")}
-                            disabled={!isSuperAdmin}
+                            disabled={!canUpdateSettings}
                             type="time"
                             data-testid="agency-work-end"
                             className="h-10"
@@ -331,7 +333,7 @@ export default function SettingsPage() {
                       <div className="flex flex-wrap items-center gap-4 p-4 rounded-xl border border-border bg-muted/20">
                         <Input
                           {...register("primaryColor")}
-                          disabled={!isSuperAdmin}
+                          disabled={!canUpdateSettings}
                           type="color"
                           className="w-12 h-10 p-1 border rounded-lg cursor-pointer shrink-0"
                           data-testid="agency-color-picker"
@@ -349,7 +351,7 @@ export default function SettingsPage() {
                                   <button
                                     key={color}
                                     type="button"
-                                    disabled={!isSuperAdmin}
+                                    disabled={!canUpdateSettings}
                                     onClick={() => field.onChange(color)}
                                     className={`w-7 h-7 rounded-full border border-border transition-all hover:scale-110 flex items-center justify-center ${field.value === color ? "ring-2 ring-primary ring-offset-2" : ""}`}
                                     style={{ backgroundColor: color }}
@@ -429,7 +431,7 @@ export default function SettingsPage() {
                             <Select
                               value={field.value}
                               onValueChange={field.onChange}
-                              disabled={!isSuperAdmin}
+                              disabled={!canUpdateSettings}
                             >
                               <SelectTrigger data-testid="agency-currency-select" className="h-10">
                                 <SelectValue placeholder="Select currency" />
@@ -450,7 +452,7 @@ export default function SettingsPage() {
                           <Label className="text-xs font-medium">Tax Label</Label>
                           <Input
                             {...register("taxLabel")}
-                            disabled={!isSuperAdmin}
+                            disabled={!canUpdateSettings}
                             placeholder="GST"
                             data-testid="agency-tax-label"
                             className="h-10"
@@ -460,7 +462,7 @@ export default function SettingsPage() {
                           <Label className="text-xs font-medium">Tax Percent (%)</Label>
                           <Input
                             {...register("taxPercent")}
-                            disabled={!isSuperAdmin}
+                            disabled={!canUpdateSettings}
                             type="number"
                             placeholder="18"
                             data-testid="agency-tax-percent"
@@ -500,7 +502,7 @@ export default function SettingsPage() {
                         <Input
                           type="number"
                           defaultValue={60}
-                          disabled={!isSuperAdmin}
+                          disabled={!canUpdateSettings}
                           className="h-10"
                         />
                         <p className="text-[11px] text-muted-foreground">Auto logout after inactivity (15–1440 min)</p>
@@ -510,7 +512,7 @@ export default function SettingsPage() {
                         <Input
                           type="time"
                           defaultValue="10:30"
-                          disabled={!isSuperAdmin}
+                          disabled={!canUpdateSettings}
                           className="h-10"
                         />
                         <p className="text-[11px] text-muted-foreground">Check-ins after this time are tagged as Late</p>
@@ -615,7 +617,7 @@ export default function SettingsPage() {
                         <input
                           type="checkbox"
                           defaultChecked={item.enabled}
-                          disabled={!isSuperAdmin}
+                          disabled={!canUpdateSettings}
                           className="h-4 w-4 rounded border-input text-primary accent-primary cursor-pointer"
                         />
                       </div>
@@ -635,7 +637,7 @@ export default function SettingsPage() {
           </Tabs>
 
           {/* Form Submit Footer */}
-          {isSuperAdmin ? (
+          {canUpdateSettings ? (
             <div className="flex justify-end gap-3 border-t border-border pt-6">
               <Button
                 type="submit"

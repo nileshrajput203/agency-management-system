@@ -1,4 +1,6 @@
 import ExcelJS from "exceljs";
+import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import {
   useListInvoices,
   useListQuotations,
@@ -145,14 +147,18 @@ function ExportCard({ sheet }: { sheet: SheetDef }) {
 }
 
 export default function ExcelReportsPage() {
-  const { data: invoices, isLoading: loadInv } = useListInvoices();
-  const { data: quotations, isLoading: loadQt } = useListQuotations();
-  const { data: purchaseOrders, isLoading: loadPO } = useListPurchaseOrders();
-  const { data: proposals, isLoading: loadProp } = useListProposals();
-  const { data: leads, isLoading: loadLeads } = useListLeads();
-  const { data: clients, isLoading: loadClients } = useListClients();
-  const { data: projects, isLoading: loadProj } = useListProjects();
-  const { data: tasks, isLoading: loadTasks } = useListTasks();
+  const { user } = useAuth();
+  const canViewFinance = canManageModule(user, "finance");
+  const { data: invoices, isLoading: loadInv } = useListInvoices({ query: { enabled: canViewFinance } });
+  const { data: quotations, isLoading: loadQt } = useListQuotations({ query: { enabled: canViewFinance } });
+  const { data: purchaseOrders, isLoading: loadPO } = useListPurchaseOrders({ query: { enabled: canViewFinance } });
+  const { data: proposals, isLoading: loadProp } = useListProposals({ query: { enabled: canViewFinance } });
+  const { data: leads, isLoading: loadLeads } = useListLeads({ query: { enabled: canManageModule(user, "sales") } });
+  const { data: clients, isLoading: loadClients } = useListClients(undefined, {
+    query: { enabled: canManageModule(user, "clients") },
+  });
+  const { data: projects, isLoading: loadProj } = useListProjects({ query: { enabled: canManageModule(user, "projects") } });
+  const { data: tasks, isLoading: loadTasks } = useListTasks({ query: { enabled: canManageModule(user, "tasks") } });
 
   const sheets: SheetDef[] = [
     {

@@ -1,4 +1,6 @@
 import { useState, useRef } from "react";
+import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { useListClients, getListInvoicesQueryKey, getGetFinancialSummaryQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -38,8 +40,12 @@ function saveBiz(data: BuilderForm) {
 }
 
 export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editData?: Record<string, unknown> | null }) {
+  const { user } = useAuth();
   const qc = useQueryClient();
-  const { data: clients } = useListClients();
+  const canViewClients = canManageModule(user, "clients");
+  const { data: clients } = useListClients(undefined, {
+    query: { enabled: canViewClients },
+  });
   const logoRef = useRef<HTMLInputElement>(null);
   const sigRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
@@ -338,15 +344,23 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
             <SectionHead icon={<User className="h-4 w-4" />} title="Client's Details" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5 sm:col-span-2">
-                <Label className="text-xs">Client *</Label>
-                <Controller control={control} name="clientId" render={({ field }) => (
-                  <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                    <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
-                    <SelectContent>
-                      {(clients ?? []).map(c => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )} />
+                {canViewClients ? (
+                  <>
+                    <Label className="text-xs">Client *</Label>
+                    <Controller control={control} name="clientId" render={({ field }) => (
+                      <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                        <SelectContent>
+                          {(clients ?? []).map(c => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )} />
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Enable the Clients section to link an invoice to a saved client.
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Phone</Label>

@@ -24,6 +24,8 @@ import { Plus, Trash2, ClipboardList, Pencil, Download } from "lucide-react";
 import { openPrintWindow, buildProposalHtml, type ProposalPdfData } from "@/lib/pdf-print";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   DRAFT: { label: "Draft", className: "bg-slate-100 text-slate-600" },
@@ -49,13 +51,16 @@ interface ProposalFormData {
 }
 
 export default function ProposalsPage() {
+  const { user } = useAuth();
   const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
 
   const { data: proposals, isLoading } = useListProposals();
-  const { data: clients } = useListClients();
+  const { data: clients } = useListClients(undefined, {
+    query: { enabled: canManageModule(user, "clients") },
+  });
 
   const createMutation = useCreateProposal({
     mutation: {

@@ -1,4 +1,6 @@
 import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import {
   useCreateQuotation, useUpdateQuotation,
   useListClients, getListQuotationsQueryKey,
@@ -51,8 +53,11 @@ export function QuotationEditor({
   onBack: () => void;
   onSaved: () => void;
 }) {
+  const { user } = useAuth();
   const qc = useQueryClient();
-  const { data: clients } = useListClients();
+  const { data: clients } = useListClients(undefined, {
+    query: { enabled: canManageModule(user, "clients") },
+  });
 
   const createMutation = useCreateQuotation({
     mutation: {

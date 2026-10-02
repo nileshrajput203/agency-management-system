@@ -41,6 +41,12 @@ An empty `allowedModules` list represents the standard employee workspace (tasks
 
 **How to apply:** Keep frontend navigation guards and API permission checks aligned with these section-level rules; custom roles use their name as `systemRole` and still receive access through `allowedModules`.
 
+Pending task requests remain editable only by their requester even when a legacy request has no assignee. Active tasks remain assignee-scoped, and employees must submit completion for review rather than bypassing approval.
+
+**Why:** Employees need to correct their own requests without gaining access to other people's work or skipping the task approval process.
+
+**How to apply:** Preserve requester ownership for pending requests, assignee ownership for active work, and the review transition for employee completion.
+
 Access changes are surfaced through the Team & Roles audit trail; user role/module/delegation/activation changes and custom-role creation should remain auditable with actor, target, change details, and timestamp.
 
 **Why:** Administrators need to know who changed an employee's access, not only the employee's current state.

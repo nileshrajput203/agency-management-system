@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/App";
 import {
   useListTasks, useCreateTask, useUpdateTask, useDeleteTask,
   useListProjects, useListUsers, getListTasksQueryKey,
@@ -20,6 +21,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WriteWithAI } from "@/components/common/WriteWithAI";
+import { canManageModule } from "@/lib/permissions";
 import { useForm, Controller } from "react-hook-form";
 import {
   Plus, Trash2, Calendar, CheckSquare, Clock, AlertCircle, ListTodo, CheckCircle2, Edit3, EyeOff, Eye
@@ -27,7 +29,6 @@ import {
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { cn, formatDateOnly } from "@/lib/utils";
 import { SearchBar } from "@/components/common/SearchBar";
-import { useAuth } from "@/App";
 import {
   Tooltip, TooltipTrigger, TooltipContent
 } from "@/components/ui/tooltip";
@@ -108,7 +109,9 @@ export function AdminTasksView() {
   const { data: tasks, isLoading } = useListTasks();
   const selectedTaskForAction = selectedTaskForActionState ? (tasks ?? []).find((t: any) => t.id === selectedTaskForActionState.id) || selectedTaskForActionState : null;
   const { data: projects } = useListProjects();
-  const { data: users } = useListUsers();
+  const { data: users } = useListUsers({
+    query: { enabled: canManageModule(user, "team") },
+  });
 
   const createMutation = useCreateTask({
     mutation: {

@@ -6,10 +6,12 @@ import { EmployeeDashboard } from "@/components/dashboard/employee-dashboard";
 import { DashboardSkeleton } from "@/components/dashboard/dashboard-admin-sections";
 import { PLATFORM_DOT } from "@/components/dashboard/dashboard-components";
 import { getPostDateKey } from "@/components/content/content-constants";
+import { canManageModule } from "@/lib/permissions";
 
 export default function EmployeeDashboardPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
+  const canViewContent = canManageModule(user, "content");
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useGetDashboardStats({
     query: {
@@ -26,8 +28,14 @@ export default function EmployeeDashboardPage() {
   const weekEndMonthStr = format(weekEnd, "yyyy-MM");
   const needsBothMonths = currentMonthStr !== weekEndMonthStr;
 
-  const { data: weekPosts } = useListContentPosts({ month: currentMonthStr } as any);
-  const { data: weekPostsNext } = useListContentPosts({ month: weekEndMonthStr } as any);
+  const { data: weekPosts } = useListContentPosts(
+    { month: currentMonthStr } as any,
+    { query: { enabled: canViewContent } },
+  );
+  const { data: weekPostsNext } = useListContentPosts(
+    { month: weekEndMonthStr } as any,
+    { query: { enabled: canViewContent } },
+  );
   const allWeekPosts = needsBothMonths ? [...(weekPosts ?? []), ...(weekPostsNext ?? [])] : (weekPosts ?? []);
 
   const greeting = () => {

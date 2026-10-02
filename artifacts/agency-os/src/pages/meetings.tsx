@@ -59,7 +59,7 @@ export default function MeetingsPage() {
   const canViewClients = canManageModule(user, "clients");
   const canViewProjects = canManageModule(user, "projects");
   const canViewTeam = canManageModule(user, "team");
-  const { data: clients } = useListClients({ query: { enabled: canViewClients } });
+  const { data: clients } = useListClients(undefined, { query: { enabled: canViewClients } });
   const { data: projects } = useListProjects({ query: { enabled: canViewProjects } });
   const { data: usersList } = useListUsers({ query: { enabled: canViewTeam } });
 
@@ -478,6 +478,9 @@ export default function MeetingsPage() {
           clients={clients}
           projects={projects}
           usersList={usersList}
+          canViewClients={canViewClients}
+          canViewProjects={canViewProjects}
+          canViewTeam={canViewTeam}
           onSave={handleSaveMeeting}
         />
 

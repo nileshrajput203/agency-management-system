@@ -23,6 +23,9 @@ interface MeetingFormDialogProps {
   clients?: Array<{ id: string; companyName: string }>;
   projects?: Array<{ id: string; name: string }>;
   usersList?: Array<{ id: string; name: string; email: string }>;
+  canViewClients: boolean;
+  canViewProjects: boolean;
+  canViewTeam: boolean;
   onSave: (payload: any) => Promise<void>;
 }
 
@@ -34,6 +37,9 @@ export function MeetingFormDialog({
   clients,
   projects,
   usersList,
+  canViewClients,
+  canViewProjects,
+  canViewTeam,
   onSave,
 }: MeetingFormDialogProps) {
   const [title, setTitle] = useState("");
@@ -59,7 +65,7 @@ export function MeetingFormDialog({
       setClientId(meetingToEdit.clientId ?? "");
       setProjectId(meetingToEdit.projectId ?? "");
       setStatus(meetingToEdit.status ?? "SCHEDULED");
-      setSelectedUserIds((meetingToEdit.attendees ?? []).map((a) => a.id));
+      setSelectedUserIds((meetingToEdit.attendees ?? []).map((attendee) => attendee.userId ?? attendee.id));
     } else if (modalMode === "CREATE") {
       setTitle("");
       setDescription("");
@@ -103,7 +109,7 @@ export function MeetingFormDialog({
         clientId,
         projectId,
         status,
-        attendeeUserIds: selectedUserIds,
+        ...(canViewTeam ? { attendeeUserIds: selectedUserIds } : {}),
       });
       onOpenChange(false);
     } finally {
@@ -188,67 +194,73 @@ export function MeetingFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5 min-w-0">
-              <Label className="text-xs font-semibold">Related Client</Label>
-              <Select
-                value={clientId || "none"}
-                onValueChange={(val) => setClientId(val === "none" ? "" : val)}
-              >
-                <SelectTrigger className="w-full">
-                  <Tooltip>
-                    <TooltipTrigger className="w-full text-left truncate">
-                      <SelectValue placeholder="Select client">
-                        {selectedClient ? selectedClient.companyName : undefined}
-                      </SelectValue>
-                    </TooltipTrigger>
-                    {selectedClient && <TooltipContent>{selectedClient.companyName}</TooltipContent>}
-                  </Tooltip>
-                </SelectTrigger>
-                <SelectContent className="max-w-[320px]">
-                  <SelectItem value="none">None (Internal)</SelectItem>
-                  {(clients ?? []).map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <span className="truncate max-w-[260px] block" title={c.companyName}>
-                        {c.companyName}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          {(canViewClients || canViewProjects) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {canViewClients && (
+                <div className="space-y-1.5 min-w-0">
+                  <Label className="text-xs font-semibold">Related Client</Label>
+                  <Select
+                    value={clientId || "none"}
+                    onValueChange={(val) => setClientId(val === "none" ? "" : val)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <Tooltip>
+                        <TooltipTrigger className="w-full text-left truncate">
+                          <SelectValue placeholder="Select client">
+                            {selectedClient ? selectedClient.companyName : undefined}
+                          </SelectValue>
+                        </TooltipTrigger>
+                        {selectedClient && <TooltipContent>{selectedClient.companyName}</TooltipContent>}
+                      </Tooltip>
+                    </SelectTrigger>
+                    <SelectContent className="max-w-[320px]">
+                      <SelectItem value="none">None (Internal)</SelectItem>
+                      {(clients ?? []).map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          <span className="truncate max-w-[260px] block" title={client.companyName}>
+                            {client.companyName}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-            <div className="space-y-1.5 min-w-0">
-              <Label className="text-xs font-semibold">Related Project</Label>
-              <Select
-                value={projectId || "none"}
-                onValueChange={(val) => setProjectId(val === "none" ? "" : val)}
-              >
-                <SelectTrigger className="w-full">
-                  <Tooltip>
-                    <TooltipTrigger className="w-full text-left truncate">
-                      <SelectValue placeholder="Select project">
-                        {selectedProject ? selectedProject.name : undefined}
-                      </SelectValue>
-                    </TooltipTrigger>
-                    {selectedProject && <TooltipContent>{selectedProject.name}</TooltipContent>}
-                  </Tooltip>
-                </SelectTrigger>
-                <SelectContent className="max-w-[320px]">
-                  <SelectItem value="none">None</SelectItem>
-                  {(projects ?? []).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <span className="truncate max-w-[260px] block" title={p.name}>
-                        {p.name}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {canViewProjects && (
+                <div className="space-y-1.5 min-w-0">
+                  <Label className="text-xs font-semibold">Related Project</Label>
+                  <Select
+                    value={projectId || "none"}
+                    onValueChange={(val) => setProjectId(val === "none" ? "" : val)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <Tooltip>
+                        <TooltipTrigger className="w-full text-left truncate">
+                          <SelectValue placeholder="Select project">
+                            {selectedProject ? selectedProject.name : undefined}
+                          </SelectValue>
+                        </TooltipTrigger>
+                        {selectedProject && <TooltipContent>{selectedProject.name}</TooltipContent>}
+                      </Tooltip>
+                    </SelectTrigger>
+                    <SelectContent className="max-w-[320px]">
+                      <SelectItem value="none">None</SelectItem>
+                      {(projects ?? []).map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          <span className="truncate max-w-[260px] block" title={project.name}>
+                            {project.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
-          <div className="space-y-1.5">
+          {canViewTeam && <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Description / Agenda</Label>
             <Textarea
               value={description}
@@ -256,7 +268,7 @@ export function MeetingFormDialog({
               placeholder="Outline discussion items, goals, links..."
               rows={2}
             />
-          </div>
+          </div>}
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">

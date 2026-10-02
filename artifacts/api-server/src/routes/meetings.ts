@@ -2,7 +2,11 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { meetings, meetingAttendees, notifications, users, clients, projects } from "@workspace/db/schema";
 import { eq, and, sql, inArray, or } from "drizzle-orm";
-import { requirePermission, canManageMeetingWorkspace } from "../middleware/auth";
+import {
+  requirePermission,
+  canManageEnabledSection,
+  canManageMeetingWorkspace,
+} from "../middleware/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { isValidUUID } from "../lib/validation";
@@ -10,12 +14,13 @@ import { NotificationService } from "../services/notificationService";
 import { meetingLogger } from "../lib/logger";
 
 const router = Router();
-router.use((req, res, next) => {
+router.use((req, res, next): void => {
   if (!canManageMeetingWorkspace(
     (req as any).userSystemRole,
     (req as any).userConfiguredModules,
   )) {
-    return res.status(403).json({ error: "Forbidden: Enable the Meetings section to continue" });
+    res.status(403).json({ error: "Forbidden: Enable the Meetings section to continue" });
+    return;
   }
   next();
 });
@@ -25,13 +30,19 @@ router.get("/", requirePermission("meetings.view"), asyncHandler(async (req, res
   const { clientId, projectId } = req.query as Record<string, string>;
   const userId = (req as any).userId;
   const userRole = (req as any).userSystemRole;
+  const configuredModules = (req as any).userConfiguredModules;
+  const canViewClients = canManageEnabledSection(userRole, "clients", configuredModules);
+  const canViewProjects = canManageEnabledSection(userRole, "projects", configuredModules);
+  const canViewTeam = canManageEnabledSection(userRole, "team", configuredModules);
 
   const conditions = [];
   if (clientId) {
+    if (!canViewClients) throw createError("Forbidden: Enable Clients to filter meetings by client", 403);
     if (!isValidUUID(clientId)) throw createError("Invalid clientId format", 400);
     conditions.push(eq(meetings.clientId, clientId));
   }
   if (projectId) {
+    if (!canViewProjects) throw createError("Forbidden: Enable Projects to filter meetings by project", 403);
     if (!isValidUUID(projectId)) throw createError("Invalid projectId format", 400);
     conditions.push(eq(meetings.projectId, projectId));
   }
@@ -71,11 +82,27 @@ router.get("/", requirePermission("meetings.view"), asyncHandler(async (req, res
   }
 
   const meetingIds = allMeetings.map((m) => m.id);
-  const [attendeesList, allUsers, allClients, allProjects] = await Promise.all([
-    db.select().from(meetingAttendees).where(inArray(meetingAttendees.meetingId, meetingIds)),
-    db.select({ id: users.id, name: users.name, email: users.email }).from(users),
-    db.select({ id: clients.id, companyName: clients.companyName }).from(clients),
-    db.select({ id: projects.id, name: projects.name }).from(projects),
+  const attendeesList = await db.select().from(meetingAttendees)
+    .where(inArray(meetingAttendees.meetingId, meetingIds));
+  const participantIds = Array.from(new Set([
+    ...allMeetings.map((meeting) => meeting.organizerId).filter(Boolean),
+    ...attendeesList.map((attendee) => attendee.userId).filter(Boolean),
+  ])) as string[];
+  const relatedClientIds = Array.from(new Set(allMeetings.map((meeting) => meeting.clientId).filter(Boolean))) as string[];
+  const relatedProjectIds = Array.from(new Set(allMeetings.map((meeting) => meeting.projectId).filter(Boolean))) as string[];
+  const [allUsers, allClients, allProjects] = await Promise.all([
+    participantIds.length
+      ? db.select({ id: users.id, name: users.name, email: users.email }).from(users)
+          .where(inArray(users.id, participantIds))
+      : Promise.resolve([]),
+    canViewClients && relatedClientIds.length
+      ? db.select({ id: clients.id, companyName: clients.companyName }).from(clients)
+          .where(inArray(clients.id, relatedClientIds))
+      : Promise.resolve([]),
+    canViewProjects && relatedProjectIds.length
+      ? db.select({ id: projects.id, name: projects.name }).from(projects)
+          .where(inArray(projects.id, relatedProjectIds))
+      : Promise.resolve([]),
   ]);
 
   const userMap = Object.fromEntries(allUsers.map((u) => [u.id, u]));
@@ -89,12 +116,14 @@ router.get("/", requirePermission("meetings.view"), asyncHandler(async (req, res
     attendeesByMeeting[a.meetingId].push({
       ...a,
       name: a.name || uInfo?.name || "Guest",
-      email: a.email || uInfo?.email || "",
+      email: canViewTeam ? a.email || uInfo?.email || "" : "",
     });
   });
 
   const result = allMeetings.map((m) => ({
     ...m,
+    clientId: canViewClients ? m.clientId : null,
+    projectId: canViewProjects ? m.projectId : null,
     clientName: m.clientId ? clientMap[m.clientId] ?? null : null,
     projectName: m.projectId ? projectMap[m.projectId] ?? null : null,
     organizerName: m.organizerId ? userMap[m.organizerId]?.name ?? "Admin" : "Admin",
@@ -108,9 +137,13 @@ router.get("/", requirePermission("meetings.view"), asyncHandler(async (req, res
 
 // GET /meetings/:id - Get single meeting details
 router.get("/:id", requirePermission("meetings.view"), asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id ?? "");
   const userId = (req as any).userId;
   const userRole = (req as any).userSystemRole;
+  const configuredModules = (req as any).userConfiguredModules;
+  const canViewClients = canManageEnabledSection(userRole, "clients", configuredModules);
+  const canViewProjects = canManageEnabledSection(userRole, "projects", configuredModules);
+  const canViewTeam = canManageEnabledSection(userRole, "team", configuredModules);
 
   if (!isValidUUID(id)) throw createError("Invalid ID format", 400);
 
@@ -127,10 +160,23 @@ router.get("/:id", requirePermission("meetings.view"), asyncHandler(async (req, 
     throw createError("Forbidden: You do not have permission to view this meeting", 403);
   }
 
+  const participantIds = Array.from(new Set([
+    m.organizerId,
+    ...attendeesList.map((attendee) => attendee.userId),
+  ].filter(Boolean))) as string[];
   const [allUsers, allClients, allProjects] = await Promise.all([
-    db.select({ id: users.id, name: users.name, email: users.email }).from(users),
-    db.select({ id: clients.id, companyName: clients.companyName }).from(clients),
-    db.select({ id: projects.id, name: projects.name }).from(projects),
+    participantIds.length
+      ? db.select({ id: users.id, name: users.name, email: users.email }).from(users)
+          .where(inArray(users.id, participantIds))
+      : Promise.resolve([]),
+    canViewClients && m.clientId
+      ? db.select({ id: clients.id, companyName: clients.companyName }).from(clients)
+          .where(eq(clients.id, m.clientId))
+      : Promise.resolve([]),
+    canViewProjects && m.projectId
+      ? db.select({ id: projects.id, name: projects.name }).from(projects)
+          .where(eq(projects.id, m.projectId))
+      : Promise.resolve([]),
   ]);
 
   const userMap = Object.fromEntries(allUsers.map((u) => [u.id, u]));
@@ -142,12 +188,14 @@ router.get("/:id", requirePermission("meetings.view"), asyncHandler(async (req, 
     return {
       ...a,
       name: a.name || uInfo?.name || "Guest",
-      email: a.email || uInfo?.email || "",
+      email: canViewTeam ? a.email || uInfo?.email || "" : "",
     };
   });
 
   return res.json({
     ...m,
+    clientId: canViewClients ? m.clientId : null,
+    projectId: canViewProjects ? m.projectId : null,
     clientName: m.clientId ? clientMap[m.clientId] ?? null : null,
     projectName: m.projectId ? projectMap[m.projectId] ?? null : null,
     organizerName: m.organizerId ? userMap[m.organizerId]?.name ?? "Admin" : "Admin",
@@ -160,6 +208,11 @@ router.get("/:id", requirePermission("meetings.view"), asyncHandler(async (req, 
 // POST /meetings - Schedule a new meeting
 router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
+  const userRole = (req as any).userSystemRole;
+  const configuredModules = (req as any).userConfiguredModules;
+  const canViewClients = canManageEnabledSection(userRole, "clients", configuredModules);
+  const canViewProjects = canManageEnabledSection(userRole, "projects", configuredModules);
+  const canViewTeam = canManageEnabledSection(userRole, "team", configuredModules);
 
   const {
     title,
@@ -173,22 +226,67 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
     attendeeUserIds = [],
   } = req.body;
 
-  if (!title || !startTime || !endTime) {
+  if (typeof title !== "string" || !title.trim() || title.trim().length > 200 || !startTime || !endTime) {
     throw createError("Title, start time, and end time are required", 400);
   }
+  const cleanTitle = title.trim();
 
   const start = new Date(startTime);
   const end = new Date(endTime);
   if (isNaN(start.getTime()) || isNaN(end.getTime())) {
     throw createError("Invalid start or end time format", 400);
   }
+  if (end.getTime() <= start.getTime()) {
+    throw createError("End time must be after start time", 400);
+  }
+
+  if (clientId && !canViewClients) {
+    throw createError("Forbidden: Enable Clients to link a client to this meeting", 403);
+  }
+  if (projectId && !canViewProjects) {
+    throw createError("Forbidden: Enable Projects to link a project to this meeting", 403);
+  }
+  if (clientId && !isValidUUID(clientId)) throw createError("Invalid clientId format", 400);
+  if (projectId && !isValidUUID(projectId)) throw createError("Invalid projectId format", 400);
+  if (clientId) {
+    const [client] = await db.select({ id: clients.id }).from(clients).where(eq(clients.id, clientId));
+    if (!client) throw createError("Client not found", 404);
+  }
+  if (projectId) {
+    const [project] = await db.select({ id: projects.id }).from(projects).where(eq(projects.id, projectId));
+    if (!project) throw createError("Project not found", 404);
+  }
+
+  if (!Array.isArray(attendeeUserIds)) {
+    throw createError("attendeeUserIds must be an array", 400);
+  }
+  const finalAttendeeIds = Array.from(new Set([...attendeeUserIds, userId]));
+  if (finalAttendeeIds.some((id) => typeof id !== "string" || !isValidUUID(id))) {
+    throw createError("Invalid attendee ID", 400);
+  }
+  if (!canViewTeam && finalAttendeeIds.some((id) => id !== userId)) {
+    throw createError("Forbidden: Enable Team to invite other users", 403);
+  }
+  const activeUsers = await db.select({
+    id: users.id,
+    name: users.name,
+    email: users.email,
+  }).from(users).where(and(
+    eq(users.isActive, true),
+    inArray(users.id, finalAttendeeIds),
+  ));
+  if (activeUsers.length !== finalAttendeeIds.length) {
+    throw createError("One or more invitees are inactive or unavailable", 400);
+  }
+  const [creator] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
+  const creatorName = creator?.name || "A user";
 
   const durationMinutes = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
 
   const meetingId = crypto.randomUUID();
   const [newMeeting] = await db.insert(meetings).values({
     id: meetingId,
-    title,
+    title: cleanTitle,
     description: description ?? null,
     meetingLink: meetingLink ?? null,
     startTime: start,
@@ -200,20 +298,6 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
     projectId: projectId || null,
     createdBy: userId,
   }).returning();
-
-  // Get active users for attendee selection and notification delivery
-  const activeUsers = await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(eq(users.isActive, true));
-  const [creator] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
-  const creatorName = creator?.name || "A user";
-
-  // Ensure creator/organizer is included in attendees
-  const rawTargetIds: string[] = Array.isArray(attendeeUserIds) && attendeeUserIds.length > 0
-    ? attendeeUserIds
-    : activeUsers.map((u) => u.id);
-  
-  const attendeeUserSet = new Set<string>(rawTargetIds);
-  attendeeUserSet.add(userId);
-  const finalAttendeeIds = Array.from(attendeeUserSet);
 
   // Insert meeting attendees
   const attendeesToInsert = finalAttendeeIds.map((uId) => {
@@ -244,8 +328,8 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
   });
 
   const notifPayload = {
-    title: `📅 New Meeting: ${title}`,
-    message: `${creatorName} invited you to "${title}" scheduled for ${formattedTime}.${meetingLink ? ` Link: ${meetingLink}` : ""}`,
+    title: `📅 New Meeting: ${cleanTitle}`,
+    message: `${creatorName} invited you to "${cleanTitle}" scheduled for ${formattedTime}.${meetingLink ? ` Link: ${meetingLink}` : ""}`,
     type: "MEETING",
     priority: "HIGH" as const,
     action: "MEETING_INVITED",
@@ -260,21 +344,32 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
     await NotificationService.createNotificationsForUsers(notifyUserIds, notifPayload);
   }
 
-  // 2. Always notify Admins and Managers about new meeting creations (if not already notified)
-  const adminIds = await NotificationService.getAdminAndManagerUserIds();
+  // Notify only root users and users explicitly granted the Meetings section.
+  const candidates = await db.select({
+    id: users.id,
+    systemRole: users.systemRole,
+    role: users.role,
+    allowedModules: users.allowedModules,
+  }).from(users).where(sql`(${users.isActive} IS TRUE OR ${users.isActive} IS NULL)`);
+  const adminIds = candidates
+    .filter((candidate) => canManageMeetingWorkspace(
+      candidate.systemRole ?? candidate.role,
+      candidate.allowedModules,
+    ))
+    .map((candidate) => candidate.id);
   const unnotifiedAdmins = adminIds.filter((aId) => aId !== userId && !notifyUserIds.includes(aId));
   if (unnotifiedAdmins.length > 0) {
     await NotificationService.createNotificationsForUsers(unnotifiedAdmins, {
       ...notifPayload,
-      title: `📅 New Meeting Created: ${title}`,
-      message: `${creatorName} created meeting "${title}" scheduled for ${formattedTime}.`,
+      title: `📅 New Meeting Created: ${cleanTitle}`,
+      message: `${creatorName} created meeting "${cleanTitle}" scheduled for ${formattedTime}.`,
     });
   }
 
   meetingLogger.info(
     {
       meetingId,
-      title,
+      title: cleanTitle,
       organizerId: userId,
       attendeesCount: attendeesToInsert.length,
       startTime: start,
@@ -293,9 +388,13 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
 
 // PUT /meetings/:id - Update an existing meeting
 router.put("/:id", requirePermission("meetings.edit"), asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id ?? "");
   const userId = (req as any).userId;
   const userRole = (req as any).userSystemRole;
+  const configuredModules = (req as any).userConfiguredModules;
+  const canViewClients = canManageEnabledSection(userRole, "clients", configuredModules);
+  const canViewProjects = canManageEnabledSection(userRole, "projects", configuredModules);
+  const canViewTeam = canManageEnabledSection(userRole, "team", configuredModules);
 
   if (!isValidUUID(id)) throw createError("Invalid ID format", 400);
 
@@ -333,6 +432,77 @@ router.put("/:id", requirePermission("meetings.edit"), asyncHandler(async (req, 
   if (end.getTime() <= start.getTime()) {
     throw createError("End time must be after start time", 400);
   }
+  if (status != null && !["SCHEDULED", "COMPLETED", "CANCELLED"].includes(status)) {
+    throw createError("Invalid meeting status", 400);
+  }
+
+  if (!canViewClients && clientId) {
+    throw createError("Forbidden: Enable Clients to link a client to this meeting", 403);
+  }
+  if (!canViewProjects && projectId) {
+    throw createError("Forbidden: Enable Projects to link a project to this meeting", 403);
+  }
+  const nextClientId = canViewClients && clientId !== undefined
+    ? clientId || null
+    : existing.clientId;
+  const nextProjectId = canViewProjects && projectId !== undefined
+    ? projectId || null
+    : existing.projectId;
+  if (nextClientId && !isValidUUID(nextClientId)) throw createError("Invalid clientId format", 400);
+  if (nextProjectId && !isValidUUID(nextProjectId)) throw createError("Invalid projectId format", 400);
+  if (nextClientId) {
+    const [client] = await db.select({ id: clients.id }).from(clients)
+      .where(eq(clients.id, nextClientId));
+    if (!client) throw createError("Client not found", 404);
+  }
+  if (nextProjectId) {
+    const [project] = await db.select({ id: projects.id }).from(projects)
+      .where(eq(projects.id, nextProjectId));
+    if (!project) throw createError("Project not found", 404);
+  }
+
+  let attendeesToInsert: Array<{
+    id: string;
+    meetingId: string;
+    userId: string;
+    name: string | null;
+    email: string | null;
+    status: string;
+  }> | undefined;
+  if (attendeeUserIds !== undefined) {
+    if (!Array.isArray(attendeeUserIds)) {
+      throw createError("attendeeUserIds must be an array", 400);
+    }
+    if (!canViewTeam) {
+      throw createError("Forbidden: Enable Team to update meeting invitees", 403);
+    }
+    const finalIds = Array.from(new Set([...attendeeUserIds, userId]));
+    if (finalIds.some((inviteeId) => typeof inviteeId !== "string" || !isValidUUID(inviteeId))) {
+      throw createError("Invalid attendee ID", 400);
+    }
+    const activeUsers = await db.select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+    }).from(users).where(and(
+      eq(users.isActive, true),
+      inArray(users.id, finalIds),
+    ));
+    if (activeUsers.length !== finalIds.length) {
+      throw createError("One or more invitees are inactive or unavailable", 400);
+    }
+    attendeesToInsert = finalIds.map((inviteeId) => {
+      const invitee = activeUsers.find((candidate) => candidate.id === inviteeId)!;
+      return {
+        id: crypto.randomUUID(),
+        meetingId: id,
+        userId: inviteeId,
+        name: invitee.name,
+        email: invitee.email,
+        status: inviteeId === userId ? "ORGANIZER" : "INVITED",
+      };
+    });
+  }
 
   const durationMinutes = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
 
@@ -346,8 +516,8 @@ router.put("/:id", requirePermission("meetings.edit"), asyncHandler(async (req, 
       durationMinutes,
       location: location ?? null,
       status: status || existing.status,
-      clientId: clientId || null,
-      projectId: projectId || null,
+      clientId: nextClientId,
+      projectId: nextProjectId,
       updatedBy: userId,
       updatedAt: new Date(),
     })
@@ -358,29 +528,13 @@ router.put("/:id", requirePermission("meetings.edit"), asyncHandler(async (req, 
   const updaterName = updater?.name || "A user";
 
   // If attendeeUserIds was provided in payload, sync attendees
-  if (Array.isArray(attendeeUserIds)) {
+  if (attendeesToInsert) {
     await db.delete(meetingAttendees).where(eq(meetingAttendees.meetingId, id));
+    await db.insert(meetingAttendees).values(attendeesToInsert);
 
-    const activeUsers = await db.select({ id: users.id, name: users.name, email: users.email }).from(users);
-    const finalIds = Array.from(new Set([...attendeeUserIds, userId]));
-
-    const attendeesToInsert = finalIds.map((uId) => {
-      const u = activeUsers.find((user) => user.id === uId);
-      return {
-        id: crypto.randomUUID(),
-        meetingId: id,
-        userId: uId,
-        name: u?.name ?? null,
-        email: u?.email ?? null,
-        status: uId === userId ? "ORGANIZER" : "INVITED",
-      };
-    });
-
-    if (attendeesToInsert.length > 0) {
-      await db.insert(meetingAttendees).values(attendeesToInsert);
-    }
-
-    const notifyUserIds = finalIds.filter((uId) => uId !== userId);
+    const notifyUserIds = attendeesToInsert
+      .map((attendee) => attendee.userId)
+      .filter((attendeeId) => attendeeId !== userId);
     const formattedTime = start.toLocaleString("en-US", {
       month: "short",
       day: "numeric",
@@ -415,7 +569,7 @@ router.put("/:id", requirePermission("meetings.edit"), asyncHandler(async (req, 
 
 // PATCH /meetings/:id/status - Quick status change (e.g. COMPLETED, CANCELLED)
 router.patch("/:id/status", requirePermission("meetings.edit"), asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id ?? "");
   const { status } = req.body;
   const userId = (req as any).userId;
   const userRole = (req as any).userSystemRole;
@@ -476,7 +630,7 @@ router.patch("/:id/status", requirePermission("meetings.edit"), asyncHandler(asy
 
 // DELETE /meetings/:id - Delete / cancel meeting
 router.delete("/:id", requirePermission("meetings.delete"), asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id ?? "");
   const userId = (req as any).userId;
   const userRole = (req as any).userSystemRole;
 

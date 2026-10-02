@@ -206,7 +206,7 @@ export default function ProjectsPage() {
   };
 
   const { data: projects, isLoading } = useListProjects();
-  const { data: clients } = useListClients({
+  const { data: clients } = useListClients(undefined, {
     query: { enabled: canManageModule(user, "clients") },
   });
   const { data: users } = useListUsers({

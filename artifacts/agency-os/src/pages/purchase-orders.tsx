@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAuth } from "@/App";
+import { canManageModule } from "@/lib/permissions";
 import {
   useListPurchaseOrders, useCreatePurchaseOrder, useUpdatePurchaseOrder, useDeletePurchaseOrder,
   useListClients, getListPurchaseOrdersQueryKey,
@@ -61,6 +63,7 @@ function calcTotals(items: LineItem[]) {
 }
 
 export default function PurchaseOrdersPage() {
+  const { user } = useAuth();
   const qc = useQueryClient();
   const [view, setView] = useState<"list" | "form" | "detail">("list");
   const [selectedState, setSelected] = useState<PurchaseOrder | null>(null);
@@ -70,7 +73,9 @@ export default function PurchaseOrdersPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const { data: orders, isLoading } = useListPurchaseOrders();
-  const { data: clients } = useListClients({});
+  const { data: clients } = useListClients(undefined, {
+    query: { enabled: canManageModule(user, "clients") },
+  });
 
   const selected = selectedState ? (orders ?? []).find(o => o.id === selectedState.id) as PurchaseOrder || selectedState : null;
 

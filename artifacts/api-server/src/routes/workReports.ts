@@ -53,7 +53,7 @@ function isManagerOrAdmin(user: any): boolean {
 
 function assertReportAccess(report: any, user: any): void {
   if (!isManagerOrAdmin(user) && report.userId !== user?.id) {
-    throw createError(403, "You do not have permission to access this report.");
+    throw createError("You do not have permission to access this report.", 403);
   }
 }
 
@@ -264,12 +264,12 @@ router.get(
       .where(eq(workReportsTable.id, id));
 
     if (!report) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
 
     const isManager = isManagerOrAdmin(user);
     if (!isManager && report.report.userId !== user.id) {
-      throw createError(403, "You do not have permission to view this report.");
+      throw createError("You do not have permission to view this report.", 403);
     }
 
     const versions = await db
@@ -366,7 +366,7 @@ router.put(
       .where(eq(workReportsTable.id, id));
 
     if (!existing) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
 
     const isManager = isManagerOrAdmin(user);
@@ -374,14 +374,14 @@ router.put(
     // Security Permission Enforcement
     if (!isManager) {
       if (existing.userId !== user.id) {
-        throw createError(403, "You do not have permission to edit this report.");
+        throw createError("You do not have permission to edit this report.", 403);
       }
 
       const forbiddenStatuses = ["Submitted", "Under Review", "Approved", "Archived"];
       if (forbiddenStatuses.includes(existing.status)) {
         throw createError(
-          403,
-          `Employees cannot edit reports in ${existing.status} status. Only Draft and Needs Changes reports are editable.`
+          `Employees cannot edit reports in ${existing.status} status. Only Draft and Needs Changes reports are editable.`,
+          403
         );
       }
     }
@@ -468,12 +468,12 @@ router.post(
       .where(eq(workReportsTable.id, id));
 
     if (!existing) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
 
     const isManager = isManagerOrAdmin(user);
     if (!isManager && existing.userId !== user.id) {
-      throw createError(403, "You do not have permission to submit this report.");
+      throw createError("You do not have permission to submit this report.", 403);
     }
 
     const isResubmission = existing.status === "Needs Changes" || existing.currentVersion > 1;
@@ -544,7 +544,7 @@ router.post(
     const user = req.user;
 
     if (!isManagerOrAdmin(user)) {
-      throw createError(403, "Only Managers or Admins can mark a report under review.");
+      throw createError("Only Managers or Admins can mark a report under review.", 403);
     }
 
     const [existing] = await db
@@ -553,7 +553,7 @@ router.post(
       .where(eq(workReportsTable.id, id));
 
     if (!existing) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
 
     assertReportAccess(existing, user);
@@ -593,7 +593,7 @@ router.post(
     const { managerFeedback, managerCommentSections, projectComments } = req.body;
 
     if (!isManagerOrAdmin(user)) {
-      throw createError(403, "Only Managers or Admins can request changes.");
+      throw createError("Only Managers or Admins can request changes.", 403);
     }
 
     const [existing] = await db
@@ -602,7 +602,7 @@ router.post(
       .where(eq(workReportsTable.id, id));
 
     if (!existing) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
 
     // Attach project specific comments if provided
@@ -664,7 +664,7 @@ router.post(
     const user = req.user;
 
     if (!isManagerOrAdmin(user)) {
-      throw createError(403, "Only Managers or Admins can approve reports.");
+      throw createError("Only Managers or Admins can approve reports.", 403);
     }
 
     const [existing] = await db
@@ -673,8 +673,10 @@ router.post(
       .where(eq(workReportsTable.id, id));
 
     if (!existing) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
+
+    assertReportAccess(existing, user);
 
     const [updated] = await db
       .update(workReportsTable)
@@ -727,19 +729,19 @@ router.post(
       .where(eq(workReportsTable.id, id));
 
     if (!existing) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
 
     if (existing.userId !== user.id && !isManagerOrAdmin(user)) {
-      throw createError(403, "You can only request reopening for your own reports.");
+      throw createError("You can only request reopening for your own reports.", 403);
     }
 
     if (existing.status !== "Approved") {
-      throw createError(400, "Only Approved reports can be requested for reopening.");
+      throw createError("Only Approved reports can be requested for reopening.", 400);
     }
 
     if (!reason || !reason.trim()) {
-      throw createError(400, "A valid reason for reopening the report is required.");
+      throw createError("A valid reason for reopening the report is required.", 400);
     }
 
     await db.insert(workReportReopenRequestsTable).values({
@@ -795,7 +797,7 @@ router.post(
     const { action, reviewComment } = req.body; // action: 'approve' | 'reject'
 
     if (!isManagerOrAdmin(user)) {
-      throw createError(403, "Only Managers or Admins can review reopen requests.");
+      throw createError("Only Managers or Admins can review reopen requests.", 403);
     }
 
     const [existing] = await db
@@ -804,7 +806,7 @@ router.post(
       .where(eq(workReportsTable.id, id));
 
     if (!existing) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
 
     const isApprove = action === "approve";
@@ -883,8 +885,10 @@ router.post(
       .where(eq(workReportsTable.id, id));
 
     if (!existing) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
+
+    assertReportAccess(existing, user);
 
     const [updated] = await db
       .update(workReportsTable)
@@ -924,7 +928,7 @@ router.post(
       .where(eq(workReportsTable.id, id));
 
     if (!existing) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
 
     assertReportAccess(existing, user);
@@ -969,13 +973,13 @@ router.delete(
       .where(eq(workReportsTable.id, id));
 
     if (!existing) {
-      throw createError(404, "Work report not found");
+      throw createError("Work report not found", 404);
     }
 
     const isManager = isManagerOrAdmin(user);
     assertReportAccess(existing, user);
     if (!isManager && existing.status !== "Draft") {
-      throw createError(400, "Only your own Draft reports can be deleted.");
+      throw createError("Only your own Draft reports can be deleted.", 400);
     }
 
     await db.delete(workReportsTable).where(eq(workReportsTable.id, id));
@@ -1433,16 +1437,16 @@ router.get(
                     <div style="font-weight:700;color:#0f172a;margin-top:2px">${esc(empName)}</div>
                   </div>
                   <div>
-                    <span style="color:#64748b">Employee ID / Email:</span>
-                    <div style="font-weight:700;color:#0f172a;margin-top:2px">${esc(r.employeeId || empEmail)}</div>
+                    <span style="color:#64748b">Employee Email:</span>
+                    <div style="font-weight:700;color:#0f172a;margin-top:2px">${esc(empEmail || "N/A")}</div>
                   </div>
                   <div>
-                    <span style="color:#64748b">Department / Role:</span>
-                    <div style="font-weight:700;color:#0f172a;margin-top:2px">${esc(r.department || "Engineering")} / ${esc(r.employeeDesignation || r.role || "Team Member")}</div>
+                    <span style="color:#64748b">Designation:</span>
+                    <div style="font-weight:700;color:#0f172a;margin-top:2px">${esc(r.employeeDesignation || "Team Member")}</div>
                   </div>
                   <div>
                     <span style="color:#64748b">Reporting Manager:</span>
-                    <div style="font-weight:600;color:#334155;margin-top:2px">${esc(r.managerName || "Reporting Manager")}</div>
+                    <div style="font-weight:600;color:#334155;margin-top:2px">Not specified</div>
                   </div>
                   <div>
                     <span style="color:#64748b">Reporting Period:</span>
@@ -1577,7 +1581,7 @@ router.get(
                 <div class="grid-4" style="font-size:11px">
                   <div>
                     <span style="color:#64748b">Approved By:</span>
-                    <div style="font-weight:700;color:#0f172a;margin-top:2px">${esc(r.approvedByName || (r.status === 'Approved' ? 'Blink Beyond Management' : 'N/A'))}</div>
+                    <div style="font-weight:700;color:#0f172a;margin-top:2px">${esc(r.status === 'Approved' ? 'Blink Beyond Management' : 'N/A')}</div>
                   </div>
                   <div>
                     <span style="color:#64748b">Approval Date:</span>

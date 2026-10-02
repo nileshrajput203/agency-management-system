@@ -2,6 +2,7 @@ import { format } from "date-fns";
 
 export interface MeetingAttendee {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   role: string;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@/App";
 import { SearchBar } from "@/components/common/SearchBar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isPastDate, getTodayDateString } from "@/components/content/content-constants";
+import { canManageModule } from "@/lib/permissions";
 
 const PLATFORMS = [
   { id: "INSTAGRAM", label: "Instagram", icon: <Instagram className="h-4 w-4 text-pink-500" />, color: "bg-pink-50 border-pink-200 dark:bg-pink-950/20" },
@@ -58,6 +60,7 @@ function formatBytes(bytes: number) {
 }
 
 export default function HawanHubPage() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("accounts");
   const [activeClientId, setActiveClientId] = useState<string>("");
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
@@ -83,7 +86,9 @@ export default function HawanHubPage() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: clients } = useListClients();
+  const { data: clients } = useListClients(undefined, {
+    query: { enabled: canManageModule(user, "clients") },
+  });
 
   const token = typeof window !== "undefined" ? localStorage.getItem("agency_token") : null;
 

@@ -1,12 +1,11 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { leadsTable } from "@workspace/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
-import { requirePermission } from "../middleware/auth";
-import { isTaskManagerRole } from "../middleware/auth";
+import { canManageEnabledSection, requirePermission } from "../middleware/auth";
 
 const router = Router();
 
@@ -27,12 +26,15 @@ function sanitizeLead(body: any, isUpdate = false) {
 
 router.get("/", requirePermission("sales.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
-  const isCompanySalesManager = isTaskManagerRole((req as any).userSystemRole) ||
-    ["ACCOUNT_MANAGER"].includes((req as any).userSystemRole);
+  const canViewWorkspace = canManageEnabledSection(
+    (req as any).userSystemRole,
+    "sales",
+    (req as any).userConfiguredModules,
+  );
   const rows = await db
     .select()
     .from(leadsTable)
-    .where(isCompanySalesManager ? undefined : eq(leadsTable.createdBy, requesterId));
+    .where(canViewWorkspace ? undefined : eq(leadsTable.createdBy, requesterId));
   const now = Date.now();
   const result = rows.map((lead) => ({
     ...lead,
@@ -45,15 +47,18 @@ router.get("/", requirePermission("sales.view"), asyncHandler(async (req, res) =
 
 router.get("/pipeline-summary", requirePermission("sales.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
-  const isCompanySalesManager = isTaskManagerRole((req as any).userSystemRole) ||
-    ["ACCOUNT_MANAGER"].includes((req as any).userSystemRole);
+  const canViewWorkspace = canManageEnabledSection(
+    (req as any).userSystemRole,
+    "sales",
+    (req as any).userConfiguredModules,
+  );
   const allLeads = await db
     .select({
       stage: leadsTable.stage,
       value: leadsTable.value,
     })
     .from(leadsTable)
-    .where(isCompanySalesManager ? undefined : eq(leadsTable.createdBy, requesterId));
+    .where(canViewWorkspace ? undefined : eq(leadsTable.createdBy, requesterId));
 
   const stageCounts: Record<string, number> = {};
   const stageValues: Record<string, number> = {};
@@ -88,12 +93,18 @@ router.patch("/:id", requirePermission("sales.edit"), asyncHandler(async (req, r
   const { id: _id, createdAt: _ts, ...body } = req.body;
   const sanitized = sanitizeLead(body, true);
   const requesterId = (req as any).userId;
-  const isCompanySalesManager = isTaskManagerRole((req as any).userSystemRole) ||
-    ["ACCOUNT_MANAGER"].includes((req as any).userSystemRole);
-  if (!isCompanySalesManager) {
+  const canManageWorkspace = canManageEnabledSection(
+    (req as any).userSystemRole,
+    "sales",
+    (req as any).userConfiguredModules,
+  );
+  if (!canManageWorkspace) {
     const [ownedLead] = await db.select({ id: leadsTable.id })
       .from(leadsTable)
-      .where(eq(leadsTable.id, req.params.id as string));
+      .where(and(
+        eq(leadsTable.id, req.params.id as string),
+        eq(leadsTable.createdBy, requesterId),
+      ));
     if (!ownedLead) throw createError("Not found", 404);
   }
   const updates: Record<string, unknown> = { ...sanitized, updatedBy: requesterId };
@@ -108,17 +119,33 @@ router.patch("/:id", requirePermission("sales.edit"), asyncHandler(async (req, r
 }));
 
 router.delete("/:id", requirePermission("sales.delete"), asyncHandler(async (req, res) => {
-  await db.delete(leadsTable).where(eq(leadsTable.id, (req.params.id as string)));
+  const requesterId = (req as any).userId;
+  const canManageWorkspace = canManageEnabledSection(
+    (req as any).userSystemRole,
+    "sales",
+    (req as any).userConfiguredModules,
+  );
+  const whereClause = canManageWorkspace
+    ? eq(leadsTable.id, req.params.id as string)
+    : and(
+        eq(leadsTable.id, req.params.id as string),
+        eq(leadsTable.createdBy, requesterId),
+      );
+  const [deleted] = await db.delete(leadsTable).where(whereClause).returning({ id: leadsTable.id });
+  if (!deleted) throw createError("Not found", 404);
   return res.status(204).send();
 }));
 
 // Returns leads with a nextCallDate that is today or overdue (for Sales Tasks tab)
 router.get("/scheduled-calls", requirePermission("sales.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
-  const isCompanySalesManager = isTaskManagerRole((req as any).userSystemRole) ||
-    ["ACCOUNT_MANAGER"].includes((req as any).userSystemRole);
+  const canViewWorkspace = canManageEnabledSection(
+    (req as any).userSystemRole,
+    "sales",
+    (req as any).userConfiguredModules,
+  );
   const rows = await db.select().from(leadsTable)
-    .where(isCompanySalesManager ? undefined : eq(leadsTable.createdBy, requesterId));
+    .where(canViewWorkspace ? undefined : eq(leadsTable.createdBy, requesterId));
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const scheduled = rows

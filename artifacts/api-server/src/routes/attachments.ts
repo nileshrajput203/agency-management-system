@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { tasksTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { tasksTable, fileAttachmentsTable } from "@workspace/db/schema";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate, isValidUUID } from "../lib/validation";
@@ -102,11 +102,15 @@ router.get("/", requirePermission("attachments.view"), asyncHandler(async (req, 
 
   const normalizedType = normalizeEntityType(entityType);
   await assertEntityAccess(req, normalizedType, entityId);
-  const result = await db.execute(
-    `SELECT * FROM file_attachments WHERE entity_type = ANY($1::text[]) AND entity_id = $2 ORDER BY created_at DESC`,
-    [aliasesForEntity(normalizedType), entityId]
-  );
-  return res.json(result.rows ?? result);
+  const result = await db
+    .select()
+    .from(fileAttachmentsTable)
+    .where(and(
+      inArray(fileAttachmentsTable.entityType, aliasesForEntity(normalizedType)),
+      eq(fileAttachmentsTable.entityId, entityId),
+    ))
+    .orderBy(desc(fileAttachmentsTable.createdAt));
+  return res.json(result);
 }));
 
 // POST /api/attachments
@@ -131,42 +135,38 @@ router.post("/", requirePermission("attachments.upload"), asyncHandler(async (re
 
   const uploadedBy = (req as any).userId ?? null;
 
-  const result = await db.execute(
-    `INSERT INTO file_attachments (id, entity_type, entity_id, filename, url, uploaded_by)
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5)
-     RETURNING *`,
-    [sanitized.entityType, sanitized.entityId, sanitized.filename, sanitized.url, uploadedBy]
-  );
-  const row = (result.rows ?? result)[0];
+  const [row] = await db.insert(fileAttachmentsTable).values({
+    entityType: sanitized.entityType,
+    entityId: sanitized.entityId,
+    filename: sanitized.filename,
+    url: sanitized.url,
+    uploadedBy,
+  }).returning();
   return res.status(201).json(row);
 }));
 
 // DELETE /api/attachments/:id
 router.delete("/:id", requirePermission("attachments.upload"), asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id ?? "");
   if (!isValidUUID(id)) {
     throw createError("Invalid attachment ID format", 400);
   }
-  const findResult = await db.execute(
-    `SELECT * FROM file_attachments WHERE id = $1`,
-    [id]
-  );
-  const attachment = (findResult.rows ?? findResult)[0] as any;
+  const [attachment] = await db
+    .select()
+    .from(fileAttachmentsTable)
+    .where(eq(fileAttachmentsTable.id, id));
   if (!attachment) {
     throw createError("Attachment not found", 404);
   }
 
   const userId = (req as any).userId;
-  const normalizedType = normalizeEntityType(attachment.entity_type);
-  const canManageAttachment = await assertEntityAccess(req, normalizedType, attachment.entity_id);
-  if (!canManageAttachment && attachment.uploaded_by !== userId) {
+  const normalizedType = normalizeEntityType(attachment.entityType);
+  const canManageAttachment = await assertEntityAccess(req, normalizedType, attachment.entityId);
+  if (!canManageAttachment && attachment.uploadedBy !== userId) {
     throw createError("Forbidden: You can only delete attachments you uploaded", 403);
   }
 
-  await db.execute(
-    `DELETE FROM file_attachments WHERE id = $1`,
-    [id]
-  );
+  await db.delete(fileAttachmentsTable).where(eq(fileAttachmentsTable.id, id));
   return res.status(204).send();
 }));
 

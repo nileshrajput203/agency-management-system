@@ -267,7 +267,7 @@ export function requirePermission(permission: Permission) {
     (req as any).userAllowedModules = allowedModulesList;
     (req as any).userConfiguredModules = configuredModulesList ?? [];
 
-    next();
+    return next();
   });
 }
 
@@ -308,6 +308,6 @@ export function requireRole(allowedRole: UserRole) {
     (req as any).userSystemRole = user.systemRole;
     (req as any).userIsDelegatedAdmin = Boolean(user.isDelegatedAdmin);
 
-    next();
+    return next();
   });
 }
