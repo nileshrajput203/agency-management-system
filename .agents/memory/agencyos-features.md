@@ -20,6 +20,14 @@ description: Features implemented — SearchBar, Finance tabbed page, Excel expo
 - `artifacts/agency-os/src/pages/dashboard.tsx` — 4 stat cards (border-l accent), AreaChart revenue (range toggle 3M/6M/12M/YTD), PieChart project health donut, sales pipeline bars, content calendar week strip (handles month boundary by fetching adjacent month), activity feed timeline.
 - `artifacts/api-server/src/routes/dashboard.ts` — replaced with new file adding `GET /dashboard/project-health` (onTrack/atRisk/delayed/completed) and `GET /dashboard/revenue-chart?range=` alongside existing stats + recent-activity endpoints.
 
+## Shoot scheduling and performance reports
+
+Shoot-specific specifications are stored in the existing meeting description using a versioned marker, with a title prefix identifying shoots; no meetings-table migration is needed. Monthly performance reports are computed from task, attendance, time-entry, and work-report records when requested rather than persisted as duplicate snapshots.
+
+**Why:** Keep shoot scheduling compatible with the current database while making specifications visible/editable, and ensure monthly reports reflect corrected source records without a separate report lifecycle.
+
+**How to apply:** Preserve the marker parsing/serialization when extending shoot details; keep report calculations permission-scoped and derived from source-of-truth rows.
+
 ### AI writing assistant (site-wide)
 - Backend: `artifacts/api-server/src/routes/ai.ts` — `POST /api/ai/generate` using `OPENAI_API_KEY` (user-provided secret, not the Replit blueprint) + `gpt-4o-mini`, context-aware system prompts keyed by a `context` field (proposal/quotation/invoice/content-caption/task/client-notes/lead/email/general).
 - Frontend: `artifacts/agency-os/src/components/common/AiAssistButton.tsx` — reusable Popover+Sparkles button; pass `context`, `currentValue`, `onResult(text)`. Drop it next to any Textarea/rich-text field.

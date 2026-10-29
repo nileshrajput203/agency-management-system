@@ -34,7 +34,13 @@ import { useListClients, useListProjects, useListUsers } from "@workspace/api-cl
 import { cn } from "@/lib/utils";
 import { MeetingFormDialog } from "@/components/meetings/meeting-form-dialog";
 import { MeetingDetailsDialog } from "@/components/meetings/meeting-details-dialog";
-import { MeetingItem, formatDateTime } from "@/components/meetings/meeting-helpers";
+import {
+  getMeetingDisplayTitle,
+  MeetingItem,
+  formatDateTime,
+  isShootMeeting,
+  parseMeetingDescription,
+} from "@/components/meetings/meeting-helpers";
 
 export default function MeetingsPage() {
   const { user } = useAuth();
@@ -139,7 +145,7 @@ export default function MeetingsPage() {
   const handleSaveMeeting = async (payload: any) => {
     try {
       const url = modalMode === "EDIT" && editingMeeting ? `/api/meetings/${editingMeeting.id}` : "/api/meetings";
-      const method = modalMode === "EDIT" ? "PATCH" : "POST";
+      const method = modalMode === "EDIT" ? "PUT" : "POST";
       const res = await fetch(url, {
         method,
         headers: {
@@ -183,7 +189,7 @@ export default function MeetingsPage() {
 
   const handleStatusChange = async (meetingId: string, newStatus: string) => {
     try {
-      const res = await fetch(`/api/meetings/${meetingId}`, {
+      const res = await fetch(`/api/meetings/${meetingId}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -220,16 +226,17 @@ export default function MeetingsPage() {
 
   const filteredMeetings = useMemo(() => {
     return meetings.filter((m) => {
+      const title = getMeetingDisplayTitle(m.title);
       const matchesSearch =
         searchQuery.trim() === "" ||
-        m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (m.description && m.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        parseMeetingDescription(m.description).description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (m.clientName && m.clientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (m.projectName && m.projectName.toLowerCase().includes(searchQuery.toLowerCase()));
 
       const matchesStatus = statusFilter === "ALL" || m.status === statusFilter;
       return matchesSearch && matchesStatus;
-    });
+    }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }, [meetings, searchQuery, statusFilter]);
 
   return (
@@ -313,6 +320,11 @@ export default function MeetingsPage() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                       {getStatusBadge(m.status)}
+                      {isShootMeeting(m) && (
+                        <Badge variant="outline" className="text-[10px] border-violet-300 text-violet-700 dark:text-violet-300">
+                          Shoot
+                        </Badge>
+                      )}
                       {m.clientName && (
                         <Tooltip>
                           <TooltipTrigger>
@@ -378,15 +390,15 @@ export default function MeetingsPage() {
                     className="text-base font-semibold mt-2 leading-snug cursor-pointer hover:text-primary transition-colors line-clamp-2"
                     onClick={() => setViewMeeting(m)}
                   >
-                    {m.title}
+                    {getMeetingDisplayTitle(m.title)}
                   </CardTitle>
                 </CardHeader>
 
                 <CardContent className="space-y-3 text-xs flex-1 flex flex-col justify-between">
                   <div>
-                    {m.description && (
+                    {parseMeetingDescription(m.description).description && (
                       <p className="text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
-                        {m.description}
+                        {parseMeetingDescription(m.description).description}
                       </p>
                     )}
 
@@ -436,7 +448,7 @@ export default function MeetingsPage() {
                   {m.attendees && m.attendees.length > 0 && (
                     <div className="pt-2 border-t border-border mt-2">
                       <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold mb-1.5">
-                        <span className="uppercase tracking-wider">Attendees ({m.attendees.length})</span>
+                        <span className="uppercase tracking-wider">{isShootMeeting(m) ? "Assigned crew" : "Attendees"} ({m.attendees.length})</span>
                         <span>Organizer: {m.organizerName}</span>
                       </div>
                       <div className="flex flex-wrap gap-1">

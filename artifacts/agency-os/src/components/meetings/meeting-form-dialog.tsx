@@ -10,10 +10,27 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Clapperboard } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MeetingItem } from "./meeting-helpers";
+import { isShootMeeting, MeetingItem, parseMeetingDescription, ShootDetails } from "./meeting-helpers";
+
+const EMPTY_SHOOT_DETAILS: ShootDetails = {
+  category: "",
+  objective: "",
+  shotList: "",
+  deliverables: "",
+  equipment: "",
+  referenceLink: "",
+  notes: "",
+};
+
+function toLocalDateTimeInput(value?: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
 
 interface MeetingFormDialogProps {
   open: boolean;
@@ -52,29 +69,37 @@ export function MeetingFormDialog({
   const [projectId, setProjectId] = useState("");
   const [status, setStatus] = useState("SCHEDULED");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [meetingType, setMeetingType] = useState<"MEETING" | "SHOOT">("MEETING");
+  const [shootDetails, setShootDetails] = useState<ShootDetails>(EMPTY_SHOOT_DETAILS);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (modalMode === "EDIT" && meetingToEdit) {
-      setTitle(meetingToEdit.title ?? "");
-      setDescription(meetingToEdit.description ?? "");
-      setStartTime(meetingToEdit.startTime ? new Date(meetingToEdit.startTime).toISOString().slice(0, 16) : "");
-      setEndTime(meetingToEdit.endTime ? new Date(meetingToEdit.endTime).toISOString().slice(0, 16) : "");
+      const parsedDescription = parseMeetingDescription(meetingToEdit.description);
+      const isShoot = isShootMeeting(meetingToEdit);
+      setTitle(meetingToEdit.title?.replace(/^\[SHOOT\]\s*/, "") ?? "");
+      setDescription(parsedDescription.description);
+      setStartTime(toLocalDateTimeInput(meetingToEdit.startTime));
+      setEndTime(toLocalDateTimeInput(meetingToEdit.endTime));
       setMeetingLink(meetingToEdit.meetingLink ?? "");
       setLocation(meetingToEdit.location ?? "");
       setClientId(meetingToEdit.clientId ?? "");
       setProjectId(meetingToEdit.projectId ?? "");
       setStatus(meetingToEdit.status ?? "SCHEDULED");
-      setSelectedUserIds((meetingToEdit.attendees ?? []).map((attendee) => attendee.userId ?? attendee.id));
+      setMeetingType(isShoot ? "SHOOT" : "MEETING");
+      setShootDetails(parsedDescription.shootDetails ?? EMPTY_SHOOT_DETAILS);
+      setSelectedUserIds((meetingToEdit.attendees ?? [])
+        .map((attendee) => attendee.userId ?? attendee.id)
+        .filter((id) => !isShoot || id !== meetingToEdit.organizerId));
     } else if (modalMode === "CREATE") {
       setTitle("");
       setDescription("");
       const now = new Date();
       now.setMinutes(0, 0, 0);
       now.setHours(now.getHours() + 1);
-      const startIso = now.toISOString().slice(0, 16);
+      const startIso = toLocalDateTimeInput(now.toISOString());
       now.setHours(now.getHours() + 1);
-      const endIso = now.toISOString().slice(0, 16);
+      const endIso = toLocalDateTimeInput(now.toISOString());
       setStartTime(startIso);
       setEndTime(endIso);
       setMeetingLink("");
@@ -83,11 +108,10 @@ export function MeetingFormDialog({
       setProjectId("");
       setStatus("SCHEDULED");
       setSelectedUserIds([]);
+      setMeetingType("MEETING");
+      setShootDetails(EMPTY_SHOOT_DETAILS);
     }
   }, [modalMode, meetingToEdit, open]);
-
-  const selectedClient = (clients ?? []).find((c) => c.id === clientId);
-  const selectedProject = (projects ?? []).find((p) => p.id === projectId);
 
   const toggleUserSelection = (userId: string) => {
     setSelectedUserIds((prev) =>
@@ -97,6 +121,7 @@ export function MeetingFormDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (meetingType === "SHOOT" && !selectedUserIds.length) return;
     setSubmitting(true);
     try {
       await onSave({
@@ -109,6 +134,8 @@ export function MeetingFormDialog({
         clientId,
         projectId,
         status,
+        meetingType,
+        ...(meetingType === "SHOOT" ? { shootDetails } : {}),
         ...(canViewTeam ? { attendeeUserIds: selectedUserIds } : {}),
       });
       onOpenChange(false);
@@ -133,10 +160,24 @@ export function MeetingFormDialog({
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              maxLength={meetingType === "SHOOT" ? 194 : 200}
               placeholder="e.g., Q3 Strategy Review / Client Onboarding Call"
               required
             />
           </div>
+
+          {canViewTeam && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Schedule Type</Label>
+              <Select value={meetingType} onValueChange={(value: string) => setMeetingType(value as "MEETING" | "SHOOT")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="MEETING">Meeting</SelectItem>
+                  <SelectItem value="SHOOT">Photo / Video Shoot</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {modalMode === "EDIT" && (
             <div className="space-y-1.5">
@@ -201,17 +242,10 @@ export function MeetingFormDialog({
                   <Label className="text-xs font-semibold">Related Client</Label>
                   <Select
                     value={clientId || "none"}
-                    onValueChange={(val) => setClientId(val === "none" ? "" : val)}
+                    onValueChange={(val: string) => setClientId(val === "none" ? "" : val)}
                   >
                     <SelectTrigger className="w-full">
-                      <Tooltip>
-                        <TooltipTrigger className="w-full text-left truncate">
-                          <SelectValue placeholder="Select client">
-                            {selectedClient ? selectedClient.companyName : undefined}
-                          </SelectValue>
-                        </TooltipTrigger>
-                        {selectedClient && <TooltipContent>{selectedClient.companyName}</TooltipContent>}
-                      </Tooltip>
+                      <SelectValue placeholder="Select client" />
                     </SelectTrigger>
                     <SelectContent className="max-w-[320px]">
                       <SelectItem value="none">None (Internal)</SelectItem>
@@ -232,17 +266,10 @@ export function MeetingFormDialog({
                   <Label className="text-xs font-semibold">Related Project</Label>
                   <Select
                     value={projectId || "none"}
-                    onValueChange={(val) => setProjectId(val === "none" ? "" : val)}
+                    onValueChange={(val: string) => setProjectId(val === "none" ? "" : val)}
                   >
                     <SelectTrigger className="w-full">
-                      <Tooltip>
-                        <TooltipTrigger className="w-full text-left truncate">
-                          <SelectValue placeholder="Select project">
-                            {selectedProject ? selectedProject.name : undefined}
-                          </SelectValue>
-                        </TooltipTrigger>
-                        {selectedProject && <TooltipContent>{selectedProject.name}</TooltipContent>}
-                      </Tooltip>
+                      <SelectValue placeholder="Select project" />
                     </SelectTrigger>
                     <SelectContent className="max-w-[320px]">
                       <SelectItem value="none">None</SelectItem>
@@ -270,9 +297,67 @@ export function MeetingFormDialog({
             />
           </div>}
 
-          <div className="space-y-1.5">
+          {meetingType === "SHOOT" && (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Clapperboard className="h-4 w-4 text-primary" />
+                <h3 className="text-xs font-bold uppercase tracking-wide">Shoot brief</h3>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Shoot Category *</Label>
+                <Select
+                  value={shootDetails.category || "__none__"}
+                  onValueChange={(value: string) => setShootDetails((current) => ({
+                    ...current,
+                    category: value === "__none__" ? "" : value,
+                  }))}
+                >
+                  <SelectTrigger><SelectValue placeholder="Choose a shoot type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Choose a shoot type</SelectItem>
+                    {["Product", "Brand / Campaign", "Portrait / Fashion", "Event", "Food", "Property", "Other"].map((category) => (
+                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!shootDetails.category && (
+                  <p className="text-[11px] text-rose-600">Choose a category for this shoot.</p>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Objective</Label>
+                <Textarea value={shootDetails.objective} onChange={(e) => setShootDetails((d) => ({ ...d, objective: e.target.value }))} rows={2} placeholder="What should this shoot achieve?" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Shot List</Label>
+                  <Textarea value={shootDetails.shotList} onChange={(e) => setShootDetails((d) => ({ ...d, shotList: e.target.value }))} rows={3} placeholder="Scenes, angles, or moments to capture" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Deliverables</Label>
+                  <Textarea value={shootDetails.deliverables} onChange={(e) => setShootDetails((d) => ({ ...d, deliverables: e.target.value }))} rows={3} placeholder="Formats, quantities, aspect ratios, deadlines" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Equipment / Props</Label>
+                  <Textarea value={shootDetails.equipment} onChange={(e) => setShootDetails((d) => ({ ...d, equipment: e.target.value }))} rows={2} placeholder="Gear, props, wardrobe, or setup" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Reference Link</Label>
+                  <Input type="url" value={shootDetails.referenceLink} onChange={(e) => setShootDetails((d) => ({ ...d, referenceLink: e.target.value }))} placeholder="https://…" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Special Instructions</Label>
+                <Textarea value={shootDetails.notes} onChange={(e) => setShootDetails((d) => ({ ...d, notes: e.target.value }))} rows={2} placeholder="Access details, client constraints, safety notes…" />
+              </div>
+            </div>
+          )}
+
+          {canViewTeam && <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold">Invite Team Members</Label>
+              <Label className="text-xs font-semibold">{meetingType === "SHOOT" ? "Assigned Shoot Crew *" : "Invite Team Members"}</Label>
               <span className="text-[10px] text-muted-foreground font-medium">
                 {selectedUserIds.length} selected
               </span>
@@ -300,11 +385,17 @@ export function MeetingFormDialog({
                 );
               })}
             </div>
-          </div>
+            {meetingType === "SHOOT" && selectedUserIds.length === 0 && (
+              <p className="text-[11px] text-rose-600">Select at least one active team member to assign this shoot.</p>
+            )}
+          </div>}
 
           <DialogFooter className="pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={submitting}>
+            <Button
+              type="submit"
+              disabled={submitting || (meetingType === "SHOOT" && (!selectedUserIds.length || !shootDetails.category))}
+            >
               {submitting
                 ? modalMode === "EDIT" ? "Saving..." : "Scheduling..."
                 : modalMode === "EDIT" ? "Update Meeting" : "Schedule & Notify"}

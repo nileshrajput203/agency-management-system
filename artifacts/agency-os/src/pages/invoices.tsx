@@ -52,7 +52,17 @@ export default function InvoicesPage() {
     />;
   }
 
-  const filtered = (invoices ?? []).filter(inv => statusFilter === "ALL" || inv.status === statusFilter);
+  const filtered = (invoices ?? [])
+    .filter(inv => statusFilter === "ALL" || inv.status === statusFilter)
+    .slice()
+    .sort((a, b) => {
+      const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY;
+      const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY;
+      if (aDue !== bDue) return aDue - bDue;
+      const aDate = a.invoiceDate ? new Date(a.invoiceDate).getTime() : Number.POSITIVE_INFINITY;
+      const bDate = b.invoiceDate ? new Date(b.invoiceDate).getTime() : Number.POSITIVE_INFINITY;
+      return aDate - bDate;
+    });
 
   return (
     <div className="p-6 animated-fade-in space-y-5">

@@ -54,6 +54,22 @@ interface EmployeeReport {
     isOverdue: boolean;
     isDelayed: boolean;
   }[];
+  attendance: {
+    records: number;
+    presentDays: number;
+    halfDays: number;
+    absentDays: number;
+    leaveDays: number;
+    lateDays: number;
+    overtimeMinutes: number;
+    attendanceRate: number | null;
+  };
+  workReports: {
+    total: number;
+    submitted: number;
+    approved: number;
+  };
+  trackedMinutes: number;
 }
 
 interface PerformanceData {
@@ -62,15 +78,21 @@ interface PerformanceData {
   employees: EmployeeReport[];
 }
 
-function performanceScore(emp: EmployeeReport): number {
-  if (emp.totalAssigned === 0) return 100;
+function performanceScore(emp: EmployeeReport): number | null {
+  if (emp.totalAssigned === 0) return null;
   const completionRate = emp.completed / emp.totalAssigned;
-  const onTimeRate = emp.completed > 0 ? emp.completedOnTime / emp.completed : 1;
+  const completedWithDueDate = emp.tasks.filter(task =>
+    ["DONE", "COMPLETED"].includes(task.status.toUpperCase()) && Boolean(task.dueDate)
+  ).length;
+  const onTimeRate = completedWithDueDate > 0 ? emp.completedOnTime / completedWithDueDate : 1;
   const overduepenalty = emp.overdue / emp.totalAssigned;
   return Math.round((completionRate * 0.5 + onTimeRate * 0.35 - overduepenalty * 0.15) * 100);
 }
 
-function ScoreBadge({ score }: { score: number }) {
+function ScoreBadge({ score }: { score: number | null }) {
+  if (score === null) {
+    return <Badge variant="outline" className="text-muted-foreground">No task data</Badge>;
+  }
   const clr =
     score >= 80 ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
     score >= 50 ? "bg-amber-100 text-amber-700 border-amber-200" :
@@ -84,13 +106,26 @@ function ScoreBadge({ score }: { score: number }) {
 
 function downloadCSV(data: PerformanceData) {
   const rows = [
-    ["Employee", "Total Assigned", "Completed", "On Time", "Delayed", "In Progress", "Overdue", "Score (%)"],
+    [
+      "Employee", "Total Assigned", "Completed", "On Time", "Delayed", "In Progress", "Overdue",
+      "Task Score (%)", "Attendance Rate (%)", "Present Days", "Half Days", "Absent Days",
+      "Leave Days", "Late Days", "Overtime Minutes", "Tracked Minutes",
+      "Work Reports", "Submitted Work Reports", "Approved Work Reports",
+    ],
     ...data.employees.map(e => [
       e.employeeName, e.totalAssigned, e.completed, e.completedOnTime,
-      e.delayed, e.inProgress, e.overdue, performanceScore(e),
+      e.delayed, e.inProgress, e.overdue, performanceScore(e) ?? "",
+      e.attendance.attendanceRate ?? "", e.attendance.presentDays, e.attendance.halfDays,
+      e.attendance.absentDays, e.attendance.leaveDays, e.attendance.lateDays,
+      e.attendance.overtimeMinutes, e.trackedMinutes,
+      e.workReports.total, e.workReports.submitted, e.workReports.approved,
     ]),
   ];
-  const csv = rows.map(r => r.join(",")).join("\n");
+  const csv = rows.map(r => r.map(value => {
+    const rawCell = String(value ?? "");
+    const cell = /^[=+\-@]/.test(rawCell) ? `'${rawCell}` : rawCell;
+    return /[",\r\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
+  }).join(",")).join("\r\n");
   const blob = new Blob([csv], { type: "text/csv" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
@@ -131,7 +166,7 @@ export default function PerformanceReportPage() {
             Monthly Performance Report
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Employee task completion &amp; delay analysis for {monthLabel}
+            Auto-generated from task delivery, attendance, tracked time, and work reports for {monthLabel}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -197,9 +232,9 @@ export default function PerformanceReportPage() {
       {data && !isLoading && data.employees.length === 0 && (
         <div className="text-center py-20">
           <BarChart3 className="h-10 w-10 mx-auto mb-4 text-muted-foreground/40" />
-          <p className="font-semibold">No task data for {monthLabel}</p>
+          <p className="font-semibold">No employee data for {monthLabel}</p>
           <p className="text-sm text-muted-foreground mt-1">
-            No tasks were assigned or due during this month.
+            No active employees are available in this report.
           </p>
         </div>
       )}
@@ -226,7 +261,7 @@ export default function PerformanceReportPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
+                  {score !== null && <div className="flex items-center gap-1.5">
                     {score >= 80 ? (
                       <TrendingUp className="h-4 w-4 text-emerald-500" />
                     ) : score >= 50 ? (
@@ -234,8 +269,8 @@ export default function PerformanceReportPage() {
                     ) : (
                       <TrendingDown className="h-4 w-4 text-rose-500" />
                     )}
-                    <span className="text-xs font-medium text-muted-foreground">Performance</span>
-                  </div>
+                    <span className="text-xs font-medium text-muted-foreground">Task score</span>
+                  </div>}
                   <ScoreBadge score={score} />
                   <Button
                     variant="ghost" size="sm"
@@ -262,6 +297,37 @@ export default function PerformanceReportPage() {
                   <div key={label} className="bg-muted/50 rounded-lg p-2">
                     <p className={cn("text-xl font-bold font-heading", cls)}>{value}</p>
                     <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 text-center">
+                {[
+                  {
+                    label: "Attendance",
+                    value: emp.attendance.attendanceRate === null ? "No records" : `${emp.attendance.attendanceRate}%`,
+                    detail: `${emp.attendance.presentDays} present · ${emp.attendance.halfDays} half · ${emp.attendance.absentDays} absent`,
+                  },
+                  {
+                    label: "Late / Leave",
+                    value: `${emp.attendance.lateDays} late`,
+                    detail: `${emp.attendance.leaveDays} leave days`,
+                  },
+                  {
+                    label: "Tracked Time",
+                    value: `${(emp.trackedMinutes / 60).toFixed(1)} hrs`,
+                    detail: `${emp.attendance.overtimeMinutes} overtime minutes`,
+                  },
+                  {
+                    label: "Work Reports",
+                    value: `${emp.workReports.submitted} submitted`,
+                    detail: `${emp.workReports.approved} approved · ${emp.workReports.total} total`,
+                  },
+                ].map(({ label, value, detail }) => (
+                  <div key={label} className="bg-muted/30 rounded-lg p-2">
+                    <p className="text-sm font-semibold">{value}</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{detail}</p>
                   </div>
                 ))}
               </div>

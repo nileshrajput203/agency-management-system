@@ -27,6 +27,27 @@ import { ContentShareDialog } from "@/components/content/content-share-dialog";
 import { ContentPostDrawer } from "@/components/content/content-post-drawer";
 import { esc, openPrintWindow } from "@/lib/pdf-print";
 
+async function copyShareLink(url: string) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url);
+      return true;
+    }
+  } catch {
+    // Fall through to the copy fallback for browsers that deny clipboard access.
+  }
+  const input = document.createElement("textarea");
+  input.value = url;
+  input.setAttribute("readonly", "");
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  document.body.appendChild(input);
+  input.select();
+  const copied = document.execCommand("copy");
+  document.body.removeChild(input);
+  return copied;
+}
+
 export default function ContentPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -55,19 +76,19 @@ export default function ContentPage() {
   });
   // Use the full client list only when the account has Clients access. Content
   // users without it can still choose clients already represented in content.
-  const clientHistory = contentHistory ?? posts ?? [];
-  const clients = canViewClientDirectory
-    ? (clientDirectory ?? [])
-    : Array.from(
-        new Map(
-          clientHistory
-            .filter((post: any) => post.clientId)
-            .map((post: any) => [
-              post.clientId,
-              { id: post.clientId, companyName: post.clientName || "Client" },
-            ])
-        ).values()
-      ) as Array<{ id: string; companyName: string }>;
+  const clientHistory = [...(contentHistory ?? []), ...(posts ?? [])];
+  const clientChoices = [
+    ...(canViewClientDirectory ? clientDirectory ?? [] : []),
+    ...clientHistory
+      .filter((post: any) => post.clientId)
+      .map((post: any) => ({
+        id: post.clientId,
+        companyName: post.clientName || "Client",
+      })),
+  ];
+  const clients = Array.from(
+    new Map(clientChoices.map((client: any) => [client.id, client])).values()
+  ) as Array<{ id: string; companyName: string }>;
   const isLoadingClients = canViewClientDirectory
     ? isLoadingClientDirectory
     : Boolean(user) && isLoadingContentHistory;
@@ -125,13 +146,15 @@ export default function ContentPage() {
 
   const shareMutation = useCreateCalendarShare({
     mutation: {
-      onSuccess: (share) => {
+      onSuccess: async (share) => {
         const url = buildShareUrl(share.shareToken);
-        navigator.clipboard.writeText(url).then(() => {
+        if (await copyShareLink(url)) {
           setCopiedShareId(share.id);
           toast.success("Share link copied to clipboard!");
           setTimeout(() => setCopiedShareId(null), 3000);
-        });
+        } else {
+          toast.error("Share link created, but automatic copying was blocked. Copy it from the link list.");
+        }
         qc.invalidateQueries({ queryKey: ["listCalendarShares"] });
       },
       onError: () => toast.error("Failed to generate share link"),
@@ -143,7 +166,7 @@ export default function ContentPage() {
       toast.error("Cannot schedule content for past dates. Please select today or a future date.");
       return;
     }
-    setDraft(emptyDraft(defaultDate ?? ""));
+    setDraft(emptyDraft(defaultDate ?? "", activeClientId));
     setNewComment("");
     setPanel({ mode: "create", defaultDate });
   }
@@ -202,7 +225,7 @@ export default function ContentPage() {
       caption: activeDraft.caption || undefined,
       scheduledAt: activeDraft.scheduledAt || undefined,
       shootDate: activeDraft.shootDate || undefined,
-      clientId: activeDraft.clientId || undefined,
+      clientId: activeDraft.clientId || null,
       assetsLink: activeDraft.assetsLink || undefined,
       format: activeDraft.format || undefined,
       needsRevision: String(activeDraft.needsRevision),
@@ -219,7 +242,11 @@ export default function ContentPage() {
 
   function copyExistingShare(shareToken: string, shareId: string) {
     const url = buildShareUrl(shareToken);
-    navigator.clipboard.writeText(url).then(() => {
+    void copyShareLink(url).then((copied) => {
+      if (!copied) {
+        toast.error("Clipboard access was blocked. Please copy the link manually.");
+        return;
+      }
       setCopiedShareId(shareId);
       toast.success("Link copied!");
       setTimeout(() => setCopiedShareId(null), 3000);
@@ -244,6 +271,11 @@ export default function ContentPage() {
       p.clientName?.toLowerCase().includes(q) ||
       p.title?.toLowerCase().includes(q)
     );
+  }).slice().sort((a, b) => {
+    const aDate = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
+    const bDate = b.scheduledAt ? new Date(b.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
+    if (aDate !== bDate) return aDate - bDate;
+    return (a.title ?? "").localeCompare(b.title ?? "");
   });
 
   const postsByDay: Record<string, PostRecord[]> = {};

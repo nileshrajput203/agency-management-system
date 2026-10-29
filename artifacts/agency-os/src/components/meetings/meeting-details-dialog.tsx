@@ -6,7 +6,14 @@ import {
 import {
   Video, Copy, MapPin, Building2, FolderKanban, User, Edit3,
 } from "lucide-react";
-import { MeetingItem, formatDateTime, formatTimeOnly } from "./meeting-helpers";
+import {
+  getMeetingDisplayTitle,
+  MeetingItem,
+  formatDateTime,
+  formatTimeOnly,
+  isShootMeeting,
+  parseMeetingDescription,
+} from "./meeting-helpers";
 
 interface MeetingDetailsDialogProps {
   meeting: MeetingItem | null;
@@ -40,21 +47,57 @@ export function MeetingDetailsDialog({
       <DialogContent className="max-w-md">
         {meeting && (
           <div className="space-y-4">
+            {(() => {
+              const { description, shootDetails } = parseMeetingDescription(meeting.description);
+              const isShoot = isShootMeeting(meeting);
+              return (
+                <>
             <DialogHeader>
               <div className="flex items-center gap-2 mb-1">
                 {getStatusBadge(meeting.status)}
+                {isShoot && <Badge variant="outline" className="border-violet-300 text-violet-700 dark:text-violet-300">Shoot</Badge>}
                 <span className="text-xs text-muted-foreground font-medium">
                   Organized by {meeting.organizerName}
                 </span>
               </div>
-              <DialogTitle className="text-lg font-bold">{meeting.title}</DialogTitle>
+              <DialogTitle className="text-lg font-bold">{getMeetingDisplayTitle(meeting.title)}</DialogTitle>
             </DialogHeader>
 
             <div className="space-y-3 text-xs">
-              {meeting.description && (
+              {description && (
                 <div className="p-3 bg-muted/30 rounded-lg border border-border">
                   <p className="font-semibold text-muted-foreground text-[10px] uppercase mb-1">Agenda / Description</p>
-                  <p className="whitespace-pre-wrap leading-relaxed">{meeting.description}</p>
+                  <p className="whitespace-pre-wrap leading-relaxed">{description}</p>
+                </div>
+              )}
+
+              {shootDetails && (
+                <div className="rounded-lg border border-violet-200 bg-violet-50/60 p-3 space-y-2 dark:border-violet-900 dark:bg-violet-950/20">
+                  <p className="font-semibold text-violet-800 dark:text-violet-300 text-[10px] uppercase tracking-wide">
+                    Shoot brief · {shootDetails.category}
+                  </p>
+                  {[
+                    ["Objective", shootDetails.objective],
+                    ["Shot list", shootDetails.shotList],
+                    ["Deliverables", shootDetails.deliverables],
+                    ["Equipment / Props", shootDetails.equipment],
+                    ["Special instructions", shootDetails.notes],
+                  ].filter(([, value]) => value).map(([label, value]) => (
+                    <div key={label} className="space-y-0.5">
+                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</span>
+                      <p className="whitespace-pre-wrap leading-relaxed">{value}</p>
+                    </div>
+                  ))}
+                  {shootDetails.referenceLink && (
+                    <a
+                      href={shootDetails.referenceLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-block text-blue-600 hover:underline break-all"
+                    >
+                      Open reference
+                    </a>
+                  )}
                 </div>
               )}
 
@@ -112,7 +155,7 @@ export function MeetingDetailsDialog({
               {meeting.attendees && meeting.attendees.length > 0 && (
                 <div className="space-y-1.5 pt-1">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Invited Attendees ({meeting.attendees.length})
+                    {isShoot ? "Assigned Crew" : "Invited Attendees"} ({meeting.attendees.length})
                   </p>
                   <div className="space-y-1 max-h-36 overflow-y-auto">
                     {meeting.attendees.map((a) => (
@@ -159,6 +202,9 @@ export function MeetingDetailsDialog({
                 Close
               </Button>
             </DialogFooter>
+                </>
+              );
+            })()}
           </div>
         )}
       </DialogContent>

@@ -145,7 +145,7 @@ export type PanelState =
   | { mode: "create"; defaultDate?: string }
   | { mode: "edit"; post: PostRecord };
 
-export function emptyDraft(defaultDate?: string) {
+export function emptyDraft(defaultDate?: string, clientId = "") {
   return {
     title: "",
     platform: "INSTAGRAM",
@@ -154,7 +154,7 @@ export function emptyDraft(defaultDate?: string) {
     caption: "",
     scheduledAt: defaultDate ?? "",
     shootDate: "",
-    clientId: "",
+    clientId,
     assetsLink: "",
     format: "",
     needsRevision: false as boolean | string,

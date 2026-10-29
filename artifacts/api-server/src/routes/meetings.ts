@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { meetings, meetingAttendees, notifications, users, clients, projects } from "@workspace/db/schema";
-import { eq, and, sql, inArray, or } from "drizzle-orm";
+import { eq, and, sql, inArray, or, ne } from "drizzle-orm";
 import {
   requirePermission,
   canManageEnabledSection,
@@ -14,6 +14,65 @@ import { NotificationService } from "../services/notificationService";
 import { meetingLogger } from "../lib/logger";
 
 const router = Router();
+const SHOOT_TITLE_PREFIX = "[SHOOT] ";
+const SHOOT_DETAILS_MARKER = "[[AGENCYOS_SHOOT_V1]]";
+
+function normalizeShootDetails(input: any) {
+  const limit = (value: unknown, maxLength: number) =>
+    typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+  return {
+    category: limit(input?.category, 80),
+    objective: limit(input?.objective, 2000),
+    shotList: limit(input?.shotList, 4000),
+    deliverables: limit(input?.deliverables, 3000),
+    equipment: limit(input?.equipment, 2000),
+    referenceLink: limit(input?.referenceLink, 1000),
+    notes: limit(input?.notes, 3000),
+  };
+}
+
+function encodeMeetingDescription(description: unknown, shootDetails?: ReturnType<typeof normalizeShootDetails>) {
+  const plainDescription = typeof description === "string"
+    ? description.replace(/\n?\[\[AGENCYOS_SHOOT_V1\]\][\s\S]*$/, "").trim().slice(0, 5000)
+    : "";
+  if (!shootDetails) return plainDescription || null;
+  const marker = `${SHOOT_DETAILS_MARKER}${encodeURIComponent(JSON.stringify(shootDetails))}`;
+  return `${plainDescription}${plainDescription ? "\n\n" : ""}${marker}`;
+}
+
+async function findCrewConflicts(userIds: string[], start: Date, end: Date, excludeMeetingId?: string) {
+  if (!userIds.length) return [];
+  const conditions = [
+    inArray(meetingAttendees.userId, userIds),
+    eq(meetings.status, "SCHEDULED"),
+    sql`${meetings.startTime} < ${end}`,
+    sql`${meetings.endTime} > ${start}`,
+  ];
+  if (excludeMeetingId) conditions.push(ne(meetings.id, excludeMeetingId));
+  return db.select({
+    userId: meetingAttendees.userId,
+    name: users.name,
+    title: meetings.title,
+  })
+    .from(meetingAttendees)
+    .innerJoin(meetings, eq(meetingAttendees.meetingId, meetings.id))
+    .leftJoin(users, eq(meetingAttendees.userId, users.id))
+    .where(and(...conditions));
+}
+
+function parseStoredShootDetails(description: string | null) {
+  if (!description) return null;
+  const markerIndex = description.lastIndexOf(SHOOT_DETAILS_MARKER);
+  if (markerIndex < 0) return null;
+  try {
+    return normalizeShootDetails(JSON.parse(
+      decodeURIComponent(description.slice(markerIndex + SHOOT_DETAILS_MARKER.length).trim()),
+    ));
+  } catch {
+    return null;
+  }
+}
+
 router.use((req, res, next): void => {
   if (!canManageMeetingWorkspace(
     (req as any).userSystemRole,
@@ -53,7 +112,7 @@ router.get("/", requirePermission("meetings.view"), asyncHandler(async (req, res
   if (isPrivileged) {
     allMeetings = await db.select().from(meetings)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(sql`start_time desc`);
+        .orderBy(sql`start_time asc`);
   } else {
     // For regular employees, find meetings where they are organizer, creator, or attendee
     const attendeeMeetings = await db.select({ meetingId: meetingAttendees.meetingId })
@@ -74,7 +133,7 @@ router.get("/", requirePermission("meetings.view"), asyncHandler(async (req, res
 
     allMeetings = await db.select().from(meetings)
       .where(finalConditions)
-      .orderBy(sql`start_time desc`);
+      .orderBy(sql`start_time asc`);
   }
 
   if (allMeetings.length === 0) {
@@ -224,12 +283,35 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
     clientId,
     projectId,
     attendeeUserIds = [],
+    meetingType = "MEETING",
+    shootDetails,
   } = req.body;
 
   if (typeof title !== "string" || !title.trim() || title.trim().length > 200 || !startTime || !endTime) {
     throw createError("Title, start time, and end time are required", 400);
   }
-  const cleanTitle = title.trim();
+  if (!["MEETING", "SHOOT"].includes(meetingType)) {
+    throw createError("Invalid meeting type", 400);
+  }
+  const isShoot = meetingType === "SHOOT";
+  if (isShoot && !canViewTeam) {
+    throw createError("Forbidden: Enable Team to schedule and assign a shoot", 403);
+  }
+  const plainTitle = title.trim().replace(/^\[SHOOT\]\s*/, "");
+  const cleanTitle = `${isShoot ? SHOOT_TITLE_PREFIX : ""}${plainTitle}`;
+  if (isShoot && plainTitle.length > 194) throw createError("Shoot title must be 194 characters or fewer", 400);
+  const cleanShootDetails = isShoot ? normalizeShootDetails(shootDetails) : undefined;
+  if (isShoot && !cleanShootDetails?.category) {
+    throw createError("Choose a shoot category", 400);
+  }
+  if (cleanShootDetails?.referenceLink) {
+    try {
+      const referenceUrl = new URL(cleanShootDetails.referenceLink);
+      if (!["http:", "https:"].includes(referenceUrl.protocol)) throw new Error("Unsupported protocol");
+    } catch {
+      throw createError("Shoot reference link must use http or https", 400);
+    }
+  }
 
   const start = new Date(startTime);
   const end = new Date(endTime);
@@ -260,7 +342,10 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
   if (!Array.isArray(attendeeUserIds)) {
     throw createError("attendeeUserIds must be an array", 400);
   }
-  const finalAttendeeIds = Array.from(new Set([...attendeeUserIds, userId]));
+  const finalAttendeeIds = Array.from(new Set(isShoot ? attendeeUserIds : [...attendeeUserIds, userId]));
+  if (isShoot && finalAttendeeIds.length === 0) {
+    throw createError("Assign at least one team member to this shoot", 400);
+  }
   if (finalAttendeeIds.some((id) => typeof id !== "string" || !isValidUUID(id))) {
     throw createError("Invalid attendee ID", 400);
   }
@@ -278,6 +363,13 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
   if (activeUsers.length !== finalAttendeeIds.length) {
     throw createError("One or more invitees are inactive or unavailable", 400);
   }
+  if (isShoot) {
+    const conflicts = await findCrewConflicts(finalAttendeeIds, start, end);
+    if (conflicts.length) {
+      const names = Array.from(new Set(conflicts.map((conflict) => conflict.name || "A team member")));
+      throw createError(`Shoot crew already has a scheduled meeting during this time: ${names.join(", ")}`, 409);
+    }
+  }
   const [creator] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId));
   const creatorName = creator?.name || "A user";
 
@@ -287,7 +379,7 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
   const [newMeeting] = await db.insert(meetings).values({
     id: meetingId,
     title: cleanTitle,
-    description: description ?? null,
+    description: encodeMeetingDescription(description, cleanShootDetails),
     meetingLink: meetingLink ?? null,
     startTime: start,
     endTime: end,
@@ -308,7 +400,7 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
       userId: uId,
       name: u?.name ?? null,
       email: u?.email ?? null,
-      status: uId === userId ? "ORGANIZER" : "INVITED",
+      status: !isShoot && uId === userId ? "ORGANIZER" : "INVITED",
     };
   });
 
@@ -345,7 +437,7 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
   }
 
   // Notify only root users and users explicitly granted the Meetings section.
-  const candidates = await db.select({
+  const candidates = isShoot ? [] : await db.select({
     id: users.id,
     systemRole: users.systemRole,
     role: users.role,
@@ -417,10 +509,37 @@ router.put("/:id", requirePermission("meetings.edit"), asyncHandler(async (req, 
     clientId,
     projectId,
     attendeeUserIds,
+    meetingType,
+    shootDetails,
   } = req.body;
 
-  if (!title || !startTime || !endTime) {
+  if (typeof title !== "string" || !title.trim() || !startTime || !endTime) {
     throw createError("Title, start time, and end time are required", 400);
+  }
+  if (meetingType !== undefined && !["MEETING", "SHOOT"].includes(meetingType)) {
+    throw createError("Invalid meeting type", 400);
+  }
+  const isShoot = meetingType === undefined
+    ? existing.title.startsWith(SHOOT_TITLE_PREFIX)
+    : meetingType === "SHOOT";
+  const plainTitle = title.trim().replace(/^\[SHOOT\]\s*/, "");
+  if (plainTitle.length > (isShoot ? 194 : 200)) {
+    throw createError("Meeting title is too long", 400);
+  }
+  const cleanTitle = `${isShoot ? SHOOT_TITLE_PREFIX : ""}${plainTitle}`;
+  const cleanShootDetails = isShoot
+    ? (shootDetails === undefined ? parseStoredShootDetails(existing.description) : normalizeShootDetails(shootDetails)) ?? undefined
+    : undefined;
+  if (isShoot && !cleanShootDetails?.category) {
+    throw createError("Choose a shoot category", 400);
+  }
+  if (cleanShootDetails?.referenceLink) {
+    try {
+      const referenceUrl = new URL(cleanShootDetails.referenceLink);
+      if (!["http:", "https:"].includes(referenceUrl.protocol)) throw new Error("Unsupported protocol");
+    } catch {
+      throw createError("Shoot reference link must use http or https", 400);
+    }
   }
 
   const start = new Date(startTime);
@@ -476,7 +595,10 @@ router.put("/:id", requirePermission("meetings.edit"), asyncHandler(async (req, 
     if (!canViewTeam) {
       throw createError("Forbidden: Enable Team to update meeting invitees", 403);
     }
-    const finalIds = Array.from(new Set([...attendeeUserIds, userId]));
+    const finalIds = Array.from(new Set(isShoot ? attendeeUserIds : [...attendeeUserIds, userId]));
+    if (isShoot && finalIds.length === 0) {
+      throw createError("Assign at least one team member to this shoot", 400);
+    }
     if (finalIds.some((inviteeId) => typeof inviteeId !== "string" || !isValidUUID(inviteeId))) {
       throw createError("Invalid attendee ID", 400);
     }
@@ -499,17 +621,33 @@ router.put("/:id", requirePermission("meetings.edit"), asyncHandler(async (req, 
         userId: inviteeId,
         name: invitee.name,
         email: invitee.email,
-        status: inviteeId === userId ? "ORGANIZER" : "INVITED",
+        status: !isShoot && inviteeId === userId ? "ORGANIZER" : "INVITED",
       };
     });
+  }
+
+  if (isShoot && (status ?? existing.status) === "SCHEDULED") {
+    const assignedIds = attendeesToInsert
+      ? attendeesToInsert.map((attendee) => attendee.userId)
+      : (await db.select({ userId: meetingAttendees.userId })
+          .from(meetingAttendees)
+          .where(eq(meetingAttendees.meetingId, id)))
+          .map((attendee) => attendee.userId)
+          .filter(Boolean) as string[];
+    if (!assignedIds.length) throw createError("Assign at least one team member to this shoot", 400);
+    const conflicts = await findCrewConflicts(assignedIds, start, end, id);
+    if (conflicts.length) {
+      const names = Array.from(new Set(conflicts.map((conflict) => conflict.name || "A team member")));
+      throw createError(`Shoot crew already has a scheduled meeting during this time: ${names.join(", ")}`, 409);
+    }
   }
 
   const durationMinutes = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
 
   const [updatedMeeting] = await db.update(meetings)
     .set({
-      title,
-      description: description ?? null,
+      title: cleanTitle,
+      description: encodeMeetingDescription(description, cleanShootDetails),
       meetingLink: meetingLink ?? null,
       startTime: start,
       endTime: end,
