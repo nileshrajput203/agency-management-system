@@ -26,6 +26,7 @@ export * from "./timeEntries";
 export * from "./auditLogs";
 export * from "./userHiddenItems";
 export * from "./workReports";
+export * from "./financeOperations";
 
 export { usersTable as users } from "./users";
 export { clientsTable as clients } from "./clients";
@@ -57,3 +58,4 @@ export { timeEntriesTable as timeEntries } from "./timeEntries";
 export { auditLogsTable as auditLogs } from "./auditLogs";
 export { userHiddenItemsTable as userHiddenItems } from "./userHiddenItems";
 export { workReportsTable as workReports, workReportVersionsTable as workReportVersions, workReportAuditLogsTable as workReportAuditLogs, workReportReopenRequestsTable as workReportReopenRequests } from "./workReports";
+export { financeSequencesTable as financeSequences, proformaInvoicesTable as proformaInvoices, supplierBillsTable as supplierBills, supplierBillPaymentsTable as supplierBillPayments, employeeExpensesTable as employeeExpenses, clientLifecycleEventsTable as clientLifecycleEvents } from "./financeOperations";
