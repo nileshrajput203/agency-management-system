@@ -215,7 +215,7 @@ export default function ClientsPage() {
       platforms: data.platforms || undefined,
       targetAudience: data.targetAudience || undefined,
       notes: data.notes || undefined,
-      assignedTo: data.assignedTo || undefined,
+      assignedTo: (data.assignedTo && data.assignedTo !== "UNASSIGNED") ? data.assignedTo : undefined,
     };
 
     if (editClient) {

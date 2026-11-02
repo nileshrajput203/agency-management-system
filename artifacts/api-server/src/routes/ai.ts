@@ -1,9 +1,21 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import OpenAI from "openai";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 
 const router = Router();
+
+const aiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "AI rate limit reached. Please wait a few minutes before generating more content." },
+  validate: { trustProxy: false },
+});
+
+router.use(aiLimiter);
 
 // ---------------------------------------------------------------------------
 // Shared AI client factory

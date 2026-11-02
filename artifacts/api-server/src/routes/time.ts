@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
+import { db, timeEntriesTable } from "@workspace/db";
+import { eq, and, gte, lte, desc, isNull } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { sanitizeAndValidate, isValidUUID } from "../lib/validation";
 import { createError } from "../middleware/errorHandler";
@@ -38,19 +39,18 @@ router.post("/timer", requirePermission("time.log"), asyncHandler(async (req, re
 
   const userId = (req as any).userId ?? null;
 
-  const [row] = await db.execute(`
-    INSERT INTO time_entries (id, project_id, user_id, started_at, ended_at, duration_min, note, is_billable)
-    VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7)
-    RETURNING *
-  `, [
-    sanitized.projectId ?? null,
-    userId,
-    sanitized.startedAt ? new Date(sanitized.startedAt) : new Date(),
-    endedAt ? new Date(endedAt) : new Date(),
-    sanitized.minutes ?? null,
-    sanitized.description ?? null,
-    sanitized.billable ?? true,
-  ]);
+  const [row] = await db
+    .insert(timeEntriesTable)
+    .values({
+      projectId: sanitized.projectId ?? null,
+      userId,
+      startedAt: sanitized.startedAt ? new Date(sanitized.startedAt) : new Date(),
+      endedAt: endedAt ? new Date(endedAt) : new Date(),
+      durationMin: sanitized.minutes !== undefined && sanitized.minutes !== null ? Number(sanitized.minutes) : null,
+      note: sanitized.description ?? null,
+      isBillable: sanitized.billable ?? true,
+    })
+    .returning();
 
   return res.status(201).json(row);
 }));
@@ -61,25 +61,40 @@ router.get("/", requirePermission("time.view"), asyncHandler(async (req, res) =>
   const requesterId = (req as any).userId;
   const requesterRole = (req as any).userRole;
 
-  let query = `SELECT * FROM time_entries WHERE 1=1`;
-  const params: unknown[] = [];
-
   const targetUserId = requesterRole === "EMPLOYEE" ? requesterId : (userId || null);
 
-  if (projectId) { params.push(projectId); query += ` AND project_id = $${params.length}`; }
+  const conditions = [isNull(timeEntriesTable.deletedAt)];
+
+  if (projectId) {
+    conditions.push(eq(timeEntriesTable.projectId, projectId));
+  }
   if (targetUserId) {
     if (!isValidUUID(targetUserId)) {
       throw createError("Invalid userId format", 400);
     }
-    params.push(targetUserId);
-    query += ` AND user_id = $${params.length}`;
+    conditions.push(eq(timeEntriesTable.userId, targetUserId));
   }
-  if (from)      { params.push(from);      query += ` AND started_at >= $${params.length}`; }
-  if (to)        { params.push(to);        query += ` AND started_at <= $${params.length}`; }
+  if (from) {
+    const fDate = new Date(from);
+    if (!isNaN(fDate.getTime())) {
+      conditions.push(gte(timeEntriesTable.startedAt, fDate));
+    }
+  }
+  if (to) {
+    const tDate = new Date(to);
+    if (!isNaN(tDate.getTime())) {
+      conditions.push(lte(timeEntriesTable.startedAt, tDate));
+    }
+  }
 
-  query += ` ORDER BY started_at DESC LIMIT 200`;
-  const rows = await db.execute(query, params);
-  return res.json(rows.rows ?? rows);
+  const rows = await db
+    .select()
+    .from(timeEntriesTable)
+    .where(and(...conditions))
+    .orderBy(desc(timeEntriesTable.startedAt))
+    .limit(200);
+
+  return res.json(rows);
 }));
 
 export default router;

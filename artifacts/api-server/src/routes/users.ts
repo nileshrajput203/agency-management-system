@@ -13,7 +13,9 @@ const router = Router();
 
 function sanitizeUser(body: any, isUpdate = false) {
   const result = sanitizeAndValidate(body, {
-    portalMode: ["MODE_1", "MODE_2"],
+    enums: {
+      portalMode: ["MODE_1", "MODE_2"],
+    },
   });
   if (result.systemRole !== undefined && result.systemRole !== null) {
     const normalizedRole = String(result.systemRole).trim().toUpperCase().replace(/[\s-]+/g, "_");

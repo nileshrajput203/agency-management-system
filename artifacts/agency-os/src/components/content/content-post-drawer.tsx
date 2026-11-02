@@ -446,8 +446,12 @@ export function ContentPostDrawer({
                       const formData = new FormData();
                       formData.append("file", file);
                       try {
+                        const token = typeof window !== "undefined"
+                          ? (localStorage.getItem("agency_token") || localStorage.getItem("token") || localStorage.getItem("auth_token") || "")
+                          : "";
                         const res = await fetch("/api/uploads", {
                           method: "POST",
+                          headers: token ? { Authorization: `Bearer ${token}` } : {},
                           body: formData,
                         });
                         if (!res.ok) throw new Error("Upload failed");

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { tasksTable, projectsTable, usersTable } from "@workspace/db/schema";
-import { and, eq, or, sql, desc } from "drizzle-orm";
+import { and, eq, or, sql, desc, asc, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
@@ -98,6 +98,7 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
   if (!isPrivileged) {
     query = query.where(or(
       eq(tasksTable.assigneeId, requesterId),
+      sql`${tasksTable.coAssignees}::text LIKE ${`%"${requesterId}"%`}`,
       and(
         eq(tasksTable.requestedBy, requesterId),
         eq(tasksTable.approvalStatus, "PENDING"),
@@ -240,6 +241,9 @@ router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res
       approvedAt: tasksTable.approvedAt,
       rejectionReason: tasksTable.rejectionReason,
       requestedAt: tasksTable.requestedAt,
+      coAssignees: tasksTable.coAssignees,
+      assignmentNote: tasksTable.assignmentNote,
+      parentId: tasksTable.parentId,
     })
     .from(tasksTable)
     .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
@@ -326,27 +330,21 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
     }
 
     if (sanitized.approvalStatus !== "REJECTED") {
-      if (
-        task.approvalStatus === "PENDING" ||
-        sanitized.status === "DONE" ||
-        sanitized.status === "COMPLETED" ||
-        sanitized.approvalStatus === "APPROVED" ||
-        sanitized.approvalStatus === "MODIFIED" ||
-        !sanitized.approvalStatus
-      ) {
-        // Any task manager can approve a request. Do not leave legacy DONE
-        // values in place when an old request is approved.
-        sanitized.approvalStatus = sanitized.approvalStatus || "APPROVED";
+      if (sanitized.approvalStatus === "APPROVED" || sanitized.approvalStatus === "MODIFIED") {
         sanitized.approvedBy = requesterId;
         sanitized.approvedAt = new Date();
-        // A request submitted as Done/In Review is still awaiting approval.
-        // Approval activates it as To Do; otherwise it is counted as completed
-        // immediately even though the manager has only just approved it.
         if (task.approvalStatus === "PENDING" &&
             (task.status === "DONE" || task.status === "COMPLETED" || task.status === "IN_REVIEW" ||
              sanitized.status === "DONE" || sanitized.status === "COMPLETED" || sanitized.status === "IN_REVIEW")) {
           sanitized.status = "TODO";
         }
+      } else if (sanitized.approvalStatus === "MANAGER_APPROVED") {
+        sanitized.managerApprovedBy = requesterId;
+        sanitized.managerApprovedAt = new Date();
+      } else if (task.approvalStatus === "PENDING" && (sanitized.status === "TODO" || sanitized.status === "IN_PROGRESS")) {
+        sanitized.approvalStatus = "APPROVED";
+        sanitized.approvedBy = requesterId;
+        sanitized.approvedAt = new Date();
       }
 
       if (!sanitized.assigneeId && !task.assigneeId) {
@@ -585,13 +583,30 @@ router.get("/:id/subtasks", requirePermission("tasks.view"), asyncHandler(async 
     }
   }
 
-  const result = await db.execute(
-    `SELECT t.*, u.name as assignee_name FROM tasks t
-     LEFT JOIN users u ON t.assignee_id = u.id
-     WHERE t.parent_id = $1 ORDER BY t.created_at ASC`,
-    [req.params.id]
-  );
-  return res.json(result.rows ?? result);
+  const subtasks = await db
+    .select({
+      id: tasksTable.id,
+      title: tasksTable.title,
+      description: tasksTable.description,
+      status: tasksTable.status,
+      priority: tasksTable.priority,
+      projectId: tasksTable.projectId,
+      assigneeId: tasksTable.assigneeId,
+      assigneeName: usersTable.name,
+      parentId: tasksTable.parentId,
+      coAssignees: tasksTable.coAssignees,
+      startDate: tasksTable.startDate,
+      dueDate: tasksTable.dueDate,
+      approvalStatus: tasksTable.approvalStatus,
+      createdAt: tasksTable.createdAt,
+      updatedAt: tasksTable.updatedAt,
+    })
+    .from(tasksTable)
+    .leftJoin(usersTable, eq(tasksTable.assigneeId, usersTable.id))
+    .where(and(eq(tasksTable.parentId, req.params.id as string), isNull(tasksTable.deletedAt)))
+    .orderBy(asc(tasksTable.createdAt));
+
+  return res.json(subtasks);
 }));
 
 export default router;

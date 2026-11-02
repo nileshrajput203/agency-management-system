@@ -78,6 +78,7 @@ router.get("/", requirePermission("projects.view"), asyncHandler(async (req, res
       updatedAt: projectsTable.updatedAt,
       createdBy: projectsTable.createdBy,
       assignedTo: projectsTable.assignedTo,
+      coAssignees: projectsTable.coAssignees,
       assignedEmployeeName: assignedUserTable.name,
       assignmentStatus: projectsTable.assignmentStatus,
       assignmentDescription: projectsTable.assignmentDescription,
@@ -220,6 +221,7 @@ router.patch("/:id", requirePermission("projects.edit"), asyncHandler(async (req
       !project.assignedTo ||
       project.assignedTo === requesterId ||
       (updaterUserCheck?.name && project.assignedTo.toLowerCase() === updaterUserCheck.name.toLowerCase()) ||
+      (Array.isArray((project as any).coAssignees) && (project as any).coAssignees.includes(requesterId)) ||
       (Array.isArray((project as any).teamMembers) && (project as any).teamMembers.includes(requesterId));
 
     if (!isAssigned) {
@@ -786,13 +788,18 @@ router.post("/:id/requests", requirePermission("projects.view"), asyncHandler(as
     })
     .returning();
 
-  // Notify super admins
-  await NotificationService.createSystemNotification(
-    "SUPER_ADMIN",
-    "PROJECT_REQUEST",
-    `New project request submitted for "${project.name}": ${title || requestType}`,
-    `/projects?tab=requests`
-  ).catch(() => {});
+  // Notify super admins and managers
+  await NotificationService.notifyAdminsAndManagers({
+    title: "New Project Request",
+    message: `New project request submitted for "${project.name}": ${title || requestType}`,
+    type: "PROJECT",
+    priority: "MEDIUM",
+    referenceId: projectId,
+    referenceType: "PROJECT",
+    action: "PROJECT_REQUEST",
+    actionUrl: `/projects?tab=requests`,
+    createdBy: requesterId,
+  }).catch(() => {});
 
   return res.status(201).json(newRequest);
 }));

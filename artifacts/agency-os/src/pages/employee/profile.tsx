@@ -22,20 +22,46 @@ export default function EmployeeProfilePage() {
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "E";
 
-  const handleChangePassword = (e: React.FormEvent) => {
+  const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentPassword) {
+      toast.error("Please enter your current password");
+      return;
+    }
     if (!newPassword || newPassword !== confirmPassword) {
       toast.error("New passwords do not match");
       return;
     }
+    if (newPassword.length < 6) {
+      toast.error("New password must be at least 6 characters");
+      return;
+    }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const token = typeof window !== "undefined"
+        ? (localStorage.getItem("agency_token") || localStorage.getItem("token") || localStorage.getItem("auth_token") || "")
+        : "";
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update password");
+      }
       toast.success("Password updated successfully");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    }, 600);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update password");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

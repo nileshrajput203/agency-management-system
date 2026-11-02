@@ -8,6 +8,9 @@ import { sanitizeAndValidate, isValidUUID } from "../lib/validation";
 import { requirePermission } from "../middleware/auth";
 
 function sanitizeClient(body: any, isUpdate = false) {
+  if (body.assignedTo === "UNASSIGNED" || body.assignedTo === "") {
+    body.assignedTo = null;
+  }
   if (!isUpdate && (!body.companyName || typeof body.companyName !== "string" || body.companyName.trim() === "")) {
     throw createError("Company name is required", 400, undefined, "companyName");
   }
@@ -17,6 +20,7 @@ function sanitizeClient(body: any, isUpdate = false) {
     }
   }
   return sanitizeAndValidate(body, {
+    uuids: body.assignedTo ? ["assignedTo"] : [],
     dates: ["onboardingDate"],
     enums: {
       category: ["RETAINER", "ONE_TIME", "PARTNER", "LEAD", "INACTIVE", "CHURNED"],

@@ -57,11 +57,21 @@ export function ContentShareDialog({
     setShareFormExpiry("");
   };
 
+  const getAuthHeaders = (): Record<string, string> => {
+    const token = typeof window !== "undefined"
+      ? (localStorage.getItem("agency_token") || localStorage.getItem("token") || localStorage.getItem("auth_token") || "")
+      : "";
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   const handleRegenerateShare = async (shareId: string) => {
     setIsRegeneratingShareId(shareId);
     try {
       const res = await fetch(`/api/content/shares/${shareId}/regenerate`, {
         method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+        },
       });
       if (!res.ok) throw new Error("Failed to regenerate share link");
       toast.success("New secure link generated! Previous link has been revoked.");
@@ -77,7 +87,10 @@ export function ContentShareDialog({
     try {
       const res = await fetch(`/api/content/shares/${shareId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify({ isRevoked: !currentRevoked }),
       });
       if (!res.ok) throw new Error("Failed to update link status");
@@ -92,6 +105,9 @@ export function ContentShareDialog({
     try {
       const res = await fetch(`/api/content/shares/${shareId}`, {
         method: "DELETE",
+        headers: {
+          ...getAuthHeaders(),
+        },
       });
       if (!res.ok) throw new Error("Failed to delete share link");
       toast.success("Share link deleted");

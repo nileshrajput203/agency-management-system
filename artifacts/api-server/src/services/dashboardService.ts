@@ -355,8 +355,8 @@ export async function getDashboardStatsService(userId: string) {
   const totalTasks = tasks.length;
   const pendingTasks = tasks.filter((t) => t.status === "TODO").length;
   const inProgressTasks = tasks.filter((t) => t.status === "IN_PROGRESS").length;
-  const completedTasks = tasks.filter((t) => t.status === "COMPLETED").length;
-  const overdueTasks = tasks.filter((t) => t.status !== "COMPLETED" && t.dueDate && new Date(t.dueDate) < now).length;
+  const completedTasks = tasks.filter((t) => t.status === "COMPLETED" || t.status === "DONE").length;
+  const overdueTasks = tasks.filter((t) => t.status !== "COMPLETED" && t.status !== "DONE" && t.dueDate && new Date(t.dueDate) < now).length;
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -364,7 +364,7 @@ export async function getDashboardStatsService(userId: string) {
   todayEnd.setHours(23, 59, 59, 999);
 
   const tasksDueToday = tasks.filter((t) => {
-    if (t.status === "COMPLETED" || !t.dueDate) return false;
+    if (t.status === "COMPLETED" || t.status === "DONE" || !t.dueDate) return false;
     const d = new Date(t.dueDate);
     return d >= todayStart && d <= todayEnd;
   }).length;
@@ -490,7 +490,7 @@ export async function getDashboardStatsService(userId: string) {
   const invoicesGeneratedThisMonth = invoices.filter((i) => i.createdAt && new Date(i.createdAt) >= startOfMonth).length;
   const quotationsGeneratedThisMonth = quotations.filter((q) => q.createdAt && new Date(q.createdAt) >= startOfMonth).length;
   const purchaseOrdersCreatedThisMonth = purchaseOrders.filter((po) => po.createdAt && new Date(po.createdAt) >= startOfMonth).length;
-  const tasksCompletedThisMonth = tasks.filter((t) => t.status === "COMPLETED" && t.updatedAt && new Date(t.updatedAt) >= startOfMonth).length;
+  const tasksCompletedThisMonth = tasks.filter((t) => (t.status === "COMPLETED" || t.status === "DONE") && t.updatedAt && new Date(t.updatedAt) >= startOfMonth).length;
 
   // Upcoming Deadlines
   const upcomingDeadlines: any[] = [];
@@ -512,7 +512,7 @@ export async function getDashboardStatsService(userId: string) {
     }
 
     for (const t of tasks) {
-      if (t.dueDate && t.status !== "COMPLETED") {
+      if (t.dueDate && t.status !== "COMPLETED" && t.status !== "DONE") {
         const d = new Date(t.dueDate);
         if (!isNaN(d.getTime())) {
           upcomingDeadlines.push({
@@ -539,7 +539,7 @@ export async function getDashboardStatsService(userId: string) {
             date: d.toISOString(),
             status: i.status,
             overdue: d < now,
-            extraInfo: `Amount: $${i.total ?? 0}`,
+            extraInfo: `Amount: ₹${i.total ?? 0}`,
           });
         }
       }

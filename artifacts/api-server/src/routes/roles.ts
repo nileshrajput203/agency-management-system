@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { rolesTable, auditLogsTable, usersTable } from "@workspace/db/schema";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { requirePermission } from "../middleware/auth";
@@ -12,7 +12,7 @@ router.get("/", requirePermission("users.view"), asyncHandler(async (_req, res) 
   const roles = await db
     .select({ id: rolesTable.id, name: rolesTable.name, description: rolesTable.description })
     .from(rolesTable)
-    .where(eq(rolesTable.deletedAt, null))
+    .where(isNull(rolesTable.deletedAt))
     .orderBy(asc(rolesTable.name));
   return res.json(roles);
 }));

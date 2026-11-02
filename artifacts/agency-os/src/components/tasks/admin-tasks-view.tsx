@@ -78,6 +78,7 @@ export function AdminTasksView() {
     const rawAssigneeId = formData.get("assigneeId") as string;
     const assigneeId = (!rawAssigneeId || rawAssigneeId === "unassigned") ? null : rawAssigneeId;
     const dueDate = formData.get("dueDate") as string || null;
+    const assignmentNote = (formData.get("assignmentNote") as string) || null;
     const rawCoAssignees = formData.get("coAssignees") as string;
     const coAssignees = rawCoAssignees ? JSON.parse(rawCoAssignees) : [];
 
@@ -90,6 +91,7 @@ export function AdminTasksView() {
         requirements,
         deliverables,
         notes,
+        assignmentNote,
         startDate: startDate ? new Date(startDate).toISOString() : null,
         priority,
         status,
@@ -220,6 +222,7 @@ export function AdminTasksView() {
     const rawAssigneeId = formData.get("assigneeId") as string;
     const assigneeId = (!rawAssigneeId || rawAssigneeId === "unassigned") ? null : rawAssigneeId;
     const dueDate = formData.get("dueDate") as string || null;
+    const assignmentNote = (formData.get("assignmentNote") as string) || null;
     const rawCoAssignees = formData.get("coAssignees") as string;
     const coAssignees = rawCoAssignees ? JSON.parse(rawCoAssignees) : [];
 
@@ -232,6 +235,7 @@ export function AdminTasksView() {
         requirements,
         deliverables,
         notes,
+        assignmentNote,
         startDate: startDate ? new Date(startDate).toISOString() : null,
         priority,
         status,

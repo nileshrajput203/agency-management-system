@@ -9,8 +9,12 @@ import { isValidUUID } from "../lib/validation";
 
 const router = Router();
 
+function getTodayDateStr(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+}
+
 export async function processAutomaticAbsentMarking(targetDateStr?: string) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateStr();
   const targetDate = targetDateStr || today;
 
   const settings = await db.query.agencySettings.findFirst({
@@ -172,7 +176,7 @@ router.post("/attendance/check-in", requirePermission("attendance.view"), asyncH
   const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, userId));
   if (!user) throw createError("Unauthorized", 401);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateStr();
   const existing = await db.query.attendance.findFirst({
     where: and(eq(attendance.userId, userId), eq(attendance.date, today)),
   });
@@ -264,20 +268,42 @@ router.post("/attendance/check-out", requirePermission("attendance.view"), async
   const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, userId));
   if (!user) throw createError("Unauthorized", 401);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateStr();
   const existing = await db.query.attendance.findFirst({
     where: and(eq(attendance.userId, userId), eq(attendance.date, today)),
   });
   if (!existing || !existing.checkInAt || existing.status === "ABSENT") throw createError("No check-in found for today", 400);
   if (existing.checkOutAt) throw createError("Already checked out", 400);
 
+  const settings = await db.query.agencySettings.findFirst({
+    where: eq(agencySettings.id, "default"),
+  });
+  const workDayEnd = settings?.workDayEnd || "18:00";
+  const [endHour, endMin] = workDayEnd.split(":").map(Number);
   const now = new Date();
   const workEnd = new Date();
-  workEnd.setHours(18, 0, 0, 0);
+  workEnd.setHours(endHour || 18, endMin || 0, 0, 0);
   const overtimeMin = Math.max(0, Math.floor((now.getTime() - workEnd.getTime()) / 60000));
 
+  let totalBreakMin = existing.breakDurationMin || 0;
+  let breakEndAt = existing.breakEndAt;
+  let breakStatus = existing.breakStatus || "IDLE";
+  if (existing.breakStatus === "ON_BREAK" && existing.breakStartAt) {
+    const bStart = new Date(existing.breakStartAt);
+    const addedBreak = Math.max(1, Math.round((now.getTime() - bStart.getTime()) / 60000));
+    totalBreakMin += addedBreak;
+    breakEndAt = now;
+    breakStatus = "IDLE";
+  }
+
   const [updated] = await db.update(attendance)
-    .set({ checkOutAt: now, overtimeMin })
+    .set({
+      checkOutAt: now,
+      overtimeMin,
+      breakDurationMin: totalBreakMin,
+      breakEndAt,
+      breakStatus,
+    })
     .where(eq(attendance.id, existing.id))
     .returning();
 
@@ -292,7 +318,7 @@ router.post("/attendance/check-out", requirePermission("attendance.view"), async
 
 router.get("/attendance/today", requirePermission("attendance.view"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateStr();
   const record = await db.query.attendance.findFirst({
     where: and(eq(attendance.userId, userId), eq(attendance.date, today)),
   });
@@ -319,7 +345,7 @@ router.post("/attendance/start-break", requirePermission("attendance.view"), asy
   const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, userId));
   if (!user) throw createError("Unauthorized", 401);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateStr();
   const existing = await db.query.attendance.findFirst({
     where: and(eq(attendance.userId, userId), eq(attendance.date, today)),
   });
@@ -357,7 +383,7 @@ router.post("/attendance/end-break", requirePermission("attendance.view"), async
   const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, userId));
   if (!user) throw createError("Unauthorized", 401);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateStr();
   const existing = await db.query.attendance.findFirst({
     where: and(eq(attendance.userId, userId), eq(attendance.date, today)),
   });
@@ -393,7 +419,7 @@ router.post("/attendance/overtime-check-in", requirePermission("attendance.view"
   const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, userId));
   if (!user) throw createError("Unauthorized", 401);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateStr();
   const existing = await db.query.attendance.findFirst({
     where: and(eq(attendance.userId, userId), eq(attendance.date, today)),
   });
@@ -429,7 +455,7 @@ router.post("/attendance/overtime-check-out", requirePermission("attendance.view
   const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, userId));
   if (!user) throw createError("Unauthorized", 401);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getTodayDateStr();
   const existing = await db.query.attendance.findFirst({
     where: and(eq(attendance.userId, userId), eq(attendance.date, today)),
   });
@@ -446,10 +472,11 @@ router.post("/attendance/overtime-check-out", requirePermission("attendance.view
 
   const now = new Date();
   const otStart = new Date(existing.overtimeCheckInAt);
-  const overtimeMin = Math.max(0, Math.floor((now.getTime() - otStart.getTime()) / 60000));
+  const sessionOtMin = Math.max(0, Math.floor((now.getTime() - otStart.getTime()) / 60000));
+  const totalOvertimeMin = (existing.overtimeMin || 0) + sessionOtMin;
 
   const [updated] = await db.update(attendance)
-    .set({ overtimeCheckOutAt: now, overtimeMin })
+    .set({ overtimeCheckOutAt: now, overtimeMin: totalOvertimeMin })
     .where(eq(attendance.id, existing.id))
     .returning();
 

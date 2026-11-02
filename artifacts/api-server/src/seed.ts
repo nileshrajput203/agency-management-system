@@ -1,23 +1,24 @@
-import { db } from "@workspace/db";
-import { users, agencySettings } from "@workspace/db/schema";
+import { db, usersTable, agencySettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcrypt";
-import { createId } from "@paralleldrive/cuid2";
+import bcrypt from "bcryptjs";
 
 async function seed() {
   console.log("Seeding database...");
 
-  const existing = await db.query.users.findFirst({
-    where: eq(users.email, "admin@agencyps.com"),
-  });
+  const [existing] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, "admin@agencyps.com"))
+    .limit(1);
 
   if (!existing) {
     const passwordHash = await bcrypt.hash("Admin@123", 10);
-    await db.insert(users).values({
-      id: createId(),
+    await db.insert(usersTable).values({
+      id: crypto.randomUUID(),
       email: "admin@agencyps.com",
-      passwordHash,
+      password: passwordHash,
       name: "Super Admin",
+      role: "SUPER_ADMIN",
       systemRole: "SUPER_ADMIN",
       isActive: true,
     });
@@ -26,12 +27,14 @@ async function seed() {
     console.log("✓ Admin user already exists");
   }
 
-  const settings = await db.query.agencySettings.findFirst({
-    where: eq(agencySettings.id, "default"),
-  });
+  const [settings] = await db
+    .select()
+    .from(agencySettingsTable)
+    .where(eq(agencySettingsTable.id, "default"))
+    .limit(1);
 
   if (!settings) {
-    await db.insert(agencySettings).values({
+    await db.insert(agencySettingsTable).values({
       id: "default",
       agencyName: "Blink Beyond",
       primaryColor: "#6366f1",
@@ -49,6 +52,6 @@ async function seed() {
 }
 
 seed().catch((err) => {
-  console.error(err);
+  console.error("Seeding failed:", err);
   process.exit(1);
 });

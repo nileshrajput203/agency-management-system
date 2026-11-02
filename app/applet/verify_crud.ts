@@ -1,6 +1,10 @@
 import pg from 'pg';
 
-const neonUrl = 'postgresql://neondb_owner:npg_hiXFZ8PUsL9m@ep-sparkling-bonus-apfpbh78.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require';
+const neonUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL || '';
+if (!neonUrl) {
+  console.error("DATABASE_URL or NEON_DATABASE_URL environment variable is required.");
+  process.exit(1);
+}
 const dbClient = new pg.Client({ connectionString: neonUrl, ssl: { rejectUnauthorized: false } });
 
 async function queryDb(sql: string, params: any[] = []) {

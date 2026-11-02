@@ -7,7 +7,6 @@ import net from "net";
 import alasql from "alasql";
 import * as schema from "./schema/index.js";
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 if (pg.defaults) {
   (pg.defaults as any).ssl = { rejectUnauthorized: false };
 }

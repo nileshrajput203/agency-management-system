@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
+import { db, contentPostsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate, isValidUUID } from "../lib/validation";
@@ -16,20 +17,18 @@ router.post("/feedback", asyncHandler(async (req, res) => {
   }
 
   const sanitized = sanitizeAndValidate({ postId, comment });
-
   const userId = (req as any).userId ?? null;
 
   // Store as a comment on the content post's comments JSON column
-  // First fetch the post, then append
-  const result = await db.execute(
-    `SELECT id, comments FROM content_posts WHERE id = $1`,
-    [sanitized.postId]
-  );
-  const post = (result.rows ?? result)[0] as { id: string; comments: unknown } | undefined;
+  const [post] = await db
+    .select({ id: contentPostsTable.id, comments: contentPostsTable.comments })
+    .from(contentPostsTable)
+    .where(eq(contentPostsTable.id, sanitized.postId))
+    .limit(1);
+
   if (!post) throw createError("Post not found", 404);
 
-  const existing: Array<{ id: string; userId: string | null; comment: string; createdAt: string }> =
-    Array.isArray(post.comments) ? (post.comments as any[]) : [];
+  const existing = Array.isArray(post.comments) ? post.comments : [];
 
   const newComment = {
     id: crypto.randomUUID(),
@@ -39,10 +38,10 @@ router.post("/feedback", asyncHandler(async (req, res) => {
   };
   const updated = [...existing, newComment];
 
-  await db.execute(
-    `UPDATE content_posts SET comments = $1::jsonb WHERE id = $2`,
-    [JSON.stringify(updated), sanitized.postId]
-  );
+  await db
+    .update(contentPostsTable)
+    .set({ comments: updated })
+    .where(eq(contentPostsTable.id, sanitized.postId));
 
   return res.status(201).json(newComment);
 }));

@@ -21,9 +21,9 @@ function startApiServer() {
     }
   }
 
-  // Hardcoded fallback for production distribution
+  // Fallback to environment variable or local server configuration
   if (!databaseUrl) {
-    databaseUrl = "postgresql://neondb_owner:npg_hiXFZ8PUsL9m@ep-sparkling-bonus-apfpbh78.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require";
+    databaseUrl = process.env.DATABASE_URL || "";
   }
 
   const serverPath = path.resolve(__dirname, '../api-server/dist/index.mjs');

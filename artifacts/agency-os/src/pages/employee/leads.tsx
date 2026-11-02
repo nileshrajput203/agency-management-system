@@ -120,7 +120,7 @@ export default function EmployeeLeadsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {displayLeads.map((l: any) => {
-            const stageConfig = STAGES.find(s => s.key === l.status) || STAGES[0];
+            const stageConfig = STAGES.find(s => s.key === l.stage) || STAGES[0];
             return (
               <Card
                 key={l.id}
@@ -155,10 +155,10 @@ export default function EmployeeLeadsPage() {
                         <span>{l.phone}</span>
                       </div>
                     )}
-                    {l.followUpDate && (
+                    {l.nextCallDate && (
                       <div className="flex items-center gap-2 text-amber-500 font-medium">
                         <Calendar className="h-3.5 w-3.5 shrink-0" />
-                        <span>Follow-up: {formatDateOnly(l.followUpDate)}</span>
+                        <span>Follow-up: {formatDateOnly(l.nextCallDate)}</span>
                       </div>
                     )}
                     {l.description && (

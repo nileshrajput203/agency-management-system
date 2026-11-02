@@ -6,6 +6,7 @@ import { hash, compare } from "bcryptjs";
 import { signToken, signRefreshToken, verifyRefreshToken } from "../lib/jwt";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
+import { requireAuth } from "../middleware/auth";
 import { authLogger } from "../lib/logger";
 import { syncUserEmployeeAndRole } from "../services/userService";
 
@@ -174,9 +175,10 @@ router.post("/auth/register", asyncHandler(async (req, res) => {
       name,
       email,
       password: passwordHash,
-      role: "MANAGER",
-      systemRole: "ACCOUNT_MANAGER",
-      isActive: true,
+      role: "EMPLOYEE",
+      systemRole: "TEAM_MEMBER",
+      portalMode: "MODE_2",
+      isActive: false,
     })
     .returning({
       id: usersTable.id,
@@ -184,14 +186,50 @@ router.post("/auth/register", asyncHandler(async (req, res) => {
       email: usersTable.email,
       role: usersTable.role,
       systemRole: usersTable.systemRole,
+      isActive: usersTable.isActive,
     });
 
   await syncUserEmployeeAndRole(user);
 
   return res.status(201).json({
-    message: "Account created successfully. You can now log in.",
+    message: "Account created successfully. Please wait for administrator approval before logging in.",
     user,
   });
+}));
+
+router.post(["/auth/change-password", "/change-password"], requireAuth, asyncHandler(async (req, res) => {
+  const userId = (req as any).userId;
+  const { currentPassword, newPassword } = req.body || {};
+
+  if (!currentPassword || !newPassword) {
+    throw createError("Both currentPassword and newPassword are required", 400);
+  }
+  if (typeof newPassword !== "string" || newPassword.length < 6) {
+    throw createError("New password must be at least 6 characters", 400);
+  }
+
+  const [user] = await db
+    .select({ id: usersTable.id, password: usersTable.password })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+
+  if (!user) {
+    throw createError("User not found", 404);
+  }
+
+  const matches = await compare(currentPassword, user.password);
+  if (!matches) {
+    throw createError("Incorrect current password", 400);
+  }
+
+  const hashedPassword = await hash(newPassword, 10);
+  await db
+    .update(usersTable)
+    .set({ password: hashedPassword, updatedAt: new Date() })
+    .where(eq(usersTable.id, userId));
+
+  return res.json({ message: "Password updated successfully" });
 }));
 
 export default router;

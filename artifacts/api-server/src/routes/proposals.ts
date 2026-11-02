@@ -43,7 +43,54 @@ const proposalSyncConfig = {
 };
 
 router.get("/", requirePermission("proposals.view"), asyncHandler(async (req, res) => {
-  const rows = await db
+  const [rows, allItems] = await Promise.all([
+    db
+      .select({
+        id: proposalsTable.id,
+        title: proposalsTable.title,
+        clientId: proposalsTable.clientId,
+        clientName: clientsTable.companyName,
+        status: proposalsTable.status,
+        template: proposalsTable.template,
+        value: proposalsTable.value,
+        validUntil: proposalsTable.validUntil,
+        scope: proposalsTable.scope,
+        deliverables: proposalsTable.deliverables,
+        timeline: proposalsTable.timeline,
+        notes: proposalsTable.notes,
+        createdAt: proposalsTable.createdAt,
+      })
+      .from(proposalsTable)
+      .leftJoin(clientsTable, eq(proposalsTable.clientId, clientsTable.id))
+      .orderBy(desc(proposalsTable.createdAt)),
+    db.select().from(proposalItemsTable),
+  ]);
+
+  const itemsByProposal = new Map<string, any[]>();
+  for (const item of allItems) {
+    if (!item.proposalId) continue;
+    const list = itemsByProposal.get(item.proposalId) || [];
+    list.push(item);
+    itemsByProposal.set(item.proposalId, list);
+  }
+
+  const result = rows.map((r) => {
+    const items = itemsByProposal.get(r.id) || [];
+    return {
+      ...r,
+      items,
+      lineItems: items,
+    };
+  });
+
+  return res.json(result);
+}));
+
+router.get("/:id", requirePermission("proposals.view"), asyncHandler(async (req, res) => {
+  if (!isValidUUID(req.params.id)) {
+    throw createError("Invalid proposal ID format", 400);
+  }
+  const [row] = await db
     .select({
       id: proposalsTable.id,
       title: proposalsTable.title,
@@ -61,8 +108,20 @@ router.get("/", requirePermission("proposals.view"), asyncHandler(async (req, re
     })
     .from(proposalsTable)
     .leftJoin(clientsTable, eq(proposalsTable.clientId, clientsTable.id))
-    .orderBy(desc(proposalsTable.createdAt));
-  return res.json(rows);
+    .where(eq(proposalsTable.id, req.params.id as string));
+
+  if (!row) throw createError("Not found", 404);
+
+  const items = await db
+    .select()
+    .from(proposalItemsTable)
+    .where(eq(proposalItemsTable.proposalId, row.id));
+
+  return res.json({
+    ...row,
+    items,
+    lineItems: items,
+  });
 }));
 
 router.post("/", requirePermission("proposals.create"), asyncHandler(async (req, res) => {

@@ -204,7 +204,12 @@ function SalesTasksTab({ onEdit }: { onEdit: (lead: any) => void }) {
   const { data: scheduled = [], isLoading } = useQuery({
     queryKey: ["leads-scheduled"],
     queryFn: async () => {
-      const res = await fetch("/api/leads/scheduled-calls", { credentials: "include" });
+      const token = typeof window !== "undefined"
+        ? (localStorage.getItem("agency_token") || localStorage.getItem("token") || localStorage.getItem("auth_token") || "")
+        : "";
+      const res = await fetch("/api/leads/scheduled-calls", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },

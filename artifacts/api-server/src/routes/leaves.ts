@@ -1,15 +1,38 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { leaveRequests, users } from "@workspace/db/schema";
+import {
+  leaveRequestsTable as leaveRequests,
+  usersTable as users,
+  leaveBalancesTable,
+  attendanceTable,
+} from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { requirePermission } from "../middleware/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate, isValidUUID } from "../lib/validation";
 import { NotificationService } from "../services/notificationService";
-import { notificationLogger } from "../lib/logger";
+import { notificationLogger, logger } from "../lib/logger";
 
 const router = Router();
+
+function getDateRange(startStr: string, endStr: string): string[] {
+  const dates: string[] = [];
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return [startStr];
+  }
+  const curr = new Date(start);
+  while (curr <= end) {
+    const yyyy = curr.getFullYear();
+    const mm = String(curr.getMonth() + 1).padStart(2, "0");
+    const dd = String(curr.getDate()).padStart(2, "0");
+    dates.push(`${yyyy}-${mm}-${dd}`);
+    curr.setDate(curr.getDate() + 1);
+  }
+  return dates.length > 0 ? dates : [startStr];
+}
 
 router.get("/leaves", requirePermission("leave.view"), asyncHandler(async (req, res) => {
   const { userId, status } = req.query as Record<string, string>;
@@ -34,59 +57,58 @@ router.get("/leaves", requirePermission("leave.view"), asyncHandler(async (req, 
     db.select({ id: users.id, name: users.name }).from(users),
   ]);
 
-  const userMap: Record<string, string> = Object.fromEntries(allUsers.map((u) => [u.id, u.name]));
-
-  return res.json(allLeaves.map((l) => ({
-    ...l,
-    userName: userMap[l.userId] ?? null,
-    createdAt: l.createdAt?.toISOString() ?? null,
-  })));
+  const userMap = new Map(allUsers.map((u) => [u.id, u.name]));
+  return res.json(
+    allLeaves.map((l) => ({
+      ...l,
+      userName: userMap.get(l.userId) ?? "Unknown",
+      createdAt: l.createdAt?.toISOString() ?? null,
+    }))
+  );
 }));
 
 router.post("/leaves", requirePermission("leave.apply"), asyncHandler(async (req, res) => {
-  const userId = (req as any).userId;
-  const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, userId));
-  if (!user) throw createError("Unauthorized", 401);
-
-  const { type, startDate, endDate, reason } = req.body;
-  if (!type || !startDate || !endDate) throw createError("type, startDate, and endDate are required", 400);
-
-  const sanitized = sanitizeAndValidate({ type, startDate, endDate, reason }, {
-    textDates: ["startDate", "endDate"],
-    enums: {
-      type: ["CASUAL", "SICK", "EARNED", "UNPAID"],
+  const { type, startDate, endDate, reason } = req.body as {
+    type?: string;
+    startDate?: string;
+    endDate?: string;
+    reason?: string;
+  };
+  const sanitized = sanitizeAndValidate(
+    { type, startDate, endDate, reason },
+    {
+      enums: { type: ["CASUAL", "SICK", "EARNED", "UNPAID"] },
+      textDates: ["startDate", "endDate"],
     }
-  });
+  );
+
+  const userId = (req as any).userId;
+  const [user] = await db.select({ name: users.name }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw createError("User not found", 404);
 
   const [leave] = await db.insert(leaveRequests).values({
-    id: crypto.randomUUID(),
     userId,
-    type: sanitized.type,
+    type: sanitized.type as any,
     startDate: sanitized.startDate,
     endDate: sanitized.endDate,
     reason: sanitized.reason ?? null,
-    status: "PENDING",
   }).returning();
 
-  // Notify Admins about new leave request
+  // Notify admins and managers
   try {
-    const admins = await db.select({ id: users.id }).from(users).where(eq(users.systemRole, "SUPER_ADMIN"));
-    for (const admin of admins) {
-      if (admin.id !== userId) {
-        await NotificationService.createNotification({
-          userId: admin.id,
-          title: "🏖️ New Leave Request",
-          message: `${user.name} applied for ${sanitized.type} leave (${sanitized.startDate} to ${sanitized.endDate})`,
-          type: "LEAVE",
-          priority: "HIGH",
-          referenceId: leave.id,
-          referenceType: "LEAVE",
-          createdBy: userId,
-        });
-      }
-    }
+    await NotificationService.notifyAdminsAndManagers({
+      title: "📋 New Leave Request",
+      message: `${user.name} submitted a ${sanitized.type} leave request (${sanitized.startDate} to ${sanitized.endDate}).`,
+      type: "LEAVE",
+      priority: "HIGH",
+      referenceId: leave.id,
+      referenceType: "LEAVE",
+      createdBy: userId,
+      action: "Review Leave",
+      actionUrl: "/leaves",
+    }, userId);
   } catch (e) {
-    notificationLogger.warn({ err: e }, "Failed to notify admins on leave application");
+    notificationLogger.warn({ err: e }, "Failed to send notifications for leave request");
   }
 
   return res.status(201).json({ ...leave, userName: user.name, createdAt: leave.createdAt?.toISOString() ?? null });
@@ -102,6 +124,82 @@ router.post("/leaves/:id/approve", requirePermission("leave.approve"), asyncHand
     .where(eq(leaveRequests.id, (req.params.id as string)))
     .returning();
   if (!updated) throw createError("Not found", 404);
+
+  const days = getDateRange(updated.startDate, updated.endDate);
+  const numDays = days.length;
+  const startYear = parseInt(updated.startDate.slice(0, 4), 10) || new Date().getFullYear();
+
+  // 1. Update/Upsert leave balances
+  try {
+    const [existingBal] = await db
+      .select()
+      .from(leaveBalancesTable)
+      .where(and(eq(leaveBalancesTable.userId, updated.userId), eq(leaveBalancesTable.year, startYear)))
+      .limit(1);
+
+    const typeKey =
+      updated.type === "CASUAL"
+        ? "casualUsed"
+        : updated.type === "SICK"
+        ? "sickUsed"
+        : updated.type === "EARNED"
+        ? "earnedUsed"
+        : null;
+
+    if (existingBal) {
+      if (typeKey) {
+        await db
+          .update(leaveBalancesTable)
+          .set({
+            [typeKey]: (Number(existingBal[typeKey]) || 0) + numDays,
+            updatedAt: new Date(),
+          })
+          .where(eq(leaveBalancesTable.id, existingBal.id));
+      }
+    } else {
+      await db.insert(leaveBalancesTable).values({
+        id: crypto.randomUUID(),
+        userId: updated.userId,
+        year: startYear,
+        casualTotal: 12,
+        casualUsed: typeKey === "casualUsed" ? numDays : 0,
+        sickTotal: 6,
+        sickUsed: typeKey === "sickUsed" ? numDays : 0,
+        earnedTotal: 15,
+        earnedUsed: typeKey === "earnedUsed" ? numDays : 0,
+        updatedAt: new Date(),
+      });
+    }
+  } catch (err) {
+    logger.warn({ err }, "Error updating leave balance for approved leave");
+  }
+
+  // 2. Mark attendance as ON_LEAVE for all days in range
+  try {
+    for (const dStr of days) {
+      const [existingAtt] = await db
+        .select()
+        .from(attendanceTable)
+        .where(and(eq(attendanceTable.userId, updated.userId), eq(attendanceTable.date, dStr)))
+        .limit(1);
+
+      if (existingAtt) {
+        await db
+          .update(attendanceTable)
+          .set({ status: "ON_LEAVE" })
+          .where(eq(attendanceTable.id, existingAtt.id));
+      } else {
+        await db.insert(attendanceTable).values({
+          id: crypto.randomUUID(),
+          userId: updated.userId,
+          date: dStr,
+          status: "ON_LEAVE",
+        });
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, "Error updating attendance for approved leave");
+  }
 
   // Notify employee
   try {
@@ -175,21 +273,26 @@ router.get("/leaves/balance", requirePermission("leave.view"), asyncHandler(asyn
     throw createError("Invalid userId format", 400);
   }
 
-  const result = await db.execute(
-    `SELECT * FROM leave_balances WHERE user_id = $1 AND year = $2`,
-    [targetUserId, targetYear]
-  );
-  const rows = result.rows ?? result;
-  if (rows.length === 0) {
+  const [bal] = await db
+    .select()
+    .from(leaveBalancesTable)
+    .where(and(eq(leaveBalancesTable.userId, targetUserId), eq(leaveBalancesTable.year, targetYear)))
+    .limit(1);
+
+  if (!bal) {
     // Return default balance if no row exists yet
     return res.json({
-      userId: targetUserId, year: targetYear,
-      casualTotal: 12, casualUsed: 0,
-      sickTotal: 6, sickUsed: 0,
-      earnedTotal: 15, earnedUsed: 0,
+      userId: targetUserId,
+      year: targetYear,
+      casualTotal: 12,
+      casualUsed: 0,
+      sickTotal: 6,
+      sickUsed: 0,
+      earnedTotal: 15,
+      earnedUsed: 0,
     });
   }
-  return res.json(rows[0]);
+  return res.json(bal);
 }));
 
 export default router;
