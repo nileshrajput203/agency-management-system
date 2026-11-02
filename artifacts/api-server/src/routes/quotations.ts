@@ -69,6 +69,8 @@ router.get("/", requirePermission("quotations.view"), asyncHandler(async (req, r
     .select({
       id: quotationsTable.id,
       number: quotationsTable.number,
+      isProforma: quotationsTable.isProforma,
+      proformaNumber: quotationsTable.proformaNumber,
       clientId: quotationsTable.clientId,
       joinedClientName: clientsTable.companyName,
       status: quotationsTable.status,
@@ -184,6 +186,50 @@ router.post("/:id/convert-to-invoice", requirePermission("quotations.edit"), asy
   const invoice = await syncParentInsert(invoiceSyncConfig, body, body);
 
   await db.update(quotationsTable).set({ status: "APPROVED" }).where(eq(quotationsTable.id, (req.params.id as string)));
+
+  return res.status(201).json(invoice);
+}));
+
+router.post("/:id/convert-to-proforma-invoice", requirePermission("quotations.edit"), asyncHandler(async (req, res) => {
+  if (!isValidUUID(req.params.id)) {
+    throw createError("Invalid quotation ID format", 400);
+  }
+  const [quot] = await db.select().from(quotationsTable).where(eq(quotationsTable.id, (req.params.id as string)));
+  if (!quot) throw createError("Quotation not found", 404);
+
+  const existing = await db.select({ number: invoicesTable.number }).from(invoicesTable);
+  const nums = existing
+    .map((r) => r.number)
+    .filter((n): n is string => !!n && n.startsWith("PI-"))
+    .map((n) => parseInt(n.replace("PI-", ""), 10))
+    .filter((n) => !isNaN(n));
+  const nextNum = `PI-${nums.length > 0 ? Math.max(...nums) + 1 : 1001}`;
+
+  const body = {
+    number: nextNum,
+    invoiceType: "PROFORMA",
+    clientId: quot.clientId,
+    status: "DRAFT",
+    subtotal: quot.subtotal,
+    taxAmount: quot.taxAmount,
+    total: quot.total,
+    notes: quot.notes,
+    companyGstin: quot.companyGstin,
+    clientGstin: quot.clientGstin,
+    billingAddress: quot.billingAddress,
+    shippingAddress: quot.shippingAddress,
+    termsAndConditions: quot.termsAndConditions,
+    bankDetails: quot.bankDetails as any,
+    lineItems: quot.lineItems as any,
+  };
+
+  const invoice = await syncParentInsert(invoiceSyncConfig, body, body);
+
+  await db.update(quotationsTable).set({
+    status: "APPROVED",
+    isProforma: "true",
+    proformaNumber: nextNum,
+  }).where(eq(quotationsTable.id, (req.params.id as string)));
 
   return res.status(201).json(invoice);
 }));

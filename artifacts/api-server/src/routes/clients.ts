@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { clientsTable, invoicesTable, projectsTable } from "@workspace/db/schema";
-import { eq, ilike, or, and, inArray } from "drizzle-orm";
+import { clientsTable, invoicesTable, projectsTable, clientLifecycleEventsTable } from "@workspace/db/schema";
+import { eq, ilike, or, and, inArray, desc } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
-import { sanitizeAndValidate } from "../lib/validation";
+import { sanitizeAndValidate, isValidUUID } from "../lib/validation";
 import { requirePermission } from "../middleware/auth";
 
 function sanitizeClient(body: any, isUpdate = false) {
@@ -20,7 +20,9 @@ function sanitizeClient(body: any, isUpdate = false) {
     dates: ["onboardingDate"],
     enums: {
       category: ["RETAINER", "ONE_TIME", "PARTNER", "LEAD", "INACTIVE", "CHURNED"],
+      status: ["ACTIVE", "CONTRACT_PAUSED", "CONTRACT_CLOSED", "DORMANT"],
       health: ["GREEN", "YELLOW", "RED"],
+      paymentBehavior: ["ON_TIME", "ONE_TIME_DELAYED", "FREQUENT_DELAYED"],
     }
   });
 }
@@ -58,7 +60,7 @@ function canManageClientSection(req: any): boolean {
 }
 
 router.get("/", requirePermission("clients.view"), asyncHandler(async (req, res) => {
-  const { search, category } = req.query as Record<string, string>;
+  const { search, category, status } = req.query as Record<string, string>;
   const userId = (req as any).userId;
   const userAllowedModules = (req as any).userAllowedModules ?? [];
   const userViewAllClients = (req as any).userViewAllClients;
@@ -75,6 +77,7 @@ router.get("/", requirePermission("clients.view"), asyncHandler(async (req, res)
     );
   }
   if (category) conditions.push(eq(clientsTable.category, category));
+  if (status) conditions.push(eq(clientsTable.status, status));
 
   if (!canViewAllClients && userId) {
     // Find client IDs associated with projects assigned to this user
@@ -203,6 +206,105 @@ router.post("/:id/recalculate-health", requirePermission("clients.edit"), asyncH
     .returning();
 
   return res.json({ health, client: updated });
+}));
+
+// Close or pause contract without deleting or dismissing the client
+router.post("/:id/close-contract", requirePermission("clients.edit"), asyncHandler(async (req, res) => {
+  if (!canManageClientSection(req)) {
+    throw createError("Forbidden: You cannot modify client contracts", 403);
+  }
+  const clientId = req.params.id as string;
+  const currentUserId = (req as any).userId;
+  const { action, reason, targetRevivalDate, notes } = req.body;
+
+  const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
+  if (!client) throw createError("Client not found", 404);
+
+  const targetStatus = action === "PAUSE" ? "CONTRACT_PAUSED" : "CONTRACT_CLOSED";
+  const now = new Date();
+
+  // 1. Update client status and revival target
+  const [updated] = await db
+    .update(clientsTable)
+    .set({
+      status: targetStatus,
+      statusChangedAt: now,
+      closedAt: now,
+      closeReason: reason || "Contract concluded / deal paused",
+      targetRevivalDate: targetRevivalDate || null,
+      contractNotes: notes || null,
+      updatedAt: now,
+    })
+    .where(eq(clientsTable.id, clientId))
+    .returning();
+
+  // 2. Record lifecycle audit event
+  await db.insert(clientLifecycleEventsTable).values({
+    clientId,
+    fromStatus: client.status,
+    toStatus: targetStatus,
+    effectiveDate: now.toISOString().split("T")[0],
+    reason: reason || (action === "PAUSE" ? "Contract Paused" : "Contract Closed"),
+    notes: notes || null,
+    createdBy: currentUserId,
+  });
+
+  return res.json(updated);
+}));
+
+// Revive client back to ACTIVE
+router.post("/:id/revive", requirePermission("clients.edit"), asyncHandler(async (req, res) => {
+  if (!canManageClientSection(req)) {
+    throw createError("Forbidden: You cannot revive client contracts", 403);
+  }
+  const clientId = req.params.id as string;
+  const currentUserId = (req as any).userId;
+  const { notes } = req.body || {};
+
+  const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
+  if (!client) throw createError("Client not found", 404);
+
+  const now = new Date();
+
+  // 1. Restore client status to ACTIVE, keeping all historical documents intact
+  const [updated] = await db
+    .update(clientsTable)
+    .set({
+      status: "ACTIVE",
+      statusChangedAt: now,
+      revivedAt: now,
+      closedAt: null,
+      closeReason: null,
+      targetRevivalDate: null,
+      contractNotes: notes ? `Revived: ${notes}` : client.contractNotes,
+      updatedAt: now,
+    })
+    .where(eq(clientsTable.id, clientId))
+    .returning();
+
+  // 2. Record lifecycle audit event
+  await db.insert(clientLifecycleEventsTable).values({
+    clientId,
+    fromStatus: client.status,
+    toStatus: "ACTIVE",
+    effectiveDate: now.toISOString().split("T")[0],
+    reason: "Contract Revived / Deal Reactivated",
+    notes: notes || null,
+    createdBy: currentUserId,
+  });
+
+  return res.json(updated);
+}));
+
+// Get client lifecycle events history
+router.get("/:id/lifecycle-history", requirePermission("clients.view"), asyncHandler(async (req, res) => {
+  const clientId = req.params.id as string;
+  const events = await db
+    .select()
+    .from(clientLifecycleEventsTable)
+    .where(eq(clientLifecycleEventsTable.clientId, clientId))
+    .orderBy(desc(clientLifecycleEventsTable.createdAt));
+  return res.json(events);
 }));
 
 router.get(

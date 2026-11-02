@@ -6,6 +6,8 @@ import { clientsTable } from "./clients";
 export const quotationsTable = pgTable("quotations", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   number: text("number"),
+  isProforma: text("is_proforma").default("false"),
+  proformaNumber: text("proforma_number"),
   clientId: text("client_id").references(() => clientsTable.id, { onDelete: "set null" }),
   status: text("status").default("DRAFT"),
   quotationDate: text("quotation_date"),

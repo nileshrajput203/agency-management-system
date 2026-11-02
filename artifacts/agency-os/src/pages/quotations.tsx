@@ -47,12 +47,31 @@ export default function QuotationsPage() {
   const convertMutation = useConvertQuotationToInvoice({
     mutation: {
       onSuccess: () => {
-        toast.success("Converted to invoice!");
+        toast.success("Converted to Tax Invoice!");
         qc.invalidateQueries({ queryKey: getListQuotationsQueryKey() });
       },
       onError: () => toast.error("Conversion failed"),
     },
   });
+
+  const [convertingProformaId, setConvertingProformaId] = useState<string | null>(null);
+  const convertToProforma = async (id: string) => {
+    setConvertingProformaId(id);
+    try {
+      const res = await fetch(`/api/quotations/${id}/convert-to-proforma-invoice`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token")}` },
+      });
+      if (!res.ok) throw new Error();
+      const inv = await res.json();
+      toast.success(`Converted to Proforma Invoice (${inv.number})!`);
+      qc.invalidateQueries({ queryKey: getListQuotationsQueryKey() });
+    } catch {
+      toast.error("Failed to convert to proforma invoice");
+    } finally {
+      setConvertingProformaId(null);
+    }
+  };
 
   if (view === "editor") {
     return (
@@ -160,13 +179,22 @@ export default function QuotationsPage() {
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1 justify-end">
                         {q.status === "APPROVED" && (
-                          <Button
-                            size="sm" variant="outline" className="h-7 text-xs gap-1"
-                            onClick={() => convertMutation.mutate({ id: q.id })}
-                            disabled={convertMutation.isPending}
-                          >
-                            <ArrowRight className="h-3 w-3" /> Invoice
-                          </Button>
+                          <>
+                            <Button
+                              size="sm" variant="outline" className="h-7 text-xs gap-1 border-purple-300 text-purple-700 hover:bg-purple-50"
+                              onClick={() => convertToProforma(q.id)}
+                              disabled={convertingProformaId === q.id}
+                            >
+                              <ArrowRight className="h-3 w-3" /> Proforma (PI)
+                            </Button>
+                            <Button
+                              size="sm" variant="outline" className="h-7 text-xs gap-1"
+                              onClick={() => convertMutation.mutate({ id: q.id })}
+                              disabled={convertMutation.isPending}
+                            >
+                              <ArrowRight className="h-3 w-3" /> Tax Invoice
+                            </Button>
+                          </>
                         )}
                         <Button
                           size="icon" variant="ghost" className="h-7 w-7"

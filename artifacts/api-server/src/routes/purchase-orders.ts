@@ -14,10 +14,11 @@ function sanitizePurchaseOrder(body: any, isUpdate = false) {
   validateLineItems(body, "PurchaseOrders");
   return sanitizeAndValidate(body, {
     uuids: ["clientId", "vendorId"],
-    textDates: ["orderDate", "deliveryDate"],
-    numbers: ["subtotal", "taxAmount", "total"],
+    textDates: ["orderDate", "deliveryDate", "receiptDate"],
+    numbers: ["subtotal", "taxAmount", "total", "cgstAmount", "sgstAmount", "igstAmount"],
     enums: {
       status: ["DRAFT", "SENT", "APPROVED", "ORDERED", "PARTIALLY_RECEIVED", "RECEIVED", "CANCELLED"],
+      paymentMode: ["BANK_TRANSFER", "UPI", "CREDIT_CARD", "CASH", "CHEQUE", "OTHER"],
     }
   });
 }
@@ -44,16 +45,26 @@ const PO_COLS = {
   number: purchaseOrdersTable.number,
   clientId: purchaseOrdersTable.clientId,
   clientName: clientsTable.companyName,
+  vendorId: purchaseOrdersTable.vendorId,
   status: purchaseOrdersTable.status,
   orderDate: purchaseOrdersTable.orderDate,
   deliveryDate: purchaseOrdersTable.deliveryDate,
   companyGstin: purchaseOrdersTable.companyGstin,
   vendorGstin: purchaseOrdersTable.vendorGstin,
+  vendorNameSnapshot: purchaseOrdersTable.vendorNameSnapshot,
   billingAddress: purchaseOrdersTable.billingAddress,
   shippingAddress: purchaseOrdersTable.shippingAddress,
   subtotal: purchaseOrdersTable.subtotal,
   taxAmount: purchaseOrdersTable.taxAmount,
+  cgstAmount: purchaseOrdersTable.cgstAmount,
+  sgstAmount: purchaseOrdersTable.sgstAmount,
+  igstAmount: purchaseOrdersTable.igstAmount,
   total: purchaseOrdersTable.total,
+  receiptNumber: purchaseOrdersTable.receiptNumber,
+  receiptUrl: purchaseOrdersTable.receiptUrl,
+  receiptDate: purchaseOrdersTable.receiptDate,
+  itcEligible: purchaseOrdersTable.itcEligible,
+  paymentMode: purchaseOrdersTable.paymentMode,
   notes: purchaseOrdersTable.notes,
   termsAndConditions: purchaseOrdersTable.termsAndConditions,
   lineItems: purchaseOrdersTable.lineItems,
@@ -102,6 +113,32 @@ router.patch("/:id", requirePermission("purchase_orders.edit"), asyncHandler(asy
   const { id: _id, createdAt: _ts, ...body } = req.body || {};
   const sanitized = sanitizePurchaseOrder(body, true);
   const row = await syncParentUpdate(poSyncConfig, req.params.id as string, sanitized, req.body);
+  if (!row) throw createError("Not found", 404);
+  return res.json(row);
+}));
+
+router.patch("/:id/receipt", requirePermission("purchase_orders.edit"), asyncHandler(async (req, res) => {
+  if (!isValidUUID(req.params.id)) {
+    throw createError("Invalid purchase order ID format", 400);
+  }
+  const { receiptNumber, receiptUrl, receiptDate, itcEligible, paymentMode, vendorGstin, vendorNameSnapshot } = req.body;
+
+  const [row] = await db
+    .update(purchaseOrdersTable)
+    .set({
+      receiptNumber: receiptNumber || null,
+      receiptUrl: receiptUrl || null,
+      receiptDate: receiptDate || null,
+      itcEligible: itcEligible !== undefined ? String(itcEligible) : "true",
+      paymentMode: paymentMode || null,
+      vendorGstin: vendorGstin || undefined,
+      vendorNameSnapshot: vendorNameSnapshot || undefined,
+      status: "RECEIVED",
+      updatedAt: new Date(),
+    })
+    .where(eq(purchaseOrdersTable.id, req.params.id as string))
+    .returning();
+
   if (!row) throw createError("Not found", 404);
   return res.json(row);
 }));

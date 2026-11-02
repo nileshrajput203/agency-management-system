@@ -25,8 +25,10 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
-import { Plus, Trash2, ShoppingCart, Eye, Pencil, Download, Loader2 } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, Eye, Pencil, Download, Loader2, Receipt, FileCheck, Landmark } from "lucide-react";
+import { authHeaders } from "@/components/invoices/invoice-helpers";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
@@ -71,6 +73,41 @@ export default function PurchaseOrdersPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  // Receipt & GST Ledger State
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [receiptTargetPo, setReceiptTargetPo] = useState<any>(null);
+  const [receiptNumber, setReceiptNumber] = useState("");
+  const [receiptDate, setReceiptDate] = useState(new Date().toISOString().split("T")[0]);
+  const [receiptUrl, setReceiptUrl] = useState("");
+  const [vendorGstin, setVendorGstin] = useState("");
+  const [paymentMode, setPaymentMode] = useState("BANK_TRANSFER");
+  const [itcEligible, setItcEligible] = useState(true);
+
+  const handleSaveReceipt = async () => {
+    if (!receiptTargetPo) return;
+    try {
+      const res = await fetch(`/api/purchase-orders/${receiptTargetPo.id}/receipt`, {
+        method: "PATCH",
+        headers: authHeaders(true),
+        body: JSON.stringify({
+          receiptNumber,
+          receiptDate,
+          receiptUrl,
+          vendorGstin,
+          paymentMode,
+          itcEligible,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Vendor receipt & GST Input Credit (ITC) saved!");
+      setReceiptDialogOpen(false);
+      qc.invalidateQueries({ queryKey: getListPurchaseOrdersQueryKey() });
+      qc.invalidateQueries({ queryKey: ["gst-ledger-summary"] });
+    } catch {
+      toast.error("Failed to save receipt details");
+    }
+  };
 
   const { data: orders, isLoading } = useListPurchaseOrders();
   const { data: clients } = useListClients(undefined, {
@@ -519,15 +556,22 @@ export default function PurchaseOrdersPage() {
   }
 
   // ─── List View ───────────────────────────────────────────────────────────────
+  const totalPurchases = (orders ?? []).reduce((acc, o) => acc + (Number(o.total) || 0), 0);
+  const totalTaxPaid = (orders ?? []).reduce((acc, o) => acc + (Number(o.taxAmount) || 0), 0);
+  const eligibleItcTotal = (orders ?? []).filter((o: any) => o.itcEligible !== "false" && o.itcEligible !== false).reduce((acc, o) => acc + (Number(o.taxAmount) || 0), 0);
+  const receiptsLoggedCount = (orders ?? []).filter((o: any) => Boolean(o.receiptNumber)).length;
+
   return (
     <div className="p-6 space-y-5 animated-fade-in">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
             <ShoppingCart className="h-6 w-6 text-primary" />
-            Purchase Orders
+            Purchase Orders & GST Receipts Ledger
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{filtered.length} orders</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Log vendor purchases, incoming bills, and claim GST Input Tax Credit (ITC).
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? "ALL")}>
@@ -545,15 +589,47 @@ export default function PurchaseOrdersPage() {
         </div>
       </div>
 
+      {/* Accountant GST & Receipts Overview Card */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Total PO Purchases</p>
+            <p className="text-xl font-bold font-mono mt-1">₹{totalPurchases.toLocaleString("en-IN")}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{(orders ?? []).length} total purchase orders</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Input GST Paid</p>
+            <p className="text-xl font-bold font-mono mt-1 text-slate-700 dark:text-slate-300">₹{totalTaxPaid.toLocaleString("en-IN")}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Total GST paid to vendors</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-emerald-500">
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Eligible ITC Claim</p>
+            <p className="text-xl font-bold font-mono mt-1 text-emerald-600">₹{eligibleItcTotal.toLocaleString("en-IN")}</p>
+            <p className="text-[11px] text-emerald-600 mt-0.5">Input Tax Credit against output GST</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Receipts Logged</p>
+            <p className="text-xl font-bold font-mono mt-1 text-primary">{receiptsLoggedCount} / {(orders ?? []).length}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Official bills on record</p>
+          </CardContent>
+        </Card>
+      </div>
+
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
+        <div className="text-center py-16 text-muted-foreground bg-muted/20 border border-dashed rounded-xl p-8">
           <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-20" />
-          <p className="font-medium">No purchase orders yet</p>
-          <p className="text-sm mt-1">Create your first purchase order to get started.</p>
+          <p className="font-medium text-foreground">No purchase orders yet</p>
+          <p className="text-sm mt-1">Create your first purchase order or log incoming vendor receipts.</p>
         </div>
       ) : (
         <Card>
@@ -562,23 +638,63 @@ export default function PurchaseOrdersPage() {
               <TableRow>
                 <TableHead>PO Number</TableHead>
                 <TableHead>Vendor / Client</TableHead>
+                <TableHead>Receipt & Bill</TableHead>
                 <TableHead>Order Date</TableHead>
-                <TableHead>Delivery Date</TableHead>
-                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Total (₹)</TableHead>
+                <TableHead className="text-right">GST (ITC)</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead />
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((po) => {
+              {filtered.map((po: any) => {
                 const sc = STATUS_CONFIG[po.status ?? "DRAFT"] ?? STATUS_CONFIG.DRAFT;
+                const hasReceipt = Boolean(po.receiptNumber);
+                const itcClaim = po.itcEligible !== "false" && po.itcEligible !== false;
+
                 return (
                   <TableRow key={po.id} className="cursor-pointer hover:bg-muted/30" onClick={() => { setSelected(po); setView("detail"); }}>
                     <TableCell className="font-semibold text-primary">{po.number}</TableCell>
-                    <TableCell>{(po as any).clientName ?? "—"}</TableCell>
-                    <TableCell>{po.orderDate ? format(new Date(po.orderDate), "dd MMM yyyy") : "—"}</TableCell>
-                    <TableCell>{po.deliveryDate ? format(new Date(po.deliveryDate), "dd MMM yyyy") : "—"}</TableCell>
-                    <TableCell className="text-right font-medium">₹{(po.total ?? 0).toLocaleString("en-IN")}</TableCell>
+                    <TableCell>
+                      <p className="font-medium">{po.clientName ?? po.vendorNameSnapshot ?? "—"}</p>
+                      {po.vendorGstin && <p className="text-[11px] text-muted-foreground">GSTIN: {po.vendorGstin}</p>}
+                    </TableCell>
+                    <TableCell onClick={e => e.stopPropagation()}>
+                      {hasReceipt ? (
+                        <div>
+                          <Badge variant="outline" className="text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200">
+                            {po.receiptNumber}
+                          </Badge>
+                          {po.receiptDate && <span className="block text-[10px] text-muted-foreground">{po.receiptDate}</span>}
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-[11px] text-amber-600 hover:text-amber-700 p-0"
+                          onClick={() => {
+                            setReceiptTargetPo(po);
+                            setReceiptNumber(po.receiptNumber || "");
+                            setReceiptDate(po.receiptDate || new Date().toISOString().split("T")[0]);
+                            setReceiptUrl(po.receiptUrl || "");
+                            setVendorGstin(po.vendorGstin || "");
+                            setPaymentMode(po.paymentMode || "BANK_TRANSFER");
+                            setItcEligible(po.itcEligible !== "false" && po.itcEligible !== false);
+                            setReceiptDialogOpen(true);
+                          }}
+                        >
+                          + Log Receipt
+                        </Button>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{po.orderDate ? format(new Date(po.orderDate), "dd MMM yyyy") : "—"}</TableCell>
+                    <TableCell className="text-right font-medium font-mono">₹{(po.total ?? 0).toLocaleString("en-IN")}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      <span className={cn(itcClaim ? "text-emerald-600 font-semibold" : "text-muted-foreground")}>
+                        ₹{Number(po.taxAmount ?? 0).toFixed(0)}
+                      </span>
+                      {itcClaim && <span className="block text-[10px] text-emerald-600">ITC Claimable</span>}
+                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Select
                         value={po.status ?? "DRAFT"}
@@ -588,7 +704,7 @@ export default function PurchaseOrdersPage() {
                           }
                         }}
                       >
-                        <SelectTrigger className="h-7 text-xs w-36 border-0 bg-transparent p-0 shadow-none focus:ring-0">
+                        <SelectTrigger className="h-7 text-xs w-32 border-0 bg-transparent p-0 shadow-none focus:ring-0">
                           <Badge className={cn("text-xs border cursor-pointer", sc.className)}>
                             {sc.label}
                           </Badge>
@@ -600,8 +716,26 @@ export default function PurchaseOrdersPage() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell onClick={(e) => e.stopPropagation()} className="text-right">
                       <div className="flex items-center gap-1 justify-end">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-slate-600 hover:text-foreground"
+                          title="Log Vendor Bill & Receipt"
+                          onClick={() => {
+                            setReceiptTargetPo(po);
+                            setReceiptNumber(po.receiptNumber || "");
+                            setReceiptDate(po.receiptDate || new Date().toISOString().split("T")[0]);
+                            setReceiptUrl(po.receiptUrl || "");
+                            setVendorGstin(po.vendorGstin || "");
+                            setPaymentMode(po.paymentMode || "BANK_TRANSFER");
+                            setItcEligible(po.itcEligible !== "false" && po.itcEligible !== false);
+                            setReceiptDialogOpen(true);
+                          }}
+                        >
+                          <Receipt className="h-3.5 w-3.5" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -628,6 +762,77 @@ export default function PurchaseOrdersPage() {
           </Table>
         </Card>
       )}
+
+      {/* Log Receipt & GST Dialog */}
+      <Dialog open={receiptDialogOpen} onOpenChange={setReceiptDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-primary" /> Log Vendor Bill & Receipt: {receiptTargetPo?.number}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            <div className="p-3 bg-muted rounded-lg text-xs space-y-1">
+              <p><span className="text-muted-foreground">PO Total:</span> <span className="font-mono font-bold">₹{Number(receiptTargetPo?.total || 0).toLocaleString("en-IN")}</span></p>
+              <p><span className="text-muted-foreground">PO GST Paid:</span> <span className="font-mono font-bold text-emerald-600">₹{Number(receiptTargetPo?.taxAmount || 0).toLocaleString("en-IN")}</span></p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Vendor Receipt / Invoice Number *</Label>
+              <Input
+                placeholder="e.g. BILL-9824 or REC-2026-01"
+                value={receiptNumber}
+                onChange={e => setReceiptNumber(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Receipt Date</Label>
+                <Input type="date" value={receiptDate} onChange={e => setReceiptDate(e.target.value)} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Payment Mode</Label>
+                <Select value={paymentMode} onValueChange={setPaymentMode}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BANK_TRANSFER">Bank Transfer / NEFT</SelectItem>
+                    <SelectItem value="UPI">UPI</SelectItem>
+                    <SelectItem value="CREDIT_CARD">Credit Card</SelectItem>
+                    <SelectItem value="CHEQUE">Cheque</SelectItem>
+                    <SelectItem value="CASH">Cash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Vendor GSTIN</Label>
+              <Input placeholder="e.g. 27AAAAA0000A1Z5" value={vendorGstin} onChange={e => setVendorGstin(e.target.value)} />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Receipt Document / Bill URL</Label>
+              <Input placeholder="e.g. https://drive.google.com/... or file attachment" value={receiptUrl} onChange={e => setReceiptUrl(e.target.value)} />
+            </div>
+
+            <div className="pt-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={itcEligible} onCheckedChange={(c) => setItcEligible(Boolean(c))} />
+                <span>Eligible for GST Input Tax Credit (ITC)</span>
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setReceiptDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveReceipt}>Save Receipt & Claim ITC</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -51,6 +51,9 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
   const [saving, setSaving] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
   const [sigUploading, setSigUploading] = useState(false);
+  const [invoiceType, setInvoiceType] = useState<"TAX_INVOICE" | "PROFORMA">(
+    ((editData?.invoiceType as string) === "PROFORMA" ? "PROFORMA" : "TAX_INVOICE")
+  );
 
   const biz = loadBiz();
   const defaults: BuilderForm = {
@@ -135,6 +138,7 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
     }));
     const payload = {
       number: data.invoiceNumber || undefined,
+      invoiceType,
       clientId: data.clientId || undefined,
       invoiceDate: data.invoiceDate, dueDate: data.dueDate || undefined,
       currency: data.currency, gstType: data.gstType,
@@ -218,6 +222,34 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
         <Card>
           <CardContent className="p-5">
             <SectionHead icon={<Receipt className="h-4 w-4" />} title="Invoice Details" />
+            
+            <div className="mb-4 p-3 bg-muted/40 rounded-xl border border-border flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <Label className="text-xs font-semibold">Document Type *</Label>
+                <p className="text-xs text-muted-foreground">Select whether this is an official Tax Invoice or an advance Proforma Invoice (PI)</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={invoiceType === "TAX_INVOICE" ? "default" : "outline"}
+                  onClick={() => setInvoiceType("TAX_INVOICE")}
+                  className="text-xs"
+                >
+                  Tax Invoice
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={invoiceType === "PROFORMA" ? "default" : "outline"}
+                  onClick={() => setInvoiceType("PROFORMA")}
+                  className="text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  Proforma Invoice (PI)
+                </Button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs">Invoice No *</Label>

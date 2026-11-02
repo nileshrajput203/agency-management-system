@@ -6,8 +6,14 @@ import { clientsTable } from "./clients";
 export const invoicesTable = pgTable("invoices", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   number: text("number"),
+  invoiceType: text("invoice_type").default("TAX_INVOICE"),
+  originalProformaNumber: text("original_proforma_number"),
+  proformaConvertedAt: timestamp("proforma_converted_at"),
   clientId: text("client_id").references(() => clientsTable.id, { onDelete: "set null" }),
   status: text("status").default("DRAFT"),
+  paymentStatus: text("payment_status").default("PENDING"),
+  delayedDays: real("delayed_days").default(0),
+  paymentNotes: text("payment_notes"),
   invoiceDate: text("invoice_date"),
   dueDate: text("due_date"),
 
@@ -41,6 +47,9 @@ export const invoicesTable = pgTable("invoices", {
   // Financials
   subtotal: real("subtotal").default(0),
   taxAmount: real("tax_amount").default(0),
+  cgstAmount: real("cgst_amount").default(0),
+  sgstAmount: real("sgst_amount").default(0),
+  igstAmount: real("igst_amount").default(0),
   discount: real("discount").default(0),
   discountType: text("discount_type").default("FIXED"),
   total: real("total").default(0),

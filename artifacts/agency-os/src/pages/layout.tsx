@@ -13,7 +13,7 @@ import {
 import {
   LayoutDashboard, Users, TrendingUp, FolderKanban, CheckSquare,
   Calendar, Receipt, FileText, ShoppingCart, ClipboardList, Clock, Umbrella,
-  UserCog, Settings, Sun, Moon, LogOut, ChevronRight, Briefcase, Flame, Sheet, CalendarDays, BarChart3,
+  UserCog, Settings, Sun, Moon, LogOut, ChevronRight, Briefcase, Flame, Sheet, CalendarDays, BarChart3, Wallet,
 } from "lucide-react";
 import { NotificationsPopover } from "@/components/common/NotificationsPopover";
 import { CompanyLogo } from "@/components/common/CompanyLogo";
@@ -57,6 +57,7 @@ const navGroups: NavGroup[] = [
       { label: "Invoices",        href: "/invoices",        icon: <Receipt className="h-4 w-4" /> },
       { label: "Quotations",      href: "/quotations",      icon: <FileText className="h-4 w-4" /> },
       { label: "Purchase Orders", href: "/purchase-orders", icon: <ShoppingCart className="h-4 w-4" /> },
+      { label: "Expenses & Spends", href: "/expenses",      icon: <Wallet className="h-4 w-4 text-amber-500" /> },
       ...(ENABLE_PROPOSALS ? [{ label: "Proposals",       href: "/proposals",       icon: <ClipboardList className="h-4 w-4" /> }] : []),
       { label: "Excel Reports",   href: "/excel-reports",   icon: <Sheet className="h-4 w-4 text-green-600" /> },
     ],

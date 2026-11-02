@@ -22,11 +22,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { useForm, Controller } from "react-hook-form";
-import { Plus, Phone, Mail, Building2, Trash2, Pencil, Users, AlertTriangle, HeartHandshake } from "lucide-react";
+import { Plus, Phone, Mail, Building2, Trash2, Pencil, Users, AlertTriangle, HeartHandshake, PauseCircle, PlayCircle, RefreshCw, Calendar, Clock, DollarSign } from "lucide-react";
 import { SearchBar } from "@/components/common/SearchBar";
 import { cn, extractClientFields } from "@/lib/utils";
 import { useAuth } from "@/App";
 import { canManageModule } from "@/lib/permissions";
+import { authHeaders } from "@/components/invoices/invoice-helpers";
 
 const HEALTH_MAP: Record<string, { label: string; className: string }> = {
   GREEN: { label: "Healthy", className: "bg-emerald-100 text-emerald-700 border-emerald-200" },
@@ -41,6 +42,19 @@ const CATEGORY_MAP: Record<string, string> = {
   CHURNED: "Churned",
 };
 
+const CONTRACT_STATUS_MAP: Record<string, { label: string; className: string }> = {
+  ACTIVE:          { label: "Active Contract",   className: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  CONTRACT_PAUSED: { label: "Contract Paused",   className: "bg-amber-50 text-amber-700 border-amber-200" },
+  CONTRACT_CLOSED: { label: "Contract Closed",   className: "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300" },
+  DORMANT:         { label: "Dormant / Inactive",className: "bg-gray-100 text-gray-600 border-gray-200" },
+};
+
+const PAYMENT_BEHAVIOR_MAP: Record<string, { label: string; className: string }> = {
+  ON_TIME:           { label: "On-Time Payer",       className: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+  ONE_TIME_DELAYED:  { label: "1-Time Delayed Payer",className: "text-amber-700 bg-amber-50 border-amber-200" },
+  FREQUENT_DELAYED:  { label: "Frequent Delayer",    className: "text-rose-700 bg-rose-50 border-rose-200" },
+};
+
 export default function ClientsPage() {
   const { user } = useAuth();
   const isAdmin = canManageModule(user, "clients");
@@ -48,9 +62,56 @@ export default function ClientsPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("ALL");
   const [health, setHealth] = useState("ALL");
+  const [contractFilter, setContractFilter] = useState("ALL");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editClientState, setEditClient] = useState<{ id: string } & ClientInput | null>(null);
   const [serviceType, setServiceType] = useState("SOCIAL_MEDIA");
+
+  // Contract Lifecycle Dialog state
+  const [closeDialogOpen, setCloseDialogOpen] = useState(false);
+  const [closeTargetClient, setCloseTargetClient] = useState<any>(null);
+  const [closeAction, setCloseAction] = useState<"PAUSE" | "CLOSE">("PAUSE");
+  const [closeReason, setCloseReason] = useState("Budget Freeze");
+  const [targetRevivalDate, setTargetRevivalDate] = useState("");
+  const [contractNotes, setContractNotes] = useState("");
+
+  const handleCloseContract = async () => {
+    if (!closeTargetClient) return;
+    try {
+      const res = await fetch(`/api/clients/${closeTargetClient.id}/close-contract`, {
+        method: "POST",
+        headers: authHeaders(true),
+        body: JSON.stringify({
+          action: closeAction,
+          reason: closeReason,
+          targetRevivalDate: targetRevivalDate || undefined,
+          notes: contractNotes || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(closeAction === "PAUSE" ? "Client contract paused" : "Client contract closed (preserved for future revival)");
+      setCloseDialogOpen(false);
+      setCloseTargetClient(null);
+      qc.invalidateQueries({ queryKey: getListClientsQueryKey() });
+    } catch {
+      toast.error("Failed to update contract status");
+    }
+  };
+
+  const handleReviveClient = async (client: any) => {
+    try {
+      const res = await fetch(`/api/clients/${client.id}/revive`, {
+        method: "POST",
+        headers: authHeaders(true),
+        body: JSON.stringify({ notes: "Revived from dashboard" }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(`Client ${client.companyName} revived and restored to Active!`);
+      qc.invalidateQueries({ queryKey: getListClientsQueryKey() });
+    } catch {
+      toast.error("Failed to revive client");
+    }
+  };
 
   const { data: clients, isLoading, isError } = useListClients({
     search: search || undefined,
@@ -164,20 +225,26 @@ export default function ClientsPage() {
     }
   };
 
-  const filtered = (clients ?? []).filter((c) => {
+  const filtered = (clients ?? []).filter((c: any) => {
     if (health !== "ALL" && c.health !== health) return false;
+    const st = c.status || "ACTIVE";
+    if (contractFilter === "ACTIVE" && st !== "ACTIVE") return false;
+    if (contractFilter === "CONTRACT_PAUSED" && st !== "CONTRACT_PAUSED") return false;
+    if (contractFilter === "CONTRACT_CLOSED" && st !== "CONTRACT_CLOSED") return false;
+    if (contractFilter === "NEEDS_REVIVAL" && (st === "ACTIVE" || !c.targetRevivalDate)) return false;
     return true;
   });
 
-  const totalRetainers = (clients ?? []).filter((c) => c.category === "RETAINER").length;
-  const totalAtRisk    = (clients ?? []).filter((c) => c.health === "YELLOW").length;
-  const totalHealthy   = (clients ?? []).filter((c) => c.health === "GREEN").length;
+  const totalActive    = (clients ?? []).filter((c: any) => !c.status || c.status === "ACTIVE").length;
+  const totalPaused    = (clients ?? []).filter((c: any) => c.status === "CONTRACT_PAUSED").length;
+  const totalClosed    = (clients ?? []).filter((c: any) => c.status === "CONTRACT_CLOSED").length;
+  const totalRevival   = (clients ?? []).filter((c: any) => (c.status === "CONTRACT_PAUSED" || c.status === "CONTRACT_CLOSED") && Boolean(c.targetRevivalDate)).length;
 
   const statChips = [
-    { label: "Total Clients", value: clients?.length ?? 0,  accent: "border-l-primary",      icon: <Building2 className="h-4 w-4" /> },
-    { label: "Retainers",     value: totalRetainers,         accent: "border-l-emerald-500",  icon: <HeartHandshake className="h-4 w-4" /> },
-    { label: "At Risk",       value: totalAtRisk,            accent: "border-l-amber-400",    icon: <AlertTriangle className="h-4 w-4" /> },
-    { label: "Healthy",       value: totalHealthy,           accent: "border-l-emerald-400",  icon: <Users className="h-4 w-4" /> },
+    { label: "Total Clients",     value: clients?.length ?? 0, accent: "border-l-primary",      icon: <Building2 className="h-4 w-4" /> },
+    { label: "Active Clients",    value: totalActive,          accent: "border-l-emerald-500",  icon: <HeartHandshake className="h-4 w-4" /> },
+    { label: "Paused Contracts",  value: totalPaused,          accent: "border-l-amber-400",    icon: <PauseCircle className="h-4 w-4" /> },
+    { label: "Closed / Revive",   value: totalClosed,          accent: "border-l-slate-400",    icon: <Clock className="h-4 w-4" /> },
   ];
 
   return (
@@ -185,13 +252,15 @@ export default function ClientsPage() {
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold font-heading">Clients</h1>
+          <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
+            <Users className="h-6 w-6 text-primary" /> Clients & Contract Lifecycle
+          </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {filtered.length} of {clients?.length ?? 0} clients shown
+            {filtered.length} of {clients?.length ?? 0} clients shown • Active, paused contracts, and revival pipeline
           </p>
         </div>
         {isAdmin && (
-          <Button onClick={openAdd} data-testid="add-client-btn" className="gap-2 btn-micro-anim">
+          <Button onClick={openAdd} data-testid="add-client-btn" className="gap-2 btn-micro-anim shadow-sm">
             <Plus className="h-4 w-4" /> Add Client
           </Button>
         )}
@@ -212,7 +281,51 @@ export default function ClientsPage() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Contract Lifecycle Filter Tabs */}
+      <div className="flex items-center gap-1.5 p-1 bg-muted/60 rounded-xl border border-border flex-wrap">
+        <Button
+          size="sm"
+          variant={contractFilter === "ALL" ? "default" : "ghost"}
+          onClick={() => setContractFilter("ALL")}
+          className="text-xs h-7 rounded-lg"
+        >
+          All Clients ({clients?.length ?? 0})
+        </Button>
+        <Button
+          size="sm"
+          variant={contractFilter === "ACTIVE" ? "default" : "ghost"}
+          onClick={() => setContractFilter("ACTIVE")}
+          className="text-xs h-7 rounded-lg text-emerald-700 dark:text-emerald-400 font-medium"
+        >
+          Active Contracts ({totalActive})
+        </Button>
+        <Button
+          size="sm"
+          variant={contractFilter === "CONTRACT_PAUSED" ? "default" : "ghost"}
+          onClick={() => setContractFilter("CONTRACT_PAUSED")}
+          className="text-xs h-7 rounded-lg text-amber-700 dark:text-amber-400 font-medium"
+        >
+          Paused Deals ({totalPaused})
+        </Button>
+        <Button
+          size="sm"
+          variant={contractFilter === "CONTRACT_CLOSED" ? "default" : "ghost"}
+          onClick={() => setContractFilter("CONTRACT_CLOSED")}
+          className="text-xs h-7 rounded-lg"
+        >
+          Closed Contracts ({totalClosed})
+        </Button>
+        <Button
+          size="sm"
+          variant={contractFilter === "NEEDS_REVIVAL" ? "default" : "ghost"}
+          onClick={() => setContractFilter("NEEDS_REVIVAL")}
+          className="text-xs h-7 rounded-lg text-purple-700 dark:text-purple-400 font-medium"
+        >
+          Revival Targets ({totalRevival})
+        </Button>
+      </div>
+
+      {/* Search & Billing/Health Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <SearchBar
           placeholder="Search clients…"
@@ -310,6 +423,34 @@ export default function ClientsPage() {
                     </div>
                     {isAdmin && (
                       <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {(c as any).status === "CONTRACT_PAUSED" || (c as any).status === "CONTRACT_CLOSED" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                            title="Revive Client Contract"
+                            onClick={() => handleReviveClient(c)}
+                          >
+                            <PlayCircle className="h-3.5 w-3.5" /> Revive
+                          </Button>
+                        ) : (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-amber-600 hover:text-amber-700"
+                            title="Pause or Close Contract (Preserves client data for future revival)"
+                            onClick={() => {
+                              setCloseTargetClient(c);
+                              setCloseAction("PAUSE");
+                              setCloseReason("Budget Freeze");
+                              setTargetRevivalDate("");
+                              setContractNotes("");
+                              setCloseDialogOpen(true);
+                            }}
+                          >
+                            <PauseCircle className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(c)} data-testid={`edit-client-${c.id}`}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -320,14 +461,56 @@ export default function ClientsPage() {
                     )}
                   </div>
 
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    <Badge variant="outline" className={cn("text-[11px] border", healthInfo.className)}>
-                      {healthInfo.label}
-                    </Badge>
-                    <Badge variant="secondary" className="text-[11px]">
-                      {CATEGORY_MAP[c.category ?? "RETAINER"] ?? c.category}
-                    </Badge>
+                  {/* Status, Billing, and Payment Behavior Badges */}
+                  <div className="flex flex-wrap gap-1.5 mb-2.5">
+                    {(() => {
+                      const contractSt = CONTRACT_STATUS_MAP[(c as any).status || "ACTIVE"] || CONTRACT_STATUS_MAP.ACTIVE;
+                      const paymentBeh = PAYMENT_BEHAVIOR_MAP[(c as any).paymentBehavior || "ON_TIME"] || PAYMENT_BEHAVIOR_MAP.ON_TIME;
+                      return (
+                        <>
+                          <Badge variant="outline" className={cn("text-[11px] border font-medium", contractSt.className)}>
+                            {contractSt.label}
+                          </Badge>
+                          <Badge variant="outline" className={cn("text-[11px] border font-medium", paymentBeh.className)}>
+                            {paymentBeh.label}
+                          </Badge>
+                          <Badge variant="outline" className={cn("text-[11px] border", healthInfo.className)}>
+                            {healthInfo.label}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[11px]">
+                            {CATEGORY_MAP[c.category ?? "RETAINER"] ?? c.category}
+                          </Badge>
+                        </>
+                      );
+                    })()}
                   </div>
+
+                  {/* Paused / Closed Contract Information & Revival Banner */}
+                  {((c as any).status === "CONTRACT_PAUSED" || (c as any).status === "CONTRACT_CLOSED") && (
+                    <div className="mb-3 p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/20 border border-amber-200/60 text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-amber-800 dark:text-amber-300">
+                          {(c as any).status === "CONTRACT_PAUSED" ? "Contract Paused" : "Contract Closed"}
+                        </span>
+                        {(c as any).targetRevivalDate && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-0.5 rounded">
+                            <Calendar className="h-3 w-3" /> Target: {(c as any).targetRevivalDate}
+                          </span>
+                        )}
+                      </div>
+                      {(c as any).closeReason && (
+                        <p className="text-muted-foreground text-[11px]">Reason: {(c as any).closeReason}</p>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full mt-1.5 h-6 text-xs text-emerald-700 bg-white hover:bg-emerald-50 border-emerald-300 gap-1.5 shadow-xs"
+                        onClick={() => handleReviveClient(c)}
+                      >
+                        <PlayCircle className="h-3.5 w-3.5" /> 1-Click Revive Client
+                      </Button>
+                    </div>
+                  )}
 
                   <div className="space-y-1.5 text-xs text-muted-foreground pt-1 border-t border-border/50">
                     {c.phone && (
@@ -483,6 +666,84 @@ export default function ClientsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close or Pause Contract Dialog */}
+      <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PauseCircle className="h-5 w-5 text-amber-500" />
+              Contract Lifecycle: {closeTargetClient?.companyName}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            <div className="p-3 bg-blue-50/70 dark:bg-blue-950/20 rounded-xl border border-blue-200 text-xs text-blue-800 dark:text-blue-300">
+              <p className="font-semibold mb-0.5">Preserve All Historical Records</p>
+              <p>Closing or pausing this contract keeps all client invoices, proposals, tasks, and project history 100% intact. You can revive this client with 1 click at any time.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Action *</Label>
+              <Select value={closeAction} onValueChange={(v: "PAUSE" | "CLOSE") => setCloseAction(v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PAUSE">Pause Contract (Temporary Hold / Seasonal Break)</SelectItem>
+                  <SelectItem value="CLOSE">Close Deal / Conclude Contract Term</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Reason *</Label>
+              <Select value={closeReason} onValueChange={setCloseReason}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Budget Freeze">Client Budget Freeze</SelectItem>
+                  <SelectItem value="Seasonal Break">Seasonal Break / Festive Off-season</SelectItem>
+                  <SelectItem value="Project Completed">Scope / Project Completed</SelectItem>
+                  <SelectItem value="Internal Restructuring">Client Internal Restructuring</SelectItem>
+                  <SelectItem value="Agency Switch">Switching Vendors Temporarily</SelectItem>
+                  <SelectItem value="Contract Concluded">Contract Concluded on Friendly Terms</SelectItem>
+                  <SelectItem value="Other">Other Reason</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Target Revival Date (Optional)</Label>
+              <Input
+                type="date"
+                value={targetRevivalDate}
+                onChange={e => setTargetRevivalDate(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Set when you expect to follow up or revive this client (e.g. in 2-3 months).
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Internal Handover / Accounting Notes</Label>
+              <Textarea
+                rows={2}
+                placeholder="e.g. Retainer paused for Q3. Promised to reconnect for Diwali campaign in October."
+                value={contractNotes}
+                onChange={e => setContractNotes(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setCloseDialogOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={handleCloseContract}
+            >
+              {closeAction === "PAUSE" ? "Pause Contract" : "Conclude Contract"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -392,6 +392,7 @@ import ExcelReportsPage from "@/pages/excel-reports";
 import NotificationsPage from "@/pages/notifications";
 import WorkReportsPage from "@/pages/work-reports";
 import PerformanceReportPage from "@/pages/performance-report";
+import ExpensesPage from "@/pages/expenses";
 
 // ─── Employee Portal imports ────────────────────────────────────
 import EmployeeLayout from "@/pages/employee/layout";
@@ -446,6 +447,7 @@ const ROUTE_MODULES: Record<string, string | null> = {
   "/quotations": "finance",
   "/proposals": "finance",
   "/purchase-orders": "finance",
+  "/expenses": "finance",
   "/excel-reports": "finance",
   "/users": "team",
   "/settings": "settings",
@@ -667,6 +669,15 @@ function AppRouter() {
               <PurchaseOrdersPage />
             </DashboardLayout>
           </AdminRoute>
+        )}
+      </Route>
+      <Route path="/expenses">
+        {() => (
+          <ProtectedRoute>
+            <DashboardLayout>
+              <ExpensesPage />
+            </DashboardLayout>
+          </ProtectedRoute>
         )}
       </Route>
       <Route path="/proposals">
