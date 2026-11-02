@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { leadsTable } from "@workspace/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, desc } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
@@ -34,7 +34,8 @@ router.get("/", requirePermission("sales.view"), asyncHandler(async (req, res) =
   const rows = await db
     .select()
     .from(leadsTable)
-    .where(canViewWorkspace ? undefined : eq(leadsTable.createdBy, requesterId));
+    .where(canViewWorkspace ? undefined : eq(leadsTable.createdBy, requesterId))
+    .orderBy(desc(leadsTable.createdAt));
   const now = Date.now();
   const result = rows.map((lead) => ({
     ...lead,

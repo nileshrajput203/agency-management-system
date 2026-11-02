@@ -121,6 +121,12 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
+
+  const indexPath = path.resolve(distDir, "index.mjs");
+  const { readFile, writeFile } = await import("node:fs/promises");
+  let code = await readFile(indexPath, "utf8");
+  code = code.replace(/const outputDir = [^;]+;/g, "const outputDir = __dirname;");
+  await writeFile(indexPath, code, "utf8");
 }
 
 buildAll().catch((err) => {

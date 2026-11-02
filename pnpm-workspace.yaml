@@ -3,3 +3,10 @@ packages:
   - 'artifacts/api-server'
   - 'artifacts/mockup-sandbox'
   - 'lib/*'
+
+autoInstallPeers: false
+
+overrides:
+  esbuild: '0.25.8'
+  nanoid: '3.3.18'
+  uuid: '11.1.1'

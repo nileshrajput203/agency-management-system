@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { proposalsTable, proposalItemsTable, clientsTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { syncParentInsert, syncParentUpdate } from "../lib/dbSync";
@@ -60,7 +60,8 @@ router.get("/", requirePermission("proposals.view"), asyncHandler(async (req, re
       createdAt: proposalsTable.createdAt,
     })
     .from(proposalsTable)
-    .leftJoin(clientsTable, eq(proposalsTable.clientId, clientsTable.id));
+    .leftJoin(clientsTable, eq(proposalsTable.clientId, clientsTable.id))
+    .orderBy(desc(proposalsTable.createdAt));
   return res.json(rows);
 }));
 

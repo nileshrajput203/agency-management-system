@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import {
   CalendarDays, Plus, Clock, Video, MapPin, Trash2, ExternalLink,
   FolderKanban, MoreVertical, Edit3, Copy, CheckCircle,
-  XCircle, Search, Eye, Filter
+  XCircle, Search, Eye, Filter, Clapperboard, Camera
 } from "lucide-react";
 import { useListClients, useListProjects, useListUsers } from "@workspace/api-client-react";
 import { cn } from "@/lib/utils";
@@ -50,9 +50,11 @@ export default function MeetingsPage() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "MEETING" | "SHOOT">("ALL");
 
   // Modal States
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [scheduleType, setScheduleType] = useState<"MEETING" | "SHOOT">("MEETING");
   const [modalMode, setModalMode] = useState<"CREATE" | "EDIT">("CREATE");
   const [editingMeeting, setEditingMeeting] = useState<MeetingItem | null>(null);
 
@@ -131,12 +133,21 @@ export default function MeetingsPage() {
   }, [meetings]);
 
   const openCreateDialog = () => {
+    setScheduleType("MEETING");
+    setModalMode("CREATE");
+    setEditingMeeting(null);
+    setDialogOpen(true);
+  };
+
+  const openCreateShootDialog = () => {
+    setScheduleType("SHOOT");
     setModalMode("CREATE");
     setEditingMeeting(null);
     setDialogOpen(true);
   };
 
   const openEditDialog = (m: MeetingItem) => {
+    setScheduleType(isShootMeeting(m) ? "SHOOT" : "MEETING");
     setModalMode("EDIT");
     setEditingMeeting(m);
     setDialogOpen(true);
@@ -226,6 +237,10 @@ export default function MeetingsPage() {
 
   const filteredMeetings = useMemo(() => {
     return meetings.filter((m) => {
+      const isShoot = isShootMeeting(m);
+      if (typeFilter === "MEETING" && isShoot) return false;
+      if (typeFilter === "SHOOT" && !isShoot) return false;
+
       const title = getMeetingDisplayTitle(m.title);
       const matchesSearch =
         searchQuery.trim() === "" ||
@@ -237,7 +252,7 @@ export default function MeetingsPage() {
       const matchesStatus = statusFilter === "ALL" || m.status === statusFilter;
       return matchesSearch && matchesStatus;
     }).sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-  }, [meetings, searchQuery, statusFilter]);
+  }, [meetings, searchQuery, statusFilter, typeFilter]);
 
   return (
     <TooltipProvider>
@@ -246,16 +261,24 @@ export default function MeetingsPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold font-heading flex items-center gap-2">
-              <CalendarDays className="h-6 w-6 text-primary" /> Meetings & Syncs
+              <CalendarDays className="h-6 w-6 text-primary" /> Meetings & Shoots
             </h1>
             <p className="text-xs text-muted-foreground mt-1">
-              Schedule, manage, and coordinate team & client meetings seamlessly.
+              Schedule meetings, coordinate shoots with specific crew members, and manage specifications seamlessly.
             </p>
           </div>
           {isUserAdminOrManager && (
-            <Button onClick={openCreateDialog} className="gap-2 shadow-xs shrink-0">
-              <Plus className="h-4 w-4" /> Schedule Meeting
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                onClick={openCreateShootDialog}
+                className="gap-2 shadow-xs shrink-0 bg-violet-600 hover:bg-violet-700 text-white font-semibold text-xs h-9"
+              >
+                <Clapperboard className="h-4 w-4" /> Schedule Shoot
+              </Button>
+              <Button onClick={openCreateDialog} variant="outline" className="gap-2 shadow-xs shrink-0 text-xs h-9">
+                <Plus className="h-4 w-4" /> Schedule Meeting
+              </Button>
+            </div>
           )}
         </div>
 
@@ -266,13 +289,37 @@ export default function MeetingsPage() {
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search meetings by title, client, or project..."
+              placeholder="Search by title, location, client, or crew member..."
               className="pl-9 text-xs"
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Type Filter */}
+            <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg text-xs">
+              {[
+                { id: "ALL", label: "All Types" },
+                { id: "MEETING", label: "Meetings" },
+                { id: "SHOOT", label: "Shoots" },
+              ].map((tp) => (
+                <button
+                  key={tp.id}
+                  onClick={() => setTypeFilter(tp.id as any)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+                    typeFilter === tp.id
+                      ? "bg-background text-foreground shadow-2xs font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {tp.label}
+                </button>
+              ))}
+            </div>
+
+            <Filter className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:inline" />
+
+            {/* Status Filter */}
             <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg text-xs">
               {["ALL", "SCHEDULED", "COMPLETED", "CANCELLED"].map((st) => (
                 <button
@@ -281,7 +328,7 @@ export default function MeetingsPage() {
                   className={cn(
                     "px-2.5 py-1 rounded-md text-xs font-medium transition-colors capitalize",
                     statusFilter === st
-                      ? "bg-background text-foreground shadow-2xs"
+                      ? "bg-background text-foreground shadow-2xs font-semibold"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -311,18 +358,27 @@ export default function MeetingsPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredMeetings.map((m) => (
+            {filteredMeetings.map((m) => {
+              const isShoot = isShootMeeting(m);
+              const { description: plainDesc, shootDetails } = parseMeetingDescription(m.description);
+              return (
               <Card
                 key={m.id}
-                className="shadow-2xs border border-border hover:border-primary/40 transition-all flex flex-col justify-between overflow-hidden group bg-card"
+                className={cn(
+                  "shadow-2xs border transition-all flex flex-col justify-between overflow-hidden group bg-card",
+                  isShoot
+                    ? "border-violet-300 dark:border-violet-800 hover:border-violet-500 bg-violet-50/15 dark:bg-violet-950/10"
+                    : "border-border hover:border-primary/40"
+                )}
               >
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                       {getStatusBadge(m.status)}
-                      {isShootMeeting(m) && (
-                        <Badge variant="outline" className="text-[10px] border-violet-300 text-violet-700 dark:text-violet-300">
-                          Shoot
+                      {isShoot && (
+                        <Badge className="text-[10px] bg-violet-600 hover:bg-violet-700 text-white border-violet-500 font-bold gap-1 shadow-2xs">
+                          <Clapperboard className="h-3 w-3" />
+                          {shootDetails?.category ? `Shoot · ${shootDetails.category}` : "Shoot"}
                         </Badge>
                       )}
                       {m.clientName && (
@@ -345,7 +401,7 @@ export default function MeetingsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuItem onClick={() => setViewMeeting(m)}>
-                          <Eye className="h-4 w-4 mr-2 text-blue-500" /> View Details
+                          <Eye className="h-4 w-4 mr-2 text-blue-500" /> View Details & Specs
                         </DropdownMenuItem>
 
                         {m.meetingLink && (
@@ -358,7 +414,7 @@ export default function MeetingsPage() {
                           <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => openEditDialog(m)}>
-                              <Edit3 className="h-4 w-4 mr-2 text-amber-500" /> Edit Meeting
+                              <Edit3 className="h-4 w-4 mr-2 text-amber-500" /> {isShoot ? "Edit Shoot Specs" : "Edit Meeting"}
                             </DropdownMenuItem>
 
                             {m.status !== "COMPLETED" && (
@@ -369,7 +425,7 @@ export default function MeetingsPage() {
 
                             {m.status !== "CANCELLED" && (
                               <DropdownMenuItem onClick={() => handleStatusChange(m.id, "CANCELLED")}>
-                                <XCircle className="h-4 w-4 mr-2 text-orange-500" /> Cancel Meeting
+                                <XCircle className="h-4 w-4 mr-2 text-orange-500" /> Cancel {isShoot ? "Shoot" : "Meeting"}
                               </DropdownMenuItem>
                             )}
 
@@ -378,7 +434,7 @@ export default function MeetingsPage() {
                               onClick={() => setDeleteMeetingId(m.id)}
                               className="text-rose-600 dark:text-rose-400 focus:text-rose-600"
                             >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete Meeting
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete {isShoot ? "Shoot" : "Meeting"}
                             </DropdownMenuItem>
                           </>
                         )}
@@ -396,10 +452,33 @@ export default function MeetingsPage() {
 
                 <CardContent className="space-y-3 text-xs flex-1 flex flex-col justify-between">
                   <div>
-                    {parseMeetingDescription(m.description).description && (
+                    {plainDesc && (
                       <p className="text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
-                        {parseMeetingDescription(m.description).description}
+                        {plainDesc}
                       </p>
+                    )}
+
+                    {shootDetails && (
+                      <div className="rounded-lg border border-violet-200/80 bg-violet-50/70 dark:border-violet-900/60 dark:bg-violet-950/30 p-2.5 space-y-1 text-[11px] mb-2">
+                        {shootDetails.objective && (
+                          <p className="line-clamp-1 text-foreground/90">
+                            <span className="font-semibold text-violet-700 dark:text-violet-300">Goal: </span>
+                            {shootDetails.objective}
+                          </p>
+                        )}
+                        {shootDetails.equipment && (
+                          <p className="line-clamp-1 text-muted-foreground">
+                            <span className="font-semibold text-violet-700 dark:text-violet-300">Gear: </span>
+                            {shootDetails.equipment}
+                          </p>
+                        )}
+                        {shootDetails.deliverables && (
+                          <p className="line-clamp-1 text-muted-foreground">
+                            <span className="font-semibold text-violet-700 dark:text-violet-300">Outputs: </span>
+                            {shootDetails.deliverables}
+                          </p>
+                        )}
+                      </div>
                     )}
 
                     <div className="space-y-1.5 text-foreground/90 font-medium">
@@ -467,7 +546,8 @@ export default function MeetingsPage() {
                   )}
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -487,6 +567,7 @@ export default function MeetingsPage() {
           onOpenChange={setDialogOpen}
           modalMode={modalMode}
           meetingToEdit={editingMeeting}
+          initialMeetingType={scheduleType}
           clients={clients}
           projects={projects}
           usersList={usersList}

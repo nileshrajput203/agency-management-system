@@ -419,17 +419,29 @@ router.post("/", requirePermission("meetings.create"), asyncHandler(async (req, 
     minute: "2-digit",
   });
 
-  const notifPayload = {
-    title: `📅 New Meeting: ${cleanTitle}`,
-    message: `${creatorName} invited you to "${cleanTitle}" scheduled for ${formattedTime}.${meetingLink ? ` Link: ${meetingLink}` : ""}`,
-    type: "MEETING",
-    priority: "HIGH" as const,
-    action: "MEETING_INVITED",
-    actionUrl: `/meetings?id=${meetingId}`,
-    referenceId: meetingId,
-    referenceType: "MEETING",
-    createdBy: userId,
-  };
+  const notifPayload = isShoot
+    ? {
+        title: `🎬 New Shoot Scheduled: ${plainTitle}`,
+        message: `${creatorName} assigned you to the ${cleanShootDetails?.category ? `${cleanShootDetails.category} ` : ""}Shoot "${plainTitle}" scheduled for ${formattedTime}.${location ? ` Location: ${location}.` : ""} Please check the call time and shoot specifications.`,
+        type: "MEETING",
+        priority: "HIGH" as const,
+        action: "SHOOT_ASSIGNED",
+        actionUrl: `/meetings?id=${meetingId}`,
+        referenceId: meetingId,
+        referenceType: "MEETING",
+        createdBy: userId,
+      }
+    : {
+        title: `📅 New Meeting: ${cleanTitle}`,
+        message: `${creatorName} invited you to "${cleanTitle}" scheduled for ${formattedTime}.${meetingLink ? ` Link: ${meetingLink}` : ""}`,
+        type: "MEETING",
+        priority: "HIGH" as const,
+        action: "MEETING_INVITED",
+        actionUrl: `/meetings?id=${meetingId}`,
+        referenceId: meetingId,
+        referenceType: "MEETING",
+        createdBy: userId,
+      };
 
   // 1. Notify specific invited attendees
   if (notifyUserIds.length > 0) {

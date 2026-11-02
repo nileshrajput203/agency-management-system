@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { contentPostsTable, clientsTable, clientCalendarSharesTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate, isValidUUID, isPastDate } from "../lib/validation";
@@ -68,7 +68,12 @@ router.get("/", requirePermission("content.view"), asyncHandler(async (req, res)
     .select(CONTENT_COLUMNS)
     .from(contentPostsTable)
     .leftJoin(clientsTable, eq(contentPostsTable.clientId, clientsTable.id))
-    .where(conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : (await import("drizzle-orm")).and(...conditions)) : undefined);
+    .where(conditions.length > 0 ? (conditions.length === 1 ? conditions[0] : (await import("drizzle-orm")).and(...conditions)) : undefined)
+    .orderBy(
+      sql`CASE WHEN ${contentPostsTable.scheduledAt} IS NULL THEN 1 ELSE 0 END`,
+      contentPostsTable.scheduledAt,
+      desc(contentPostsTable.createdAt)
+    );
   return res.json(rows);
 }));
 

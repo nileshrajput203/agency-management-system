@@ -37,6 +37,7 @@ interface MeetingFormDialogProps {
   onOpenChange: (open: boolean) => void;
   modalMode: "CREATE" | "EDIT";
   meetingToEdit?: MeetingItem | null;
+  initialMeetingType?: "MEETING" | "SHOOT";
   clients?: Array<{ id: string; companyName: string }>;
   projects?: Array<{ id: string; name: string }>;
   usersList?: Array<{ id: string; name: string; email: string }>;
@@ -51,6 +52,7 @@ export function MeetingFormDialog({
   onOpenChange,
   modalMode,
   meetingToEdit,
+  initialMeetingType,
   clients,
   projects,
   usersList,
@@ -108,10 +110,10 @@ export function MeetingFormDialog({
       setProjectId("");
       setStatus("SCHEDULED");
       setSelectedUserIds([]);
-      setMeetingType("MEETING");
+      setMeetingType(initialMeetingType ?? "MEETING");
       setShootDetails(EMPTY_SHOOT_DETAILS);
     }
-  }, [modalMode, meetingToEdit, open]);
+  }, [modalMode, meetingToEdit, open, initialMeetingType]);
 
   const toggleUserSelection = (userId: string) => {
     setSelectedUserIds((prev) =>
@@ -149,19 +151,30 @@ export function MeetingFormDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-primary" />
-            {modalMode === "EDIT" ? "Edit Meeting Details" : "Schedule New Meeting"}
+            {meetingType === "SHOOT" ? (
+              <>
+                <Clapperboard className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                {modalMode === "EDIT" ? "Edit Shoot Specifications" : "Schedule Photo / Video Shoot"}
+              </>
+            ) : (
+              <>
+                <CalendarDays className="h-5 w-5 text-primary" />
+                {modalMode === "EDIT" ? "Edit Meeting Details" : "Schedule New Meeting"}
+              </>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-1">
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Meeting Title *</Label>
+            <Label className="text-xs font-semibold">
+              {meetingType === "SHOOT" ? "Shoot Title / Campaign Name *" : "Meeting Title *"}
+            </Label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={meetingType === "SHOOT" ? 194 : 200}
-              placeholder="e.g., Q3 Strategy Review / Client Onboarding Call"
+              placeholder={meetingType === "SHOOT" ? "e.g., Summer Brand Campaign Video Shoot" : "e.g., Q3 Strategy Review / Client Onboarding Call"}
               required
             />
           </div>
@@ -315,7 +328,7 @@ export function MeetingFormDialog({
                   <SelectTrigger><SelectValue placeholder="Choose a shoot type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Choose a shoot type</SelectItem>
-                    {["Product", "Brand / Campaign", "Portrait / Fashion", "Event", "Food", "Property", "Other"].map((category) => (
+                    {["Product", "Brand / Campaign", "Portrait / Fashion", "Event", "Food", "Property", "Commercial", "Social Media Video", "Podcast / Interview", "Other"].map((category) => (
                       <SelectItem key={category} value={category}>{category}</SelectItem>
                     ))}
                   </SelectContent>

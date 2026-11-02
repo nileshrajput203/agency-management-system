@@ -347,18 +347,36 @@ export default function ProjectsPage() {
     );
   };
 
-  const filtered = (projects ?? []).filter((p) => {
-    if (statusFilter === "ACTIVE" && (p.status === "COMPLETED" || p.status === "CANCELLED")) return false;
-    if (statusFilter !== "ALL" && statusFilter !== "ACTIVE" && p.status !== statusFilter) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      const matchName = p.name.toLowerCase().includes(q);
-      const matchClient = p.clientName?.toLowerCase().includes(q);
-      const matchAssigned = p.assignedEmployeeName?.toLowerCase().includes(q);
-      if (!matchName && !matchClient && !matchAssigned) return false;
-    }
-    return true;
-  });
+  const filtered = (projects ?? [])
+    .filter((p) => {
+      if (statusFilter === "ACTIVE" && (p.status === "COMPLETED" || p.status === "CANCELLED")) return false;
+      if (statusFilter !== "ALL" && statusFilter !== "ACTIVE" && p.status !== statusFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const matchName = p.name.toLowerCase().includes(q);
+        const matchClient = p.clientName?.toLowerCase().includes(q);
+        const matchAssigned = p.assignedEmployeeName?.toLowerCase().includes(q);
+        if (!matchName && !matchClient && !matchAssigned) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.dueDate && b.dueDate) {
+        const diff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        if (diff !== 0) return diff;
+      } else if (a.dueDate) {
+        return -1;
+      } else if (b.dueDate) {
+        return 1;
+      }
+      if (a.startDate && b.startDate) {
+        const diff = new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+        if (diff !== 0) return diff;
+      }
+      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bCreated - aCreated;
+    });
 
   const totalNotStarted = (projects ?? []).filter((p) => p.status === "NOT_STARTED" || p.status === "PLANNING").length;
   const totalInProgress = (projects ?? []).filter((p) => p.status === "IN_PROGRESS").length;

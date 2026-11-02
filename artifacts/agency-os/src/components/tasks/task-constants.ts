@@ -31,16 +31,36 @@ const TASK_STATUS_ORDER: Record<string, number> = {
   COMPLETED: 4,
 };
 
-export function sortTasksByDueDate<T extends { dueDate?: string | null; id?: string; status?: string | null }>(tasks: T[]): T[] {
+export function sortTasksByDueDate<T extends { dueDate?: string | null; startDate?: string | null; createdAt?: string | null; id?: string; status?: string | null }>(tasks: T[]): T[] {
   return [...tasks].sort((a, b) => {
-    const statusDiff = (TASK_STATUS_ORDER[a.status ?? "TODO"] ?? 2) - (TASK_STATUS_ORDER[b.status ?? "TODO"] ?? 2);
-    if (statusDiff) return statusDiff;
-    // Undated tasks stay at the bottom; dated tasks are always ascending.
-    if (!a.dueDate && !b.dueDate) return String(a.id ?? "").localeCompare(String(b.id ?? ""));
-    if (!a.dueDate) return 1;
-    if (!b.dueDate) return -1;
-    const diff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-    return diff || String(a.id ?? "").localeCompare(String(b.id ?? ""));
+    // 1. Due date chronological alignment (earliest deadline first)
+    if (a.dueDate && b.dueDate) {
+      const diff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      if (diff !== 0) return diff;
+    } else if (a.dueDate) {
+      return -1;
+    } else if (b.dueDate) {
+      return 1;
+    }
+
+    // 2. Start date alignment (earliest start first)
+    if (a.startDate && b.startDate) {
+      const diff = new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+      if (diff !== 0) return diff;
+    } else if (a.startDate) {
+      return -1;
+    } else if (b.startDate) {
+      return 1;
+    }
+
+    // 3. Fallback to creation date (newest first)
+    if (a.createdAt && b.createdAt) {
+      const diff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (diff !== 0) return diff;
+    }
+
+    // 4. Stable tie-breaker by ID
+    return String(a.id ?? "").localeCompare(String(b.id ?? ""));
   });
 }
 

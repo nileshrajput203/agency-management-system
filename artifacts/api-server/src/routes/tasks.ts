@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { tasksTable, projectsTable, usersTable } from "@workspace/db/schema";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, or, sql, desc } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
@@ -104,6 +104,12 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
       ),
     ));
   }
+
+  query = query.orderBy(
+    sql`CASE WHEN ${tasksTable.dueDate} IS NULL THEN 1 ELSE 0 END`,
+    tasksTable.dueDate,
+    desc(tasksTable.createdAt)
+  );
 
   const rows = await query;
   const hiddenIds = await getHiddenEntityIds(requesterId, "tasks");

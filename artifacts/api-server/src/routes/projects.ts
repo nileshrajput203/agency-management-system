@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { projectsTable, subprojectsTable, clientsTable, usersTable, notifications, projectRequestsTable } from "@workspace/db/schema";
-import { eq, aliasedTable } from "drizzle-orm";
+import { eq, aliasedTable, sql, desc } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
@@ -86,7 +86,12 @@ router.get("/", requirePermission("projects.view"), asyncHandler(async (req, res
     })
     .from(projectsTable)
     .leftJoin(clientsTable, eq(projectsTable.clientId, clientsTable.id))
-    .leftJoin(assignedUserTable, eq(projectsTable.assignedTo, assignedUserTable.id));
+    .leftJoin(assignedUserTable, eq(projectsTable.assignedTo, assignedUserTable.id))
+    .orderBy(
+      sql`CASE WHEN ${projectsTable.dueDate} IS NULL THEN 1 ELSE 0 END`,
+      projectsTable.dueDate,
+      desc(projectsTable.createdAt)
+    );
 
   const rows = await query;
   return res.json(rows);

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { purchaseOrdersTable, purchaseOrderItemsTable, clientsTable } from "@workspace/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { syncParentInsert, syncParentUpdate } from "../lib/dbSync";
@@ -69,7 +69,8 @@ router.get("/", requirePermission("purchase_orders.view"), asyncHandler(async (r
   const rows = await db
     .select(PO_COLS)
     .from(purchaseOrdersTable)
-    .leftJoin(clientsTable, eq(purchaseOrdersTable.clientId, clientsTable.id));
+    .leftJoin(clientsTable, eq(purchaseOrdersTable.clientId, clientsTable.id))
+    .orderBy(desc(purchaseOrdersTable.createdAt));
   return res.json(rows);
 }));
 

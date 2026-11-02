@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { quotationsTable, quotationItemsTable, invoicesTable, invoiceItemsTable, clientsTable } from "@workspace/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, desc } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { syncParentInsert, syncParentUpdate } from "../lib/dbSync";
@@ -110,7 +110,8 @@ router.get("/", requirePermission("quotations.view"), asyncHandler(async (req, r
       createdAt: quotationsTable.createdAt,
     })
     .from(quotationsTable)
-    .leftJoin(clientsTable, eq(quotationsTable.clientId, clientsTable.id));
+    .leftJoin(clientsTable, eq(quotationsTable.clientId, clientsTable.id))
+    .orderBy(desc(quotationsTable.createdAt));
 
   return res.json(rows.map((r) => ({ ...r, clientName: r.clientName || r.joinedClientName || null })));
 }));
