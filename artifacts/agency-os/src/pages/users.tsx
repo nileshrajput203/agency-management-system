@@ -251,7 +251,7 @@ export default function UsersPage() {
 
   return (
     <div className="p-6 animated-fade-in space-y-5">
-      <Tabs defaultValue="directory" className="w-full">
+      <Tabs defaultValue="directory" className="w-full flex-col">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <h1 className="text-2xl font-bold font-heading">Team & Roles</h1>
