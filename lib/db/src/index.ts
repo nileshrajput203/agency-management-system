@@ -35,7 +35,9 @@ while (currentDir && currentDir !== "/") {
     envLoaded = true;
     break;
   }
-  currentDir = path.dirname(currentDir);
+  const parent = path.dirname(currentDir);
+  if (!parent || parent === currentDir) break;
+  currentDir = parent;
 }
 if (!envLoaded && fs.existsSync("/.env")) {
   dotenv.config({ path: "/.env", override: true });
