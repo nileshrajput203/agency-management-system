@@ -24,7 +24,8 @@ import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { canManageModule } from "@/lib/permissions";
 import { useForm, Controller } from "react-hook-form";
 import {
-  Plus, Trash2, Calendar, CheckSquare, Clock, AlertCircle, ListTodo, CheckCircle2, Edit3, EyeOff, Eye
+  Plus, Trash2, Calendar, CheckSquare, Clock, AlertCircle, ListTodo, CheckCircle2, Edit3, EyeOff, Eye,
+  Users, ChevronDown, ChevronUp, Bell, User, Filter, AlertTriangle, ArrowRight, Check
 } from "lucide-react";
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { cn, formatDateOnly } from "@/lib/utils";
@@ -44,8 +45,31 @@ export function AdminTasksView() {
   const [defaultStatus, setDefaultStatus] = useState("TODO");
   const [dragging, setDragging] = useState<string | null>(null);
 
-  // View tabs: "board" (All Tasks), "pending" (Approval Queue), "requests" (My Requests Tracker)
-  const [viewTab, setViewTab] = useState<"board" | "pending" | "requests">("board");
+  // View tabs: "board" (All Tasks), "pending" (Approval Queue), "team-workload" (Daily Tasks & Team Workload), "requests" (My Requests Tracker)
+  const [viewTab, setViewTab] = useState<"board" | "pending" | "team-workload" | "requests">("board");
+  const [teamTaskFilter, setTeamTaskFilter] = useState<"TODAY" | "PENDING" | "OVERDUE" | "MEMBERS">("TODAY");
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [isNotifyingManagers, setIsNotifyingManagers] = useState(false);
+
+  const handleNotifyManagersOfToday = async () => {
+    setIsNotifyingManagers(true);
+    try {
+      const res = await fetch("/api/tasks/notify-daily-summary", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error("Failed to send notification");
+      toast.success(`📢 Managers notified of all today's tasks (${data.totalToday} due today, ${data.totalOverdue} overdue)!`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to notify managers");
+    } finally {
+      setIsNotifyingManagers(false);
+    }
+  };
+
   const [hideCompleted, setHideCompleted] = useState(true);
 
   // Dialog/modal states for administrative actions
@@ -315,6 +339,45 @@ export function AdminTasksView() {
     !isCompletedTask(t.status) && t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(new Date()))
   ).length;
 
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+
+  // All tasks due today across all employees
+  const todaysTasksList = (tasks ?? []).filter((t: any) => {
+    if (isCompletedTask(t.status)) return false;
+    if (!t.dueDate) return false;
+    return t.dueDate.startsWith(todayStr);
+  });
+
+  // All uncompleted/pending tasks across the agency
+  const allPendingTasksList = (tasks ?? []).filter((t: any) => !isCompletedTask(t.status));
+
+  // Overdue tasks across the agency
+  const overdueTasksList = (tasks ?? []).filter((t: any) =>
+    !isCompletedTask(t.status) && t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(new Date()))
+  );
+
+  // Group tasks by team member / employee ("where admin can see how is everyone working")
+  const teamWorkloadList = (users ?? []).map((member: any) => {
+    const memberTasks = (tasks ?? []).filter((t: any) =>
+      t.assigneeId === member.id || (Array.isArray(t.coAssignees) && t.coAssignees.includes(member.id))
+    );
+    const memberToday = memberTasks.filter((t: any) => !isCompletedTask(t.status) && t.dueDate && t.dueDate.startsWith(todayStr));
+    const memberPending = memberTasks.filter((t: any) => !isCompletedTask(t.status));
+    const memberCompleted = memberTasks.filter((t: any) => isCompletedTask(t.status));
+    const memberOverdue = memberTasks.filter((t: any) => !isCompletedTask(t.status) && t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(new Date())));
+
+    return {
+      user: member,
+      tasks: memberTasks,
+      todayTasks: memberToday,
+      pendingTasks: memberPending,
+      completedTasks: memberCompleted,
+      overdueTasks: memberOverdue,
+      totalCount: memberTasks.length,
+      completionRate: memberTasks.length > 0 ? Math.round((memberCompleted.length / memberTasks.length) * 100) : 0,
+    };
+  }).sort((a, b) => b.todayTasks.length - a.todayTasks.length || b.pendingTasks.length - a.pendingTasks.length);
+
   const taskStatChips = [
     { label: "Approved", value: activeTasks.length, accent: "border-l-primary", icon: <ListTodo className="h-4 w-4" /> },
     { label: "Due Today", value: totalDueToday, accent: "border-l-amber-500", icon: <Calendar className="h-4 w-4" /> },
@@ -348,6 +411,7 @@ export function AdminTasksView() {
           <p className="text-sm text-muted-foreground mt-0.5">
             {viewTab === "board" && `${filteredActive.length} of ${activeTasks.length} active company tasks shown`}
             {viewTab === "pending" && `${filteredPending.length} of ${pendingTasks.length} pending requests shown`}
+            {viewTab === "team-workload" && `Tracking ${todaysTasksList.length} tasks due today and ${allPendingTasksList.length} pending tasks across ${teamWorkloadList.length} team members`}
             {viewTab === "requests" && `${filteredRequests.length} of ${myRequests.length} your requests shown`}
           </p>
         </div>
@@ -373,6 +437,21 @@ export function AdminTasksView() {
               {pendingTasks.length > 0 && (
                 <span className="ml-1.5 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                   {pendingTasks.length}
+                </span>
+              )}
+            </Button>
+            <Button
+              variant={viewTab === "team-workload" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewTab("team-workload")}
+              className="text-xs font-semibold px-3 py-1.5 h-auto rounded-md relative flex items-center gap-1.5"
+              id="admin-tab-team-workload"
+            >
+              <Users className="h-3.5 w-3.5 text-primary" />
+              Team Workload & Daily Tasks
+              {totalDueToday > 0 && (
+                <span className="ml-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                  {totalDueToday} today
                 </span>
               )}
             </Button>
@@ -673,7 +752,331 @@ export function AdminTasksView() {
             </div>
           )}
 
-          {/* 3. MY REQUESTS TRACKER */}
+          {/* 3. TEAM WORKLOAD & DAILY TASKS VIEW (Where Admin & Manager see all daily & pending tasks and how everyone is working) */}
+          {viewTab === "team-workload" && (
+            <div className="space-y-6" id="admin-team-workload-view">
+              {/* Top Action Bar & Quick Metrics */}
+              <div className="bg-card border rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mr-1">Filter View:</span>
+                  <Button
+                    size="sm"
+                    variant={teamTaskFilter === "TODAY" ? "default" : "outline"}
+                    onClick={() => setTeamTaskFilter("TODAY")}
+                    className="h-8 text-xs gap-1.5"
+                  >
+                    <Calendar className="h-3.5 w-3.5" />
+                    Today's Tasks ({todaysTasksList.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={teamTaskFilter === "PENDING" ? "default" : "outline"}
+                    onClick={() => setTeamTaskFilter("PENDING")}
+                    className="h-8 text-xs gap-1.5"
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    All Pending ({allPendingTasksList.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={teamTaskFilter === "OVERDUE" ? "default" : "outline"}
+                    onClick={() => setTeamTaskFilter("OVERDUE")}
+                    className="h-8 text-xs gap-1.5"
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5 text-rose-500" />
+                    Overdue ({overdueTasksList.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={teamTaskFilter === "MEMBERS" ? "default" : "outline"}
+                    onClick={() => setTeamTaskFilter("MEMBERS")}
+                    className="h-8 text-xs gap-1.5"
+                  >
+                    <Users className="h-3.5 w-3.5" />
+                    Team Workload Matrix ({teamWorkloadList.length})
+                  </Button>
+                </div>
+
+                {/* 1-Click Notify Managers of Today's Tasks */}
+                <Button
+                  size="sm"
+                  onClick={handleNotifyManagersOfToday}
+                  disabled={isNotifyingManagers}
+                  className="h-8 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white gap-1.5 shadow-xs shrink-0"
+                  title="Sends an in-app briefing notification of all today's tasks and pending workloads to all managers"
+                >
+                  <Bell className="h-3.5 w-3.5 fill-current" />
+                  Notify Managers of Today's Tasks
+                </Button>
+              </div>
+
+              {/* View 3A: Team Member Work Performance Grid ("Where admin can see how is everyone working") */}
+              {(teamTaskFilter === "MEMBERS" || teamTaskFilter === "TODAY") && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold font-heading flex items-center gap-2">
+                      <Users className="h-4 w-4 text-primary" />
+                      Employee Workload & Performance Breakdown
+                    </h3>
+                    <span className="text-xs text-muted-foreground">
+                      Click any employee to inspect their assigned tasks
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                    {teamWorkloadList.map((member) => {
+                      const isExpanded = expandedUserId === member.user.id;
+                      const hasActiveWork = member.todayTasks.length > 0 || member.pendingTasks.length > 0;
+
+                      return (
+                        <Card
+                          key={member.user.id}
+                          className={cn(
+                            "border transition-all bg-card overflow-hidden shadow-2xs hover:border-primary/40",
+                            member.overdueTasks.length > 0 ? "border-rose-300 dark:border-rose-900/50" : "border-border"
+                          )}
+                        >
+                          <div className="p-4 space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-sm shrink-0 border border-primary/20">
+                                  {member.user.name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "U"}
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="font-bold text-sm text-foreground truncate">{member.user.name}</h4>
+                                  <p className="text-[11px] text-muted-foreground truncate">{member.user.email}</p>
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium">
+                                      {member.user.systemRole || member.user.role || "Team Member"}
+                                    </Badge>
+                                    {member.user.department && (
+                                      <span className="text-[10px] text-muted-foreground">• {member.user.department}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <Badge
+                                className={cn(
+                                  "text-[10px] px-2 py-0.5 font-bold shrink-0",
+                                  member.todayTasks.length > 0
+                                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                                    : hasActiveWork
+                                    ? "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30"
+                                    : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                                )}
+                              >
+                                {member.todayTasks.length > 0
+                                  ? `${member.todayTasks.length} Due Today`
+                                  : hasActiveWork
+                                  ? `${member.pendingTasks.length} Active`
+                                  : "All Done"}
+                              </Badge>
+                            </div>
+
+                            {/* Stat counts bar */}
+                            <div className="grid grid-cols-4 gap-1.5 pt-2 border-t text-center">
+                              <div className="p-1.5 rounded bg-muted/40">
+                                <span className="text-[10px] text-muted-foreground block">Today</span>
+                                <span className={cn("text-xs font-bold", member.todayTasks.length > 0 ? "text-amber-600 font-extrabold" : "text-foreground")}>
+                                  {member.todayTasks.length}
+                                </span>
+                              </div>
+                              <div className="p-1.5 rounded bg-muted/40">
+                                <span className="text-[10px] text-muted-foreground block">Pending</span>
+                                <span className="text-xs font-bold text-foreground">{member.pendingTasks.length}</span>
+                              </div>
+                              <div className="p-1.5 rounded bg-muted/40">
+                                <span className="text-[10px] text-muted-foreground block">Overdue</span>
+                                <span className={cn("text-xs font-bold", member.overdueTasks.length > 0 ? "text-rose-600 font-extrabold" : "text-foreground")}>
+                                  {member.overdueTasks.length}
+                                </span>
+                              </div>
+                              <div className="p-1.5 rounded bg-muted/40">
+                                <span className="text-[10px] text-muted-foreground block">Done</span>
+                                <span className="text-xs font-bold text-emerald-600">{member.completedTasks.length}</span>
+                              </div>
+                            </div>
+
+                            {/* Completion Progress Bar */}
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                <span>Task Completion</span>
+                                <span className="font-bold">{member.completionRate}%</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                                  style={{ width: `${member.completionRate}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Expand Tasks Toggle Button */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setExpandedUserId(isExpanded ? null : member.user.id)}
+                              className="w-full h-7 text-xs text-muted-foreground hover:text-foreground justify-between px-2 pt-1 border-t"
+                            >
+                              <span>{isExpanded ? "Hide Assigned Tasks" : `View Assigned Tasks (${member.tasks.length})`}</span>
+                              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                            </Button>
+                          </div>
+
+                          {/* Expanded Task List for this Employee */}
+                          {isExpanded && (
+                            <div className="bg-muted/20 border-t p-3 space-y-2 max-h-60 overflow-y-auto">
+                              {member.tasks.length === 0 ? (
+                                <p className="text-xs text-muted-foreground text-center py-2">No tasks assigned.</p>
+                              ) : (
+                                member.tasks.map((t: any) => {
+                                  const isDueToday = t.dueDate && t.dueDate.startsWith(todayStr);
+                                  const isTaskOverdue = t.dueDate && t.status !== "DONE" && isBefore(parseISO(t.dueDate), startOfDay(new Date()));
+                                  return (
+                                    <div
+                                      key={t.id}
+                                      className={cn(
+                                        "p-2 rounded-lg border bg-card text-xs flex items-center justify-between gap-2 hover:border-primary/40 transition-colors",
+                                        isDueToday && "border-amber-400 bg-amber-500/5",
+                                        isTaskOverdue && "border-rose-400 bg-rose-500/5"
+                                      )}
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                          <Badge variant="outline" className="text-[9px] px-1 py-0">{t.status}</Badge>
+                                          <Badge variant="secondary" className="text-[9px] px-1 py-0">{t.priority}</Badge>
+                                          {isDueToday && (
+                                            <span className="text-[9px] text-amber-600 font-bold bg-amber-100 dark:bg-amber-950/40 px-1 rounded">
+                                              Due Today
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="font-semibold text-foreground truncate">{t.title}</p>
+                                        {t.projectName && <p className="text-[10px] text-muted-foreground truncate">{t.projectName}</p>}
+                                      </div>
+
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
+                                        onClick={() => handleOpenAdminEditDialog(t)}
+                                        title="Edit / Reassign Task"
+                                      >
+                                        <Edit3 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* View 3B: Today's Tasks & Pending Tasks Feed */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold font-heading flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-amber-500" />
+                    {teamTaskFilter === "TODAY"
+                      ? `Today's Daily Tasks Feed (${todaysTasksList.length})`
+                      : teamTaskFilter === "OVERDUE"
+                      ? `Overdue Tasks (${overdueTasksList.length})`
+                      : `All Pending Tasks Feed (${allPendingTasksList.length})`}
+                  </h3>
+                  <span className="text-xs text-muted-foreground">
+                    Live operational task feed across all employees
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {(teamTaskFilter === "TODAY"
+                    ? todaysTasksList
+                    : teamTaskFilter === "OVERDUE"
+                    ? overdueTasksList
+                    : allPendingTasksList
+                  ).map((task: any) => {
+                    const isDueToday = task.dueDate && task.dueDate.startsWith(todayStr);
+                    const isTaskOverdue = task.dueDate && task.status !== "DONE" && isBefore(parseISO(task.dueDate), startOfDay(new Date()));
+
+                    return (
+                      <Card
+                        key={task.id}
+                        className={cn(
+                          "border bg-card p-3.5 space-y-2.5 hover:shadow-xs transition-shadow relative",
+                          isDueToday ? "border-l-[3px] border-l-amber-500 border-amber-300" : isTaskOverdue ? "border-l-[3px] border-l-rose-500 border-rose-300" : "border-border"
+                        )}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-bold">{task.status}</Badge>
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{task.priority}</Badge>
+                              {isDueToday && (
+                                <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[9px] px-1.5 py-0 font-bold">
+                                  Due Today
+                                </Badge>
+                              )}
+                              {isTaskOverdue && (
+                                <Badge className="bg-rose-500/20 text-rose-700 dark:text-rose-300 text-[9px] px-1.5 py-0 font-bold">
+                                  Overdue
+                                </Badge>
+                              )}
+                            </div>
+                            <h4 className="font-bold text-sm text-foreground leading-snug line-clamp-2">{task.title}</h4>
+                          </div>
+
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
+                            onClick={() => handleOpenAdminEditDialog(task)}
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+
+                        {task.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/30 p-2 rounded border border-border/20">
+                            {task.description}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between gap-2 text-xs border-t pt-2 text-muted-foreground">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <User className="h-3.5 w-3.5 text-primary shrink-0" />
+                            <span className="font-semibold text-foreground truncate">{task.assigneeName || "Unassigned"}</span>
+                          </div>
+                          {task.dueDate && (
+                            <div className="flex items-center gap-1 shrink-0 font-medium text-[11px]">
+                              <Calendar className="h-3 w-3" />
+                              <span>{format(new Date(task.dueDate), "dd MMM")}</span>
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })}
+
+                  {(teamTaskFilter === "TODAY" ? todaysTasksList : teamTaskFilter === "OVERDUE" ? overdueTasksList : allPendingTasksList).length === 0 && (
+                    <div className="col-span-full py-12 text-center text-muted-foreground border border-dashed rounded-xl bg-muted/10">
+                      <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-2 opacity-70" />
+                      <p className="font-semibold text-sm">
+                        {teamTaskFilter === "TODAY" ? "All clear! No pending tasks due today." : "No tasks matching this filter."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 4. MY REQUESTS TRACKER */}
           {viewTab === "requests" && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="admin-requests-tracker-view">
               {filteredRequests.map((task) => {

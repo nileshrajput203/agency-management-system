@@ -822,7 +822,105 @@ router.delete("/:id", requirePermission("content.delete"), asyncHandler(async (r
   return res.status(204).send();
 }));
 
-// ─── Approval Routes ──────────────────────────────────────────
+// ─── Approval Routes (2-Step: Manager First, Then Client) ──────────────────────
+router.post("/:id/internal-approve", requirePermission("content.edit"), asyncHandler(async (req, res) => {
+  const userId = (req as any).userId ?? null;
+  const contentId = req.params.id as string;
+
+  const [row] = await db
+    .update(contentPostsTable)
+    .set({
+      internalApprovalStatus: "APPROVED",
+      internalApprovedBy: userId,
+      internalApprovedAt: new Date(),
+      status: "IN_REVIEW", // Ready for Client Approval
+      approvalStatus: "PENDING", // Client approval pending
+      needsRevision: "false",
+    } as any)
+    .where(eq(contentPostsTable.id, contentId))
+    .returning();
+
+  if (!row) throw createError("Not found", 404);
+
+  // Notify Admins & Managers that internal approval was granted and post is ready for client
+  await NotificationService.notifyAdminsAndManagers({
+    type: "CONTENT_INTERNAL_APPROVED",
+    title: `✅ Manager Approved: ${row.title || "Content Post"}`,
+    message: `Internally approved by manager. Now ready for client approval and final scheduling.`,
+    actionUrl: `/content?postId=${row.id}`,
+    referenceId: row.id,
+    referenceType: "CONTENT",
+  }).catch(() => {});
+
+  return res.json({ success: true, post: row });
+}));
+
+router.post("/:id/client-approve", requirePermission("content.edit"), asyncHandler(async (req, res) => {
+  const userId = (req as any).userId ?? null;
+  const contentId = req.params.id as string;
+
+  const [row] = await db
+    .update(contentPostsTable)
+    .set({
+      approvalStatus: "APPROVED",
+      approvedBy: userId,
+      approvedAt: new Date(),
+      status: "ADMIN_APPROVED", // Final approved state, ready to schedule / publish
+    } as any)
+    .where(eq(contentPostsTable.id, contentId))
+    .returning();
+
+  if (!row) throw createError("Not found", 404);
+
+  // Notify Admins & Managers
+  await NotificationService.notifyAdminsAndManagers({
+    type: "CONTENT_CLIENT_APPROVED",
+    title: `🎉 Client Approved: ${row.title || "Content Post"}`,
+    message: `Post approved by client and scheduled for ${row.scheduledAt ? row.scheduledAt.split("T")[0] : "publishing"}!`,
+    actionUrl: `/content?postId=${row.id}`,
+    referenceId: row.id,
+    referenceType: "CONTENT",
+  }).catch(() => {});
+
+  return res.json({ success: true, post: row });
+}));
+
+// Route to check upcoming scheduled posts (1-2 days before posting date) that require Manager Approval
+router.post("/check-upcoming-approvals", requirePermission("content.view"), asyncHandler(async (_req, res) => {
+  const allPosts = await db.select(CONTENT_COLUMNS).from(contentPostsTable);
+  const now = new Date();
+  const twoDaysFromNow = new Date();
+  twoDaysFromNow.setDate(now.getDate() + 2);
+
+  const pendingApprovalPosts = allPosts.filter((p) => {
+    if (!p.scheduledAt) return false;
+    if (p.internalApprovalStatus === "APPROVED") return false;
+    const sched = new Date(p.scheduledAt);
+    // Scheduled within 2 days or already due/overdue
+    return sched <= twoDaysFromNow;
+  });
+
+  // Notify managers for each urgent post
+  for (const p of pendingApprovalPosts.slice(0, 5)) {
+    const schedDate = p.scheduledAt ? p.scheduledAt.split("T")[0] : "upcoming";
+    await NotificationService.notifyAdminsAndManagers({
+      type: "CONTENT_IN_REVIEW",
+      priority: "HIGH",
+      title: `⏰ Urgent Content Approval: ${p.title || "Post"}`,
+      message: `Scheduled for ${schedDate} (within 1-2 days). Manager approval required before sending to client!`,
+      actionUrl: `/content?postId=${p.id}`,
+      referenceId: p.id,
+      referenceType: "CONTENT",
+    }).catch(() => {});
+  }
+
+  return res.json({
+    success: true,
+    totalUrgent: pendingApprovalPosts.length,
+    urgentPosts: pendingApprovalPosts.map(p => ({ id: p.id, title: p.title, scheduledAt: p.scheduledAt })),
+  });
+}));
+
 router.post("/:id/approve", requirePermission("content.edit"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId ?? null;
   const [row] = await db

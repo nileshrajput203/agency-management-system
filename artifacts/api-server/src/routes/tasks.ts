@@ -625,4 +625,62 @@ router.get("/:id/subtasks", requirePermission("tasks.view"), asyncHandler(async 
   return res.json(subtasks);
 }));
 
+// ─── POST /api/tasks/notify-daily-summary ────────────────────────
+// Dispatches notification of all today's tasks and pending workload to Admins & Managers
+router.post("/notify-daily-summary", requirePermission("tasks.view"), asyncHandler(async (_req, res) => {
+  const allTasks = await db
+    .select({
+      id: tasksTable.id,
+      title: tasksTable.title,
+      status: tasksTable.status,
+      dueDate: tasksTable.dueDate,
+      assigneeId: tasksTable.assigneeId,
+      assigneeName: usersTable.name,
+    })
+    .from(tasksTable)
+    .leftJoin(usersTable, eq(tasksTable.assigneeId, usersTable.id))
+    .where(isNull(tasksTable.deletedAt));
+
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todaysTasks = allTasks.filter((t) => {
+    if (t.status === "DONE" || t.status === "COMPLETED") return false;
+    if (!t.dueDate) return false;
+    return t.dueDate.startsWith(todayStr);
+  });
+
+  const pendingOverdueTasks = allTasks.filter((t) => {
+    if (t.status === "DONE" || t.status === "COMPLETED") return false;
+    if (!t.dueDate) return false;
+    return t.dueDate < todayStr;
+  });
+
+  // Group by employee
+  const employeeCountMap: Record<string, number> = {};
+  todaysTasks.forEach((t) => {
+    const name = t.assigneeName || "Unassigned";
+    employeeCountMap[name] = (employeeCountMap[name] || 0) + 1;
+  });
+
+  const breakdown = Object.entries(employeeCountMap)
+    .map(([emp, count]) => `${emp}: ${count}`)
+    .join(", ");
+
+  await NotificationService.notifyAdminsAndManagers({
+    type: "DAILY_TASKS_ALERT",
+    priority: "HIGH",
+    title: `📋 Daily Tasks Briefing (${todaysTasks.length} tasks today)`,
+    message: todaysTasks.length > 0
+      ? `Today's Tasks: ${breakdown || `${todaysTasks.length} total`}. ${pendingOverdueTasks.length > 0 ? `(${pendingOverdueTasks.length} overdue tasks require attention).` : ""}`
+      : `No tasks due today. ${pendingOverdueTasks.length} pending/overdue task(s) in queue.`,
+    actionUrl: "/tasks",
+  });
+
+  return res.json({
+    success: true,
+    totalToday: todaysTasks.length,
+    totalOverdue: pendingOverdueTasks.length,
+    todaysTasks,
+  });
+}));
+
 export default router;

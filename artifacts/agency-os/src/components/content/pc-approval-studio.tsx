@@ -4,9 +4,10 @@ import {
   Volume2, VolumeX, Maximize2, Sparkles, Share2, Send, Clock, ArrowLeft,
   ArrowRight, Upload, Download, FileText, Camera, Scissors, Eye, Layers,
   Film, Grid, Columns, User, Users, Pin, MapPin, Calendar, Hash,
-  ExternalLink, MessageSquare, ChevronDown, ChevronRight, Zap, RefreshCw,
+  ExternalLink, MessageSquare, ChevronDown, ChevronRight, ChevronLeft, Zap, RefreshCw,
   Plus, Trash2, Sliders, CheckSquare, Square, CornerDownLeft
 } from "lucide-react";
+import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -43,12 +44,42 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   // Selected post in studio
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
-  // Left pane filters
+  // Discover available months from posts for month-wise browsing
+  const availableMonths = Array.from(
+    new Set(
+      posts
+        .map((p) => (p.scheduledAt ? p.scheduledAt.substring(0, 7) : null))
+        .filter(Boolean) as string[]
+    )
+  ).sort().reverse();
+
+  // Left pane filters (month-wise)
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+    if (availableMonths.length > 0) return availableMonths[0];
+    return format(new Date(), "yyyy-MM");
+  });
   const [stageFilter, setStageFilter] = useState<string>("ALL");
   const [clientFilter, setClientFilter] = useState<string>("ALL");
   const [platformFilter, setPlatformFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Check if post is within 2 days of scheduled posting date (or overdue/today)
+  const isWithinApprovalWindow = (scheduledAt?: string | null) => {
+    if (!scheduledAt) return false;
+    const postDate = new Date(scheduledAt);
+    const now = new Date();
+    const diffDays = Math.ceil((postDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays <= 2;
+  };
+
+  // Filter posts month-wise (if ALL, shows all months)
+  const monthPosts = selectedMonth === "ALL"
+    ? posts
+    : posts.filter((p) => {
+        if (!p.scheduledAt) return true;
+        return p.scheduledAt.startsWith(selectedMonth);
+      });
 
   // Center pane view mode
   const [centerMode, setCenterMode] = useState<"PLAYER" | "COMPARE" | "BRIEF" | "GRID">("PLAYER");
@@ -92,13 +123,16 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   const [aiTopic, setAiTopic] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Filter queue items
-  const filteredPosts = posts.filter((p) => {
+  // Filter queue items (month-wise + workflow stage + client + platform + search)
+  const filteredPosts = monthPosts.filter((p) => {
     // Stage filtering
     if (stageFilter === "ALL") {
-      // show all posts in pipeline
+      // show all posts in this month's pipeline
     } else if (stageFilter === "NEEDS_APPROVAL") {
-      if (p.status !== "IN_REVIEW" && !(p.internalApprovalStatus === "PENDING" && !["IDEA", "SCRIPTING", "SHOOTING", "ADMIN_APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status || ""))) return false;
+      // Posts in review OR pending manager review OR coming up in 1-2 days without manager approval!
+      const isUrgentDue = isWithinApprovalWindow(p.scheduledAt) && p.internalApprovalStatus !== "APPROVED";
+      const isInternalPending = p.internalApprovalStatus === "PENDING" && !["ADMIN_APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status || "");
+      if (p.status !== "IN_REVIEW" && !isInternalPending && !isUrgentDue) return false;
     } else if (stageFilter === "REVISIONS") {
       if (p.needsRevision !== "true" && p.internalApprovalStatus !== "CHANGES_REQUESTED" && p.approvalStatus !== "NEEDS_CHANGES") return false;
     } else if (stageFilter === "IDEATION_SHOOT") {
@@ -124,8 +158,28 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
     return true;
   });
 
+  // Calculate month-wise stage counts
+  const countAll = monthPosts.length;
+  const countNeedsReview = monthPosts.filter(p =>
+    p.status === "IN_REVIEW" ||
+    (p.internalApprovalStatus === "PENDING" && !["ADMIN_APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status || "")) ||
+    (isWithinApprovalWindow(p.scheduledAt) && p.internalApprovalStatus !== "APPROVED")
+  ).length;
+  const countRevisions = monthPosts.filter(p =>
+    p.needsRevision === "true" || p.internalApprovalStatus === "CHANGES_REQUESTED" || p.approvalStatus === "NEEDS_CHANGES"
+  ).length;
+  const countShootBriefs = monthPosts.filter(p =>
+    ["IDEA", "SCRIPTING", "SHOOTING"].includes(p.status || "")
+  ).length;
+  const countEditing = monthPosts.filter(p =>
+    ["PRODUCTION", "DESIGNING"].includes(p.status || "")
+  ).length;
+  const countApprovedScheduled = monthPosts.filter(p =>
+    ["ADMIN_APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status || "")
+  ).length;
+
   // Keep a selected post
-  const activePost = filteredPosts.find((p) => p.id === selectedPostId) || filteredPosts[0] || posts.find((p) => p.id === selectedPostId) || posts[0] || null;
+  const activePost = filteredPosts.find((p) => p.id === selectedPostId) || filteredPosts[0] || monthPosts.find((p) => p.id === selectedPostId) || monthPosts[0] || null;
 
   useEffect(() => {
     if (activePost && !selectedPostId) {
@@ -238,22 +292,63 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
     }
   };
 
-  // 1-Click Approve Internally
+  // Step 1: Manager Internal Approval (done first before client)
   const handleApproveInternally = async () => {
     if (!activePost) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/content/${activePost.id}/approve`, {
+      const res = await fetch(`/api/content/${activePost.id}/internal-approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
       });
-      if (!res.ok) throw new Error("Approval failed");
-      toast.success("Post internally approved!");
+      if (!res.ok) throw new Error("Internal approval failed");
+      toast.success("✓ Internally approved by Manager! Ready for client review.");
       onRefresh();
     } catch (err: any) {
-      toast.error(err.message || "Failed to approve");
+      toast.error(err.message || "Failed to approve internally");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Step 2: Client Approval (confirmed after Manager approval)
+  const handleClientApprove = async () => {
+    if (!activePost) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/content/${activePost.id}/client-approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
+      });
+      if (!res.ok) throw new Error("Client approval failed");
+      toast.success("🎉 Client approval confirmed! Post is scheduled.");
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to confirm client approval");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Scan & notify managers for upcoming posts (1-2 days before scheduled date)
+  const handleCheckUpcomingApprovals = async () => {
+    try {
+      const res = await fetch("/api/content/check-upcoming-approvals", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}`,
+        },
+      });
+      const data = await res.json();
+      if (data.totalUrgent > 0) {
+        toast.info(`🔔 Found ${data.totalUrgent} post(s) needing Manager Approval within 1-2 days! Notifications dispatched to Managers.`);
+        setStageFilter("NEEDS_APPROVAL");
+      } else {
+        toast.success("All posts scheduled within 1-2 days have been approved by manager!");
+      }
+      onRefresh();
+    } catch {
+      toast.error("Failed to check upcoming approvals");
     }
   };
 
@@ -262,11 +357,13 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
     if (!activePost) return;
     setIsSubmitting(true);
     try {
-      // 1. Approve internally
-      await fetch(`/api/content/${activePost.id}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
-      });
+      // 1. Approve internally first if not already
+      if (activePost.internalApprovalStatus !== "APPROVED") {
+        await fetch(`/api/content/${activePost.id}/internal-approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
+        });
+      }
 
       // 2. Fetch or generate client share link
       let shareUrl = "";
@@ -456,7 +553,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
             <span className="font-bold text-sm font-heading">PC Approval & Production Studio</span>
           </div>
           <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">
-            {filteredPosts.length} Items in Queue
+            {filteredPosts.length} Items in Queue ({selectedMonth === "ALL" ? "All Months" : format(new Date(Number(selectedMonth.split("-")[0]), Number(selectedMonth.split("-")[1]) - 1, 1), "MMM yyyy")})
           </Badge>
           <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-muted-foreground ml-2">
             <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono">J / ↓</kbd> Next
@@ -467,6 +564,18 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
         </div>
 
         <div className="flex items-center gap-2">
+          {/* 1-2 Day Approval Check & Notification Button */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCheckUpcomingApprovals}
+            className="h-8 gap-1.5 text-xs border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 font-medium"
+            title="Scan upcoming posts within 1-2 days and notify managers for required approval"
+          >
+            <Clock className="h-3.5 w-3.5 text-amber-500" />
+            Check 1-2 Day Approvals
+          </Button>
+
           {/* Fast-Track Batch Upload Button */}
           <Button
             size="sm"
@@ -514,6 +623,58 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
         <aside className="w-80 shrink-0 border-r bg-card/40 flex flex-col justify-between overflow-hidden">
           {/* Filter Stage Tabs */}
           <div className="p-3 border-b space-y-2 shrink-0 bg-background/50">
+            {/* Month Navigator Header (Month-Wise View) */}
+            <div className="flex items-center justify-between bg-muted/70 p-1 rounded-md border text-xs">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 shrink-0"
+                onClick={() => {
+                  if (selectedMonth === "ALL") return;
+                  const [y, m] = selectedMonth.split("-").map(Number);
+                  const prev = new Date(y, m - 2, 1);
+                  setSelectedMonth(format(prev, "yyyy-MM"));
+                }}
+                title="Previous Month"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </Button>
+
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger className="h-6 text-[11px] font-bold border-0 bg-transparent shadow-none px-1 focus:ring-0">
+                  <SelectValue placeholder="Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableMonths.map((m) => {
+                    const count = posts.filter(p => p.scheduledAt?.startsWith(m)).length;
+                    const [y, mon] = m.split("-").map(Number);
+                    const label = format(new Date(y, mon - 1, 1), "MMMM yyyy");
+                    return (
+                      <SelectItem key={m} value={m} className="text-xs">
+                        📅 {label} ({count} posts)
+                      </SelectItem>
+                    );
+                  })}
+                  <SelectItem value="ALL" className="text-xs font-semibold">🌐 All Months Together ({posts.length})</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6 shrink-0"
+                onClick={() => {
+                  if (selectedMonth === "ALL") return;
+                  const [y, m] = selectedMonth.split("-").map(Number);
+                  const next = new Date(y, m, 1);
+                  setSelectedMonth(format(next, "yyyy-MM"));
+                }}
+                title="Next Month"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
             <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground mb-1">
               <span>WORKFLOW STAGE</span>
               {selectedIds.length > 0 && (
@@ -530,7 +691,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               >
                 <span>📋 All Content</span>
                 <span className="text-[10px] bg-primary/20 px-1.5 rounded-full font-bold">
-                  {posts.length}
+                  {countAll}
                 </span>
               </button>
 
@@ -543,7 +704,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               >
                 <span>🔔 Needs Review</span>
                 <span className="text-[10px] bg-amber-500/20 px-1.5 rounded-full font-bold">
-                  {posts.filter(p => p.status === "IN_REVIEW" || (p.internalApprovalStatus === "PENDING" && !["IDEA", "SCRIPTING", "SHOOTING", "ADMIN_APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status || ""))).length}
+                  {countNeedsReview}
                 </span>
               </button>
 
@@ -556,7 +717,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               >
                 <span>⚠️ Revisions</span>
                 <span className="text-[10px] bg-rose-500/20 px-1.5 rounded-full font-bold">
-                  {posts.filter(p => p.needsRevision === "true" || p.internalApprovalStatus === "CHANGES_REQUESTED" || p.approvalStatus === "NEEDS_CHANGES").length}
+                  {countRevisions}
                 </span>
               </button>
 
@@ -569,7 +730,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               >
                 <span>🎥 Shoot Briefs</span>
                 <span className="text-[10px] bg-blue-500/20 px-1.5 rounded-full font-bold">
-                  {posts.filter(p => ["IDEA", "SCRIPTING", "SHOOTING"].includes(p.status || "")).length}
+                  {countShootBriefs}
                 </span>
               </button>
 
@@ -582,7 +743,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               >
                 <span>✂️ In Editing</span>
                 <span className="text-[10px] bg-purple-500/20 px-1.5 rounded-full font-bold">
-                  {posts.filter(p => ["PRODUCTION", "DESIGNING"].includes(p.status || "")).length}
+                  {countEditing}
                 </span>
               </button>
 
@@ -595,7 +756,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               >
                 <span>✅ Approved & Scheduled</span>
                 <span className="text-[10px] bg-emerald-500/20 px-1.5 rounded-full font-bold">
-                  {posts.filter(p => ["ADMIN_APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status || "")).length}
+                  {countApprovedScheduled}
                 </span>
               </button>
             </div>
@@ -692,6 +853,13 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                         <span>{p.format || p.contentType || "Reel"}</span>
                         <span>{p.scheduledAt ? p.scheduledAt.split("T")[0] : p.shootDate ? `Shoot: ${p.shootDate}` : "Unscheduled"}</span>
                       </div>
+
+                      {isWithinApprovalWindow(p.scheduledAt) && p.internalApprovalStatus !== "APPROVED" && (
+                        <div className="mt-1 flex items-center gap-1 text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30">
+                          <Clock className="h-2.5 w-2.5 shrink-0 text-amber-600" />
+                          <span>Manager Approval Due (≤ 2d)</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1175,33 +1343,114 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
             <div className="text-center py-20 text-muted-foreground text-xs">No post selected</div>
           ) : (
             <>
-              {/* Sticky 1-Click Approval Decision Header */}
-              <div className="space-y-2">
+              {/* Sticky 2-Step Approval Decision Card (Manager First, Then Client) */}
+              <div className="space-y-2.5 p-3 rounded-xl border bg-muted/30">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">DECISION & APPROVAL</span>
-                  <Badge variant="outline" className="text-[10px]">
-                    Internal: {activePost.internalApprovalStatus || "PENDING"}
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    2-STEP APPROVAL WORKFLOW
+                  </span>
+                  <Badge variant="outline" className="text-[10px] font-semibold">
+                    {activePost.approvalStatus === "APPROVED"
+                      ? "Fully Approved"
+                      : activePost.internalApprovalStatus === "APPROVED"
+                      ? "Awaiting Client"
+                      : "Manager Review Required"}
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleApproveInternally}
-                    disabled={isSubmitting}
-                    className="h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-                  >
-                    <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve Internally
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleApproveAndShare}
-                    disabled={isSubmitting}
-                    className="h-9 text-xs font-semibold border-primary/30 text-primary hover:bg-primary/5"
-                  >
-                    <Share2 className="h-4 w-4 mr-1.5 text-primary" /> Send to Client
-                  </Button>
+                {isWithinApprovalWindow(activePost.scheduledAt) && activePost.internalApprovalStatus !== "APPROVED" && (
+                  <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs font-medium flex items-start gap-2">
+                    <Clock className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-[11px]">⏰ Scheduled in 1-2 Days</p>
+                      <p className="text-[10px] opacity-90">Manager internal approval must be completed before sharing with client.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 1: Manager Internal Approval */}
+                <div className="p-2.5 rounded-lg border bg-card space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <span className="h-4 w-4 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">1</span>
+                      Manager Approval (Internal)
+                    </span>
+                    {activePost.internalApprovalStatus === "APPROVED" ? (
+                      <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-[10px] font-bold">
+                        ✓ Approved
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-amber-600 border-amber-300 text-[10px]">
+                        Pending Manager
+                      </Badge>
+                    )}
+                  </div>
+
+                  {activePost.internalApprovalStatus === "APPROVED" ? (
+                    <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      <span>Internally approved by manager. Ready for client.</span>
+                    </p>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={handleApproveInternally}
+                      disabled={isSubmitting}
+                      className="w-full h-8 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Step 1: Approve as Manager
+                    </Button>
+                  )}
+                </div>
+
+                {/* Step 2: Client Approval */}
+                <div className={cn("p-2.5 rounded-lg border bg-card space-y-1.5", activePost.internalApprovalStatus !== "APPROVED" && "opacity-60")}>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold flex items-center gap-1.5">
+                      <span className="h-4 w-4 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center text-[10px] font-bold">2</span>
+                      Client Approval & Scheduling
+                    </span>
+                    {activePost.approvalStatus === "APPROVED" ? (
+                      <Badge className="bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30 text-[10px] font-bold">
+                        ✓ Client Approved
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">
+                        {activePost.internalApprovalStatus === "APPROVED" ? "Awaiting Client" : "Locked"}
+                      </Badge>
+                    )}
+                  </div>
+
+                  {activePost.internalApprovalStatus !== "APPROVED" ? (
+                    <p className="text-[10px] text-muted-foreground italic">
+                      ⚠️ Complete Step 1 (Manager Approval) first before client approval.
+                    </p>
+                  ) : activePost.approvalStatus === "APPROVED" ? (
+                    <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                      <span>Client confirmed. Post scheduled.</span>
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleApproveAndShare}
+                        disabled={isSubmitting}
+                        className="h-8 text-[11px] font-semibold border-primary/30 text-primary hover:bg-primary/5"
+                      >
+                        <Share2 className="h-3 w-3 mr-1" /> Share with Client
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleClientApprove}
+                        disabled={isSubmitting}
+                        className="h-8 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <Check className="h-3 w-3 mr-1" /> Client Approved
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
 
