@@ -20,3 +20,4 @@ services:
         value: Admin
       - key: DEFAULT_ADMIN_PASSWORD
         sync: false
+

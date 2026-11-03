@@ -57,7 +57,18 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
   const requesterSystemRole = (req as any).userSystemRole;
   const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
 
-  let query = db
+  const whereClause = !isPrivileged
+    ? or(
+        eq(tasksTable.assigneeId, requesterId),
+        sql`${tasksTable.coAssignees}::text LIKE ${`%"${requesterId}"%`}`,
+        and(
+          eq(tasksTable.requestedBy, requesterId),
+          eq(tasksTable.approvalStatus, "PENDING"),
+        ),
+      )
+    : undefined;
+
+  const rows = await db
     .select({
       id: tasksTable.id,
       title: tasksTable.title,
@@ -93,26 +104,13 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
     .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
     .leftJoin(usersTable, eq(tasksTable.assigneeId, usersTable.id))
     .leftJoin(requesterTable, eq(tasksTable.requestedBy, requesterTable.id))
-    .leftJoin(approvedByTable, eq(tasksTable.approvedBy, approvedByTable.id));
-
-  if (!isPrivileged) {
-    query = query.where(or(
-      eq(tasksTable.assigneeId, requesterId),
-      sql`${tasksTable.coAssignees}::text LIKE ${`%"${requesterId}"%`}`,
-      and(
-        eq(tasksTable.requestedBy, requesterId),
-        eq(tasksTable.approvalStatus, "PENDING"),
-      ),
-    ));
-  }
-
-  query = query.orderBy(
-    sql`CASE WHEN ${tasksTable.dueDate} IS NULL THEN 1 ELSE 0 END`,
-    tasksTable.dueDate,
-    desc(tasksTable.createdAt)
-  );
-
-  const rows = await query;
+    .leftJoin(approvedByTable, eq(tasksTable.approvedBy, approvedByTable.id))
+    .where(whereClause)
+    .orderBy(
+      sql`CASE WHEN ${tasksTable.dueDate} IS NULL THEN 1 ELSE 0 END`,
+      tasksTable.dueDate,
+      desc(tasksTable.createdAt)
+    );
   const hiddenIds = await getHiddenEntityIds(requesterId, "tasks");
   const canViewProjects = requesterSystemRole === "SUPER_ADMIN" ||
     (req as any).userConfiguredModules.includes("projects");

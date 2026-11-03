@@ -133,7 +133,7 @@ router.post("/", requirePermission("quotations.create"), asyncHandler(async (req
 }));
 
 router.patch("/:id", requirePermission("quotations.edit"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid quotation ID format", 400);
   }
   const { id: _id, createdAt: _ts, ...body } = req.body;
@@ -144,7 +144,7 @@ router.patch("/:id", requirePermission("quotations.edit"), asyncHandler(async (r
 }));
 
 router.delete("/:id", requirePermission("quotations.delete"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid quotation ID format", 400);
   }
   await db.delete(quotationsTable).where(eq(quotationsTable.id, (req.params.id as string)));
@@ -152,7 +152,7 @@ router.delete("/:id", requirePermission("quotations.delete"), asyncHandler(async
 }));
 
 router.post("/:id/convert-to-invoice", requirePermission("quotations.edit"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid quotation ID format", 400);
   }
   const [quot] = await db.select().from(quotationsTable).where(eq(quotationsTable.id, (req.params.id as string)));
@@ -191,7 +191,7 @@ router.post("/:id/convert-to-invoice", requirePermission("quotations.edit"), asy
 }));
 
 router.post("/:id/convert-to-proforma-invoice", requirePermission("quotations.edit"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid quotation ID format", 400);
   }
   const [quot] = await db.select().from(quotationsTable).where(eq(quotationsTable.id, (req.params.id as string)));

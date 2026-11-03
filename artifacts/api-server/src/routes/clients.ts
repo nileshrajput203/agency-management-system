@@ -13,7 +13,7 @@ import {
   tasksTable,
   projectMilestonesTable,
 } from "@workspace/db/schema";
-import { eq, ilike, or, and, inArray, desc, sql, isNull } from "drizzle-orm";
+import { eq, ilike, or, and, inArray, desc, asc, sql, isNull } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate, isValidUUID } from "../lib/validation";

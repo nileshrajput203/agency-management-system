@@ -33,3 +33,4 @@ COPY --from=builder /app/artifacts/agency-os/public/templates ./dist/public/temp
 EXPOSE 3000
 
 CMD ["node", "dist/index.mjs"]
+

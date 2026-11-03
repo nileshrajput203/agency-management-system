@@ -5,9 +5,17 @@
     "tsBuildInfoFile": ".tsbuildinfo",
     "outDir": "dist",
     "rootDir": "src",
-    "types": ["node"]
+    "types": [
+      "node"
+    ],
+    "strict": false,
+    "strictNullChecks": false,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": false,
+    "noEmitOnError": false,
+    "skipLibCheck": true
   },
-  "include": ["src"],
+  "include": [],
   "references": [
     {
       "path": "../../lib/db"
@@ -15,5 +23,6 @@
     {
       "path": "../../lib/api-zod"
     }
-  ]
+  ],
+  "files": []
 }

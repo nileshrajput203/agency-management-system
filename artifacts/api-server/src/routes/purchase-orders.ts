@@ -94,7 +94,7 @@ router.post("/", requirePermission("purchase_orders.create"), asyncHandler(async
 }));
 
 router.get("/:id", requirePermission("purchase_orders.view"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid purchase order ID format", 400);
   }
   const [row] = await db
@@ -107,7 +107,7 @@ router.get("/:id", requirePermission("purchase_orders.view"), asyncHandler(async
 }));
 
 router.patch("/:id", requirePermission("purchase_orders.edit"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid purchase order ID format", 400);
   }
   const { id: _id, createdAt: _ts, ...body } = req.body || {};
@@ -118,7 +118,7 @@ router.patch("/:id", requirePermission("purchase_orders.edit"), asyncHandler(asy
 }));
 
 router.patch("/:id/receipt", requirePermission("purchase_orders.edit"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid purchase order ID format", 400);
   }
   const { receiptNumber, receiptUrl, receiptDate, itcEligible, paymentMode, vendorGstin, vendorNameSnapshot } = req.body;
@@ -144,7 +144,7 @@ router.patch("/:id/receipt", requirePermission("purchase_orders.edit"), asyncHan
 }));
 
 router.delete("/:id", requirePermission("purchase_orders.delete"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid purchase order ID format", 400);
   }
   await db.delete(purchaseOrdersTable).where(eq(purchaseOrdersTable.id, (req.params.id as string)));
