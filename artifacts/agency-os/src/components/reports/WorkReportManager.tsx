@@ -340,21 +340,36 @@ export function WorkReportManager() {
               <TabsList className="flex flex-col h-auto bg-transparent p-0 space-y-1 w-full">
                 <TabsTrigger
                   value="all"
-                  className="w-full justify-start text-xs font-medium px-3 py-2 rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold transition-all"
+                  className={cn(
+                    "w-full justify-start text-xs font-medium px-3 py-2 rounded-lg transition-all",
+                    activeTab === "all"
+                      ? "bg-primary/15 text-primary font-semibold shadow-2xs"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
                 >
-                  <FileText className="h-4 w-4 mr-2 shrink-0 text-muted-foreground group-data-[state=active]:text-primary" />
+                  <FileText className={cn("h-4 w-4 mr-2 shrink-0", activeTab === "all" ? "text-primary" : "text-muted-foreground")} />
                   All Reports
                 </TabsTrigger>
                 <TabsTrigger
                   value="my"
-                  className="w-full justify-start text-xs font-medium px-3 py-2 rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold transition-all"
+                  className={cn(
+                    "w-full justify-start text-xs font-medium px-3 py-2 rounded-lg transition-all",
+                    activeTab === "my"
+                      ? "bg-primary/15 text-primary font-semibold shadow-2xs"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
                 >
-                  <UserCheck className="h-4 w-4 mr-2 shrink-0 text-muted-foreground group-data-[state=active]:text-primary" />
+                  <UserCheck className={cn("h-4 w-4 mr-2 shrink-0", activeTab === "my" ? "text-primary" : "text-muted-foreground")} />
                   My Reports
                 </TabsTrigger>
                 <TabsTrigger
                   value="pending"
-                  className="w-full justify-between text-xs font-medium px-3 py-2 rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold transition-all"
+                  className={cn(
+                    "w-full justify-between text-xs font-medium px-3 py-2 rounded-lg transition-all",
+                    activeTab === "pending"
+                      ? "bg-primary/15 text-primary font-semibold shadow-2xs"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
                 >
                   <span className="flex items-center gap-2">
                     <Clock className="h-4 w-4 shrink-0 text-blue-500" />
@@ -368,7 +383,12 @@ export function WorkReportManager() {
                 </TabsTrigger>
                 <TabsTrigger
                   value="changes"
-                  className="w-full justify-between text-xs font-medium px-3 py-2 rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold transition-all"
+                  className={cn(
+                    "w-full justify-between text-xs font-medium px-3 py-2 rounded-lg transition-all",
+                    activeTab === "changes"
+                      ? "bg-primary/15 text-primary font-semibold shadow-2xs"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
                 >
                   <span className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />
@@ -382,14 +402,24 @@ export function WorkReportManager() {
                 </TabsTrigger>
                 <TabsTrigger
                   value="approved"
-                  className="w-full justify-start text-xs font-medium px-3 py-2 rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold transition-all"
+                  className={cn(
+                    "w-full justify-start text-xs font-medium px-3 py-2 rounded-lg transition-all",
+                    activeTab === "approved"
+                      ? "bg-primary/15 text-primary font-semibold shadow-2xs"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2 shrink-0 text-emerald-500" />
                   Approved
                 </TabsTrigger>
                 <TabsTrigger
                   value="archived"
-                  className="w-full justify-start text-xs font-medium px-3 py-2 rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:font-semibold transition-all"
+                  className={cn(
+                    "w-full justify-start text-xs font-medium px-3 py-2 rounded-lg transition-all",
+                    activeTab === "archived"
+                      ? "bg-primary/15 text-primary font-semibold shadow-2xs"
+                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  )}
                 >
                   <Archive className="h-4 w-4 mr-2 shrink-0 text-slate-500" />
                   Archived
