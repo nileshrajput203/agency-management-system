@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { amountToWords } from "./pdf-utils";
+import { INVOICE_TEMPLATE_BASE64 } from "../templates/invoice-template-base64";
 
 export interface InvoiceExportData {
   number?: string;
@@ -336,14 +337,228 @@ export function buildExactInvoiceGrid(inv: InvoiceExportData): string[][] {
 }
 
 /**
+ * Loads the master workbook from /templates/INVOICE_FORMAT.xlsx or embedded base64.
+ */
+export async function loadMasterTemplateWorkbook(): Promise<ExcelJS.Workbook> {
+  const wb = new ExcelJS.Workbook();
+  let loaded = false;
+
+  // 1. Try fetching from web server
+  if (typeof window !== "undefined" && typeof fetch === "function") {
+    try {
+      const res = await fetch("/templates/INVOICE_FORMAT.xlsx");
+      if (res.ok) {
+        const ab = await res.arrayBuffer();
+        await wb.xlsx.load(ab);
+        loaded = true;
+      }
+    } catch {
+      // ignore, fallback
+    }
+  }
+
+  // 2. Fallback to embedded base64 string
+  if (!loaded && INVOICE_TEMPLATE_BASE64) {
+    try {
+      const binStr = atob(INVOICE_TEMPLATE_BASE64);
+      const len = binStr.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binStr.charCodeAt(i);
+      }
+      await wb.xlsx.load(bytes.buffer);
+      loaded = true;
+    } catch (err) {
+      console.error("Failed to load embedded invoice template:", err);
+    }
+  }
+
+  return wb;
+}
+
+/**
+ * Injects dynamic invoice data into the exact master template worksheet.
+ */
+export async function populateExactTemplate(inv: InvoiceExportData): Promise<ExcelJS.Workbook> {
+  const wb = await loadMasterTemplateWorkbook();
+  const ws = wb.worksheets[0] || wb.getWorksheet("Sale Invoice");
+  if (!ws) {
+    throw new Error("Master template worksheet not found");
+  }
+
+  const invNumber = inv.number || inv.invoiceNumber || "0003";
+  const invDate = inv.invoiceDate || new Date().toISOString().split("T")[0];
+
+  const clientName = inv.clientName || "(name)";
+  const clientAddr = [
+    inv.billingAddress || inv.clientAddress,
+    inv.clientCity,
+    inv.clientState,
+    inv.clientPostalCode,
+  ]
+    .filter(Boolean)
+    .join(", ") || "(adress)";
+  const clientGstin = inv.clientGstin || "27AHQPB7460C1ZE";
+  const placeOfSupply = inv.placeOfSupply || inv.clientState || "Maharashtra";
+
+  const isIGST =
+    inv.gstType === "IGST" ||
+    (!clientGstin.startsWith("27") &&
+      placeOfSupply.toLowerCase() !== "maharashtra" &&
+      placeOfSupply.toLowerCase() !== "mh");
+
+  const items =
+    inv.lineItems && inv.lineItems.length > 0
+      ? inv.lineItems
+      : [
+          {
+            description: "Digital Marketing & Social Media Management Services",
+            hsnSac: "998361",
+            taxPercent: 18,
+            qty: 1,
+            unitPrice: inv.subtotal || inv.total || 0,
+            amount: inv.subtotal || inv.total || 0,
+          },
+        ];
+
+  const subtotal = items.reduce(
+    (s, it) => s + Number(it.amount != null ? it.amount : Number(it.qty || 1) * Number(it.unitPrice || 0)),
+    0
+  );
+  const taxRate = items[0]?.taxPercent || 18;
+  const taxAmount = (subtotal * taxRate) / 100;
+  const grossAmount = Math.round(subtotal + taxAmount);
+  const roundOff = Number((grossAmount - (subtotal + taxAmount)).toFixed(2));
+  const words = amountToWords(grossAmount, "INR");
+
+  // Invoice Number
+  ws.getCell("B10").value = `Invoice No:- ${invNumber}`;
+  ws.getCell("L10").value = { formula: "B10", result: `Invoice No:- ${invNumber}` };
+
+  // Date
+  ws.getCell("C11").value = invDate;
+  ws.getCell("M11").value = invDate;
+
+  // Bill To / Ship To
+  ws.getCell("B13").value = clientName;
+  ws.getCell("L13").value = { formula: "B13", result: clientName };
+  ws.getCell("F13").value = { formula: "B13", result: clientName };
+  ws.getCell("P13").value = { formula: "L13", result: clientName };
+
+  ws.getCell("B14").value = clientAddr;
+  ws.getCell("L14").value = { formula: "B14", result: clientAddr };
+  ws.getCell("F14").value = { formula: "B14", result: clientAddr };
+  ws.getCell("P14").value = { formula: "L14", result: clientAddr };
+
+  // Place of Supply & GSTIN
+  ws.getCell("B15").value = `Place of Supply:- ${placeOfSupply}`;
+  ws.getCell("L15").value = { formula: "B15", result: `Place of Supply:- ${placeOfSupply}` };
+
+  ws.getCell("B16").value = `GSTIN/UIN: ${clientGstin}`;
+  ws.getCell("L16").value = { formula: "B16", result: `GSTIN/UIN: ${clientGstin}` };
+
+  // Items table (Rows 19 to 36 = 18 available slots)
+  for (let i = 0; i < 18; i++) {
+    const rowNum = 19 + i;
+    if (i < items.length) {
+      const it = items[i];
+      const itAmt = Number(it.amount != null ? it.amount : Number(it.qty || 1) * Number(it.unitPrice || 0));
+      const itTax = it.taxPercent != null ? it.taxPercent : taxRate;
+      const itHsn = it.hsnSac || "998361";
+      const itDesc = it.description || "";
+
+      ws.getCell(`B${rowNum}`).value = i + 1;
+      ws.getCell(`C${rowNum}`).value = itDesc;
+      ws.getCell(`F${rowNum}`).value = itHsn;
+      ws.getCell(`H${rowNum}`).value = itTax;
+      ws.getCell(`I${rowNum}`).value = itAmt;
+
+      ws.getCell(`L${rowNum}`).value = { formula: `B${rowNum}`, result: i + 1 };
+      ws.getCell(`M${rowNum}`).value = { formula: `C${rowNum}`, result: itDesc };
+      ws.getCell(`P${rowNum}`).value = { formula: `F${rowNum}`, result: itHsn };
+      ws.getCell(`R${rowNum}`).value = { formula: `H${rowNum}`, result: itTax };
+      ws.getCell(`S${rowNum}`).value = { formula: `I${rowNum}`, result: itAmt };
+    } else {
+      ws.getCell(`B${rowNum}`).value = null;
+      ws.getCell(`C${rowNum}`).value = null;
+      ws.getCell(`F${rowNum}`).value = null;
+      ws.getCell(`H${rowNum}`).value = null;
+      ws.getCell(`I${rowNum}`).value = null;
+
+      ws.getCell(`L${rowNum}`).value = null;
+      ws.getCell(`M${rowNum}`).value = null;
+      ws.getCell(`P${rowNum}`).value = null;
+      ws.getCell(`R${rowNum}`).value = null;
+      ws.getCell(`S${rowNum}`).value = null;
+    }
+  }
+
+  // Taxable
+  ws.getCell("J38").value = { formula: "SUM(I19:J36)", result: subtotal };
+  ws.getCell("T38").value = { formula: "SUM(S19:T36)", result: subtotal };
+
+  // Taxes
+  if (isIGST) {
+    ws.getCell("J39").value = 0;
+    ws.getCell("T39").value = { formula: "J39", result: 0 };
+    ws.getCell("J40").value = 0;
+    ws.getCell("T40").value = { formula: "J40", result: 0 };
+    ws.getCell("J41").value = { formula: "J38*18%", result: taxAmount };
+    ws.getCell("T41").value = { formula: "J41", result: taxAmount };
+    ws.getCell("J43").value = { formula: "J38+J41+J42", result: grossAmount };
+    ws.getCell("T43").value = { formula: "J43", result: grossAmount };
+  } else {
+    const halfTax = taxAmount / 2;
+    ws.getCell("J39").value = { formula: "J38*9%", result: halfTax };
+    ws.getCell("T39").value = { formula: "J39", result: halfTax };
+    ws.getCell("J40").value = { formula: "J39", result: halfTax };
+    ws.getCell("T40").value = { formula: "J40", result: halfTax };
+    ws.getCell("J41").value = null;
+    ws.getCell("T41").value = null;
+    ws.getCell("J43").value = { formula: "J38+J39+J40+J42", result: grossAmount };
+    ws.getCell("T43").value = { formula: "J43", result: grossAmount };
+  }
+
+  // Round off
+  ws.getCell("J42").value = roundOff;
+  ws.getCell("T42").value = { formula: "J42", result: roundOff };
+
+  // Amount in Words
+  ws.getCell("D44").value = words;
+  ws.getCell("N44").value = words;
+
+  return wb;
+}
+
+/**
  * Downloads the exact CSV representation of the invoice.
  */
-export function exportInvoiceToCsv(inv: InvoiceExportData) {
+export async function exportInvoiceToCsv(inv: InvoiceExportData) {
   const invNumber = inv.number || inv.invoiceNumber || "0003";
   const clientName = inv.clientName || "Client";
-  const grid = buildExactInvoiceGrid(inv);
+  const wb = await populateExactTemplate(inv);
+  const ws = wb.worksheets[0];
 
-  const csvLines = grid.map((row) =>
+  const rows: string[][] = [];
+  for (let r = 1; r <= Math.max(54, ws.rowCount); r++) {
+    const row = ws.getRow(r);
+    const rowCells: string[] = [];
+    for (let c = 1; c <= 20; c++) {
+      const cell = row.getCell(c);
+      let val = cell.value;
+      if (val != null && typeof val === "object") {
+        if ("result" in val && val.result != null) {
+          val = val.result;
+        } else if ("formula" in val) {
+          val = "";
+        }
+      }
+      rowCells.push(val != null ? String(val) : "");
+    }
+    rows.push(rowCells);
+  }
+
+  const csvLines = rows.map((row) =>
     row
       .map((cell) => {
         if (!cell) return "";
@@ -373,49 +588,8 @@ export function exportInvoiceToCsv(inv: InvoiceExportData) {
 export async function exportInvoiceToExcel(inv: InvoiceExportData) {
   const invNumber = inv.number || inv.invoiceNumber || "0003";
   const clientName = inv.clientName || "Client";
-  const grid = buildExactInvoiceGrid(inv);
 
-  const workbook = new ExcelJS.Workbook();
-  const ws = workbook.addWorksheet(invNumber.slice(0, 31));
-
-  // Set 20 columns
-  ws.columns = [
-    { width: 3 },  // 0: spacer
-    { width: 28 }, // 1: Bill To / Details
-    { width: 28 }, // 2: Description
-    { width: 12 }, // 3
-    { width: 12 }, // 4
-    { width: 14 }, // 5: Ship To / HSN
-    { width: 10 }, // 6
-    { width: 12 }, // 7: Tax Rate / Labels
-    { width: 14 }, // 8: Amount
-    { width: 16 }, // 9: Amount / Totals
-    { width: 3 },  // 10: spacer
-    { width: 28 }, // 11: Bill To / Details
-    { width: 28 }, // 12: Description
-    { width: 12 }, // 13
-    { width: 12 }, // 14: HSN
-    { width: 14 }, // 15: Ship To / HSN
-    { width: 10 }, // 16
-    { width: 12 }, // 17: Tax Rate / Labels
-    { width: 14 }, // 18: Amount
-    { width: 16 }, // 19: Amount / Totals
-  ];
-
-  grid.forEach((rowValues) => {
-    const row = ws.addRow(rowValues);
-    const firstCol = rowValues[1] || "";
-    if (firstCol === "BLINK BEYOND") {
-      row.font = { bold: true, size: 13, color: { argb: "FF1E1B4B" } };
-    } else if (firstCol === "TAX INVOICE" || firstCol === "PROFORMA INVOICE") {
-      row.font = { bold: true, size: 12 };
-    } else if (rowValues[2] === "Description" || rowValues[7] === "Original for Recipient") {
-      row.font = { bold: true };
-    } else if (rowValues[7] === "Gross Amount") {
-      row.font = { bold: true, size: 11 };
-    }
-  });
-
+  const workbook = await populateExactTemplate(inv);
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

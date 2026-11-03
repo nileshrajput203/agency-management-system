@@ -134,13 +134,13 @@ function SortableLeadCard({
         </div>
       )}
 
-      {nextCall && (
+      {nextCall && !isNaN(nextCall.getTime()) && (
         <div className={cn(
           "flex items-center gap-1 mt-1 text-[10px] font-medium rounded px-1 py-0.5",
           callIsOverdue ? "text-red-600 bg-red-50" : callIsToday ? "text-amber-600 bg-amber-50" : "text-blue-600 bg-blue-50/60",
         )}>
           <Phone className="h-3 w-3" />
-          <span>Call: {formatDateOnly(nextCall.toISOString())}</span>
+          <span>Call: {formatDateOnly(lead.nextCallDate)}</span>
           {callIsToday && <span className="ml-0.5 font-bold">• Today!</span>}
           {callIsOverdue && <span className="ml-0.5 font-bold">• Overdue</span>}
         </div>
@@ -225,7 +225,9 @@ function SalesTasksTab({ onEdit }: { onEdit: (lead: any) => void }) {
     </div>
   );
 
-  if (scheduled.length === 0) {
+  const safeScheduled = Array.isArray(scheduled) ? scheduled : [];
+
+  if (safeScheduled.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/50">
         <PhoneCall className="h-10 w-10 mb-3" />
@@ -235,9 +237,9 @@ function SalesTasksTab({ onEdit }: { onEdit: (lead: any) => void }) {
     );
   }
 
-  const overdue = scheduled.filter((l: any) => l.callStatus === "OVERDUE");
-  const today = scheduled.filter((l: any) => l.callStatus === "TODAY");
-  const upcoming = scheduled.filter((l: any) => l.callStatus === "UPCOMING");
+  const overdue = safeScheduled.filter((l: any) => l.callStatus === "OVERDUE");
+  const today = safeScheduled.filter((l: any) => l.callStatus === "TODAY");
+  const upcoming = safeScheduled.filter((l: any) => l.callStatus === "UPCOMING");
 
   const Section = ({ title, leads, icon: Icon, color }: any) => leads.length === 0 ? null : (
     <div className="space-y-2">
@@ -529,19 +531,22 @@ export default function SalesPage() {
     }
   };
 
-  const pipelineTotal = (pipeline ?? []).reduce((sum: number, s: any) => sum + (s.totalValue ?? 0), 0);
+  const safeLeads = Array.isArray(leads) ? leads : [];
+  const safePipeline = Array.isArray(pipeline) ? pipeline : [];
 
-  const filteredLeads = leads.filter((l: any) => {
+  const pipelineTotal = safePipeline.reduce((sum: number, s: any) => sum + (s?.totalValue ?? 0), 0);
+
+  const filteredLeads = safeLeads.filter((l: any) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
-      l.title?.toLowerCase().includes(q) ||
-      l.companyName?.toLowerCase().includes(q) ||
-      l.email?.toLowerCase().includes(q) ||
-      l.phone?.toLowerCase().includes(q) ||
-      l.stage?.toLowerCase().includes(q) ||
-      l.description?.toLowerCase().includes(q) ||
-      l.contactName?.toLowerCase().includes(q)
+      l?.title?.toLowerCase().includes(q) ||
+      l?.companyName?.toLowerCase().includes(q) ||
+      l?.email?.toLowerCase().includes(q) ||
+      l?.phone?.toLowerCase().includes(q) ||
+      l?.stage?.toLowerCase().includes(q) ||
+      l?.description?.toLowerCase().includes(q) ||
+      l?.contactName?.toLowerCase().includes(q)
     );
   });
 
@@ -594,10 +599,10 @@ export default function SalesPage() {
       ) : (
         <>
           {/* Pipeline summary */}
-          {pipeline && pipeline.length > 0 && (
+          {safePipeline.length > 0 && (
             <div className="flex gap-2 overflow-x-auto pb-1 shrink-0 scrollbar-none">
               {STAGES.map((stage) => {
-                const s = (pipeline as any[]).find((p) => p.stage === stage.key);
+                const s = safePipeline.find((p: any) => p?.stage === stage.key);
                 const stageColor = stage.color.replace("border-t-", "border-l-");
                 return (
                   <div key={stage.key} className={cn(
@@ -650,7 +655,9 @@ export default function SalesPage() {
               </div>
               <DragOverlay>
                 {activeLead ? (
-                  <SortableLeadCard lead={activeLead} isDragOverlay />
+                  <div className="bg-card border border-border rounded-lg p-3 shadow-lg opacity-90 cursor-grabbing min-w-[200px]">
+                    <LeadCardContent lead={activeLead} isDragOverlay />
+                  </div>
                 ) : null}
               </DragOverlay>
             </DndContext>

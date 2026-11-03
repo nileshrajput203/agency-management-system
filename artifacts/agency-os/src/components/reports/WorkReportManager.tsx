@@ -269,7 +269,7 @@ export function WorkReportManager() {
 
       {/* Metrics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <Card className="bg-card/60 border-border/80 shadow-xs hover:border-primary/30 transition-all">
+        <Card className="bg-card border-border shadow-xs hover:border-primary/30 transition-all">
           <CardContent className="p-5 flex items-center gap-4">
             <div className="p-3 rounded-xl bg-primary/10 text-primary shrink-0">
               <FileText className="h-6 w-6" />
@@ -281,7 +281,7 @@ export function WorkReportManager() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card/60 border-border/80 shadow-xs hover:border-blue-500/30 transition-all">
+        <Card className="bg-card border-border shadow-xs hover:border-blue-500/30 transition-all">
           <CardContent className="p-5 flex items-center gap-4">
             <div className="p-3 rounded-xl bg-blue-500/10 text-blue-500 shrink-0">
               <Clock className="h-6 w-6" />
@@ -293,7 +293,7 @@ export function WorkReportManager() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card/60 border-border/80 shadow-xs hover:border-amber-500/30 transition-all">
+        <Card className="bg-card border-border shadow-xs hover:border-amber-500/30 transition-all">
           <CardContent className="p-5 flex items-center gap-4">
             <div className="p-3 rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
               <AlertTriangle className="h-6 w-6" />
@@ -305,7 +305,7 @@ export function WorkReportManager() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card/60 border-border/80 shadow-xs hover:border-emerald-500/30 transition-all">
+        <Card className="bg-card border-border shadow-xs hover:border-emerald-500/30 transition-all">
           <CardContent className="p-5 flex items-center gap-4">
             <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
               <CheckCircle2 className="h-6 w-6" />
@@ -317,7 +317,7 @@ export function WorkReportManager() {
           </CardContent>
         </Card>
 
-        <Card className="bg-card/60 border-border/80 shadow-xs hover:border-slate-500/30 transition-all col-span-2 sm:col-span-1">
+        <Card className="bg-card border-border shadow-xs hover:border-slate-500/30 transition-all col-span-2 sm:col-span-1">
           <CardContent className="p-5 flex items-center gap-4">
             <div className="p-3 rounded-xl bg-slate-500/10 text-slate-500 shrink-0">
               <Edit3 className="h-6 w-6" />
@@ -334,7 +334,7 @@ export function WorkReportManager() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-0 w-full">
         <div className="flex flex-col md:flex-row gap-6 items-start w-full">
           {/* Left Vertical Filter Panel */}
-          <div className="w-full md:w-64 lg:w-72 shrink-0 md:sticky md:top-6 space-y-4 bg-card/60 border border-border/80 rounded-xl p-4 shadow-xs">
+          <div className="w-full md:w-64 lg:w-72 shrink-0 space-y-4 bg-card border border-border rounded-xl p-4 shadow-xs">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-1 mb-2">Filter Reports</p>
               <TabsList className="flex flex-col h-auto bg-transparent p-0 space-y-1 w-full">
