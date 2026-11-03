@@ -20,10 +20,12 @@ export class LocalStorageProvider implements IStorageProvider {
   private uploadsDir: string;
 
   constructor() {
-    this.uploadsDir = path.resolve(process.cwd(), "uploads");
-    if (!fs.existsSync(this.uploadsDir)) {
-      fs.mkdirSync(this.uploadsDir, { recursive: true });
-    }
+    this.uploadsDir = process.env.UPLOADS_DIR || (process.env.VERCEL ? "/tmp/uploads" : path.resolve(process.cwd(), "uploads"));
+    try {
+      if (!fs.existsSync(this.uploadsDir)) {
+        fs.mkdirSync(this.uploadsDir, { recursive: true });
+      }
+    } catch (_) {}
   }
 
   async saveFile(buffer: Buffer, originalFilename: string, mimetype: string): Promise<StoredFile> {

@@ -99,8 +99,10 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const uploadsDir = path.resolve(process.cwd(), "uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+const uploadsDir = process.env.UPLOADS_DIR || (process.env.VERCEL ? "/tmp/uploads" : path.resolve(process.cwd(), "uploads"));
+try {
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+} catch (_) {}
 app.use(["/api/uploads", "/api/v1/uploads"], express.static(uploadsDir));
 
 const rateLimitWindowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000", 10);
