@@ -39,102 +39,323 @@ export interface InvoiceExportData {
   };
 }
 
-const DEFAULT_AGENCY = {
-  name: "BLINK BEYOND",
-  tagline: "Digital Marketing Agency",
-  address: "Ground Floor, Shop No. 07, Ali Chamber Apt., Manor Road, Kotak Mahindra Bank, Palghar West, Palghar, Palghar, Maharashtra, 401404",
-  gstin: "27ABGFB9280J1Z0",
-  placeOfSupply: "Maharashtra",
-  bankName: "HDFC BANK LIMITED",
-  accountNo: "50200121903920",
-  ifsc: "HDFC0000663",
-};
-
 /**
- * Generates and downloads a CSV invoice formatted to match Blink Beyond's standard.
+ * Builds the exact 20-column 55-row 2D grid matching the user's template.
+ * Left half: cols 0-9 (Original for Recipient)
+ * Right half: cols 10-19 (Duplicate for Transporter)
  */
-export function exportInvoiceToCsv(inv: InvoiceExportData) {
-  const invNumber = inv.number || inv.invoiceNumber || "0001";
+export function buildExactInvoiceGrid(inv: InvoiceExportData): string[][] {
+  const invNumber = inv.number || inv.invoiceNumber || "0003";
   const invDate = inv.invoiceDate || new Date().toISOString().split("T")[0];
   const docType = inv.invoiceType === "PROFORMA" ? "PROFORMA INVOICE" : "TAX INVOICE";
 
-  const clientName = inv.clientName || "Valued Client";
-  const clientAddr = [inv.billingAddress || inv.clientAddress, inv.clientCity, inv.clientState, inv.clientPostalCode]
+  const clientName = inv.clientName || "(name)";
+  const clientAddr = [
+    inv.billingAddress || inv.clientAddress,
+    inv.clientCity,
+    inv.clientState,
+    inv.clientPostalCode,
+  ]
     .filter(Boolean)
-    .join(", ") || "Client Address";
-  const clientGstin = inv.clientGstin || "URP (Unregistered Person)";
+    .join(", ") || "(adress)";
+  const clientGstin = inv.clientGstin || "27AHQPB7460C1ZE";
   const placeOfSupply = inv.placeOfSupply || inv.clientState || "Maharashtra";
 
-  const isIGST = inv.gstType === "IGST" || (!clientGstin.startsWith("27") && placeOfSupply.toLowerCase() !== "maharashtra");
-  
-  const items = inv.lineItems && inv.lineItems.length > 0 ? inv.lineItems : [
-    { description: "Digital Marketing & Social Media Management Services", hsnSac: "998361", taxPercent: 18, qty: 1, unitPrice: inv.subtotal || inv.total || 0 }
-  ];
+  const isIGST =
+    inv.gstType === "IGST" ||
+    (!clientGstin.startsWith("27") && placeOfSupply.toLowerCase() !== "maharashtra" && placeOfSupply.toLowerCase() !== "mh");
 
-  const subtotal = items.reduce((s, it) => s + (Number(it.qty || 1) * Number(it.unitPrice || 0)), 0);
+  const items =
+    inv.lineItems && inv.lineItems.length > 0
+      ? inv.lineItems
+      : [
+          {
+            description: "Digital Marketing & Social Media Management Services",
+            hsnSac: "998361",
+            taxPercent: 18,
+            qty: 1,
+            unitPrice: inv.subtotal || inv.total || 0,
+          },
+        ];
+
+  const subtotal = items.reduce(
+    (s, it) => s + Number(it.qty || 1) * Number(it.unitPrice || 0),
+    0
+  );
   const taxRate = items[0]?.taxPercent || 18;
   const taxAmount = (subtotal * taxRate) / 100;
   const grossAmount = Math.round(subtotal + taxAmount);
   const roundOff = (grossAmount - (subtotal + taxAmount)).toFixed(2);
 
-  const cgst = isIGST ? 0 : Number((taxAmount / 2).toFixed(2));
-  const sgst = isIGST ? 0 : Number((taxAmount / 2).toFixed(2));
-  const igst = isIGST ? Number(taxAmount.toFixed(2)) : 0;
+  const cgst = isIGST ? "0" : (taxAmount / 2).toFixed(2);
+  const sgst = isIGST ? "0" : (taxAmount / 2).toFixed(2);
+  const igst = isIGST ? taxAmount.toFixed(2) : "";
 
   const words = amountToWords(grossAmount, "INR");
 
-  const clean = (str: string) => `"${str.replace(/"/g, '""')}"`;
+  const createEmptyRow = () => new Array(20).fill("");
+  const grid: string[][] = [];
 
-  const rows: string[] = [
-    `,,,,,,,Original for Recipient,,,,,,,,,,Duplicate for Transporter  ,,`,
-    `,BLINK BEYOND,,,,,,,,,,BLINK BEYOND,,,,,,,,`,
-    `,Digital Marketing Agency,,,,,,,,,,Digital Marketing Agency,,,,,,,,`,
-    `,,,,,,,,,,,,,,,,,,,`,
-    `,${clean(DEFAULT_AGENCY.address)},,,,,,,,,,,${clean(DEFAULT_AGENCY.address)},,,,,,,,`,
-    `,GSTIN/UIN: ${DEFAULT_AGENCY.gstin},,,,,,,,,,GSTIN/UIN: ${DEFAULT_AGENCY.gstin},,,,,,,,`,
-    `,${docType},,,,,,,,,,${docType},,,,,,,,`,
-    `,Invoice No:- ${invNumber},,,,,,,,,,Invoice No:- ${invNumber},,,,,,,,`,
-    `,Date:,${invDate},,,,,,,,,Date:,${invDate},,,,,,,`,
-    `,"Bill To,",,,,"Ship To,",,,,,,"Bill To,",,,,"Ship To,",,,,`,
-    `,${clean(clientName)},,,,${clean(clientName)},,,,,,${clean(clientName)},,,,${clean(clientName)},,,,`,
-    `,${clean(clientAddr)},,,,${clean(clientAddr)},,,,,,${clean(clientAddr)},,,,${clean(clientAddr)},,,,`,
-    `,Place of Supply:- ${placeOfSupply},,,,,,,,,,Place of Supply:- ${placeOfSupply},,,,,,,,`,
-    `,GSTIN/UIN: ${clientGstin},,,,,,,,,,GSTIN/UIN: ${clientGstin},,,,,,,,`,
-    `,,,,,,,,,,,,,,,,,,,`,
-    `,,Description,,,HSN/SAC,,Tax Rate,Amount,Amount,,,Description,,HSN/SAC,HSN/SAC,,Tax Rate,Amount,Amount`,
-  ];
+  // Rows 1-2: empty
+  grid.push(createEmptyRow());
+  grid.push(createEmptyRow());
 
+  // Row 3: Original & Duplicate headers
+  const r3 = createEmptyRow();
+  r3[7] = "Original for Recipient";
+  r3[17] = "Duplicate for Transporter  ";
+  grid.push(r3);
+
+  // Row 4: BLINK BEYOND
+  const r4 = createEmptyRow();
+  r4[1] = "BLINK BEYOND";
+  r4[11] = "BLINK BEYOND";
+  grid.push(r4);
+
+  // Row 5: Digital Marketing Agency
+  const r5 = createEmptyRow();
+  r5[1] = "Digital Marketing Agency";
+  r5[11] = "Digital Marketing Agency";
+  grid.push(r5);
+
+  // Row 6: empty
+  grid.push(createEmptyRow());
+
+  // Row 7: Address
+  const agencyAddr = "Ground Gloor, Shop No. 07, Ali Chamber Apt., Manor Road, Kotak Mahindra Bank, Palghar West, Palghar, Palghar, Maharashtra, 401404";
+  const r7 = createEmptyRow();
+  r7[1] = agencyAddr;
+  r7[11] = agencyAddr;
+  grid.push(r7);
+
+  // Row 8: Agency GSTIN
+  const r8 = createEmptyRow();
+  r8[1] = "GSTIN/UIN: 27ABGFB9280J1Z0";
+  r8[11] = "GSTIN/UIN: 27ABGFB9280J1Z0";
+  grid.push(r8);
+
+  // Row 9: Document Type
+  const r9 = createEmptyRow();
+  r9[1] = docType;
+  r9[11] = docType;
+  grid.push(r9);
+
+  // Row 10: Invoice Number
+  const r10 = createEmptyRow();
+  r10[1] = `Invoice No:- ${invNumber}`;
+  r10[11] = `Invoice No:- ${invNumber}`;
+  grid.push(r10);
+
+  // Row 11: Date
+  const r11 = createEmptyRow();
+  r11[1] = "Date:";
+  r11[2] = invDate;
+  r11[11] = "Date:";
+  r11[12] = invDate;
+  grid.push(r11);
+
+  // Row 12: Bill To & Ship To
+  const r12 = createEmptyRow();
+  r12[1] = "Bill To,";
+  r12[5] = "Ship To,";
+  r12[11] = "Bill To,";
+  r12[15] = "Ship To,";
+  grid.push(r12);
+
+  // Row 13: Client Name
+  const r13 = createEmptyRow();
+  r13[1] = clientName;
+  r13[5] = clientName;
+  r13[11] = clientName;
+  r13[15] = clientName;
+  grid.push(r13);
+
+  // Row 14: Client Address
+  const r14 = createEmptyRow();
+  r14[1] = clientAddr;
+  r14[5] = clientAddr;
+  r14[11] = clientAddr;
+  r14[15] = clientAddr;
+  grid.push(r14);
+
+  // Row 15: Place of Supply
+  const r15 = createEmptyRow();
+  r15[1] = `Place of Supply:- ${placeOfSupply}`;
+  r15[11] = `Place of Supply:- ${placeOfSupply}`;
+  grid.push(r15);
+
+  // Row 16: Client GSTIN
+  const r16 = createEmptyRow();
+  r16[1] = `GSTIN/UIN: ${clientGstin}`;
+  r16[11] = `GSTIN/UIN: ${clientGstin}`;
+  grid.push(r16);
+
+  // Row 17: empty
+  grid.push(createEmptyRow());
+
+  // Row 18: Items Header
+  const r18 = createEmptyRow();
+  r18[2] = "Description";
+  r18[5] = "HSN/SAC";
+  r18[7] = "Tax Rate";
+  r18[8] = "Amount";
+  r18[9] = "Amount";
+  r18[12] = "Description";
+  r18[14] = "HSN/SAC";
+  r18[15] = "HSN/SAC";
+  r18[17] = "Tax Rate";
+  r18[18] = "Amount";
+  r18[19] = "Amount";
+  grid.push(r18);
+
+  // Items rows
   items.forEach((item, idx) => {
-    const amt = Number(item.qty || 1) * Number(item.unitPrice || 0);
+    const rItem = createEmptyRow();
+    const itAmt = Number(item.qty || 1) * Number(item.unitPrice || 0);
     const sac = item.hsnSac || "998361";
-    const rate = item.taxPercent || 18;
-    const desc = clean(item.description || "Digital Marketing Services");
-    rows.push(
-      `,${idx + 1},${desc},,,${sac},,${rate},${amt},${amt},,,${idx + 1},${desc},,${sac},${sac},,${rate},${amt},${amt}`
-    );
+    const rate = String(item.taxPercent || 18);
+    const desc = item.description || "";
+
+    rItem[1] = String(idx + 1);
+    rItem[2] = desc;
+    rItem[5] = sac;
+    rItem[7] = rate;
+    rItem[8] = String(itAmt);
+    rItem[9] = String(itAmt);
+
+    rItem[11] = String(idx + 1);
+    rItem[12] = desc;
+    rItem[14] = sac;
+    rItem[15] = sac;
+    rItem[17] = rate;
+    rItem[18] = String(itAmt);
+    rItem[19] = String(itAmt);
+
+    grid.push(rItem);
   });
 
-  // Empty filler rows matching standard invoice format height
-  for (let i = 0; i < 5; i++) {
-    rows.push(`,,,,,,,,,,,,,,,,,,,`);
+  // Empty filler rows (matching template height)
+  const totalItemRows = items.length;
+  const fillerCount = Math.max(1, 19 - totalItemRows);
+  for (let i = 0; i < fillerCount; i++) {
+    grid.push(createEmptyRow());
   }
 
-  // Totals & Bank details
-  rows.push(`,,Bank Details,,,,,Taxable,,${subtotal},,,Bank Details,,,,,Taxable,,${subtotal}`);
-  rows.push(`,Banking Name: ${DEFAULT_AGENCY.bankName},,,,,,CGST,,${cgst},,Banking Name: ${DEFAULT_AGENCY.bankName},,,,,,CGST,,${cgst}`);
-  rows.push(`,Account No:- ${DEFAULT_AGENCY.accountNo},,,,,,SGST,,${sgst},,Account No:- ${DEFAULT_AGENCY.accountNo},,,,,,SGST,,${sgst}`);
-  rows.push(`,IFSC Code:- ${DEFAULT_AGENCY.ifsc},,,,,,IGST,,${igst},,IFSC Code:- ${DEFAULT_AGENCY.ifsc},,,,,,IGST,,${igst}`);
-  rows.push(`,,,,,,,Round Off.,,${roundOff},,,,,,,,,,Round Off.,,${roundOff}`);
-  rows.push(`,,,,,,,Gross Amount,,${grossAmount},,,,,,,,Gross Amount,,${grossAmount}`);
-  rows.push(`,Amount in Words:-,,${clean(words)},,,,,,,,Amount in Words:-,,${clean(words)},,,,,,`);
-  rows.push(`,,,,,,,,,,,,,,,,,,,`);
-  rows.push(`,Thank you for choosing us.,,,,,,,,,,Thank you for choosing us.,,,,,,,,`);
-  rows.push(`,,,,,Authorised Signatory,,,,,,,,,,Authorised Signatory,,,,`);
-  rows.push(
-    `,"We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.",,,,,,,,,,"We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.",,,,,,,,`
+  // Bank Details & Taxable
+  const rBank = createEmptyRow();
+  rBank[2] = "Bank Details";
+  rBank[7] = "Taxable";
+  rBank[9] = String(subtotal);
+  rBank[12] = "Bank Details";
+  rBank[17] = "Taxable";
+  rBank[19] = String(subtotal);
+  grid.push(rBank);
+
+  // Banking Name & CGST
+  const rCgst = createEmptyRow();
+  rCgst[1] = "Banking Name: HDFC BANK LIMITED";
+  rCgst[7] = "CGST";
+  rCgst[9] = cgst;
+  rCgst[11] = "Banking Name: HDFC BANK LIMITED";
+  rCgst[17] = "CGST";
+  rCgst[19] = cgst;
+  grid.push(rCgst);
+
+  // Account No & SGST
+  const rSgst = createEmptyRow();
+  rSgst[1] = "Account No:- 50200121903920";
+  rSgst[7] = "SGST";
+  rSgst[9] = sgst;
+  rSgst[11] = "Account No:- 50200121903920";
+  rSgst[17] = "SGST";
+  rSgst[19] = sgst;
+  grid.push(rSgst);
+
+  // IFSC Code & IGST
+  const rIgst = createEmptyRow();
+  rIgst[1] = "IFSC Code:- HDFC0000663";
+  rIgst[7] = "IGST";
+  rIgst[9] = igst;
+  rIgst[11] = "IFSC Code:- HDFC0000663";
+  rIgst[17] = "IGST";
+  rIgst[19] = igst;
+  grid.push(rIgst);
+
+  // Round Off
+  const rRound = createEmptyRow();
+  rRound[7] = "Round Off.";
+  rRound[9] = String(roundOff);
+  rRound[17] = "Round Off.";
+  rRound[19] = String(roundOff);
+  grid.push(rRound);
+
+  // Gross Amount
+  const rGross = createEmptyRow();
+  rGross[7] = "Gross Amount";
+  rGross[9] = String(grossAmount);
+  rGross[17] = "Gross Amount";
+  rGross[19] = String(grossAmount);
+  grid.push(rGross);
+
+  // Amount in Words
+  const rWords = createEmptyRow();
+  rWords[1] = "Amount in Words:-";
+  rWords[3] = words;
+  rWords[11] = "Amount in Words:-";
+  rWords[13] = words;
+  grid.push(rWords);
+
+  // 6 empty spacer rows
+  for (let i = 0; i < 6; i++) {
+    grid.push(createEmptyRow());
+  }
+
+  // Thank you for choosing us
+  const rThank = createEmptyRow();
+  rThank[1] = "Thank you for choosing us.";
+  rThank[11] = "Thank you for choosing us.";
+  grid.push(rThank);
+
+  // 1 empty row
+  grid.push(createEmptyRow());
+
+  // Authorised Signatory
+  const rSign = createEmptyRow();
+  rSign[5] = "Authorised Signatory";
+  rSign[15] = "Authorised Signatory";
+  grid.push(rSign);
+
+  // Declaration
+  const declaration = "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.";
+  const rDecl = createEmptyRow();
+  rDecl[1] = declaration;
+  rDecl[11] = declaration;
+  grid.push(rDecl);
+
+  return grid;
+}
+
+/**
+ * Downloads the exact CSV representation of the invoice.
+ */
+export function exportInvoiceToCsv(inv: InvoiceExportData) {
+  const invNumber = inv.number || inv.invoiceNumber || "0003";
+  const clientName = inv.clientName || "Client";
+  const grid = buildExactInvoiceGrid(inv);
+
+  const csvLines = grid.map((row) =>
+    row
+      .map((cell) => {
+        if (!cell) return "";
+        if (cell.includes(",") || cell.includes('"') || cell.includes("\n")) {
+          return `"${cell.replace(/"/g, '""')}"`;
+        }
+        return cell;
+      })
+      .join(",")
   );
 
-  const csvContent = "\uFEFF" + rows.join("\r\n");
+  const csvContent = "\uFEFF" + csvLines.join("\r\n");
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -147,136 +368,58 @@ export function exportInvoiceToCsv(inv: InvoiceExportData) {
 }
 
 /**
- * Generates and downloads a rich, formatted Excel workbook (.xlsx) with grid styling.
+ * Downloads the exact Excel workbook (.xlsx) matching the 20-column dual template.
  */
 export async function exportInvoiceToExcel(inv: InvoiceExportData) {
-  const invNumber = inv.number || inv.invoiceNumber || "0001";
-  const invDate = inv.invoiceDate || new Date().toISOString().split("T")[0];
-  const docType = inv.invoiceType === "PROFORMA" ? "PROFORMA INVOICE" : "TAX INVOICE";
-
-  const clientName = inv.clientName || "Valued Client";
-  const clientAddr = [inv.billingAddress || inv.clientAddress, inv.clientCity, inv.clientState, inv.clientPostalCode]
-    .filter(Boolean)
-    .join(", ") || "Client Address";
-  const clientGstin = inv.clientGstin || "URP (Unregistered Person)";
-  const placeOfSupply = inv.placeOfSupply || inv.clientState || "Maharashtra";
-
-  const isIGST = inv.gstType === "IGST" || (!clientGstin.startsWith("27") && placeOfSupply.toLowerCase() !== "maharashtra");
-  
-  const items = inv.lineItems && inv.lineItems.length > 0 ? inv.lineItems : [
-    { description: "Digital Marketing & Social Media Management Services", hsnSac: "998361", taxPercent: 18, qty: 1, unitPrice: inv.subtotal || inv.total || 0 }
-  ];
-
-  const subtotal = items.reduce((s, it) => s + (Number(it.qty || 1) * Number(it.unitPrice || 0)), 0);
-  const taxRate = items[0]?.taxPercent || 18;
-  const taxAmount = (subtotal * taxRate) / 100;
-  const grossAmount = Math.round(subtotal + taxAmount);
-  const roundOff = (grossAmount - (subtotal + taxAmount)).toFixed(2);
-
-  const cgst = isIGST ? 0 : Number((taxAmount / 2).toFixed(2));
-  const sgst = isIGST ? 0 : Number((taxAmount / 2).toFixed(2));
-  const igst = isIGST ? Number(taxAmount.toFixed(2)) : 0;
-
-  const words = amountToWords(grossAmount, "INR");
+  const invNumber = inv.number || inv.invoiceNumber || "0003";
+  const clientName = inv.clientName || "Client";
+  const grid = buildExactInvoiceGrid(inv);
 
   const workbook = new ExcelJS.Workbook();
   const ws = workbook.addWorksheet(invNumber.slice(0, 31));
 
-  // Set default column widths
+  // Set 20 columns
   ws.columns = [
-    { width: 4 },  // A
-    { width: 5 },  // B (Sr)
-    { width: 32 }, // C (Desc)
-    { width: 12 }, // D
-    { width: 12 }, // E
-    { width: 12 }, // F (HSN)
-    { width: 10 }, // G (Tax)
-    { width: 14 }, // H (Rate)
-    { width: 16 }, // I (Amount)
-    { width: 16 }, // J (Amount)
-    { width: 4 },  // K (Spacer)
-    { width: 5 },  // L (Sr)
-    { width: 32 }, // M (Desc)
-    { width: 12 }, // N
-    { width: 12 }, // O (HSN)
-    { width: 10 }, // P (Tax)
-    { width: 14 }, // Q (Rate)
-    { width: 16 }, // R (Amount)
-    { width: 16 }, // S (Amount)
+    { width: 3 },  // 0: spacer
+    { width: 28 }, // 1: Bill To / Details
+    { width: 28 }, // 2: Description
+    { width: 12 }, // 3
+    { width: 12 }, // 4
+    { width: 14 }, // 5: Ship To / HSN
+    { width: 10 }, // 6
+    { width: 12 }, // 7: Tax Rate / Labels
+    { width: 14 }, // 8: Amount
+    { width: 16 }, // 9: Amount / Totals
+    { width: 3 },  // 10: spacer
+    { width: 28 }, // 11: Bill To / Details
+    { width: 28 }, // 12: Description
+    { width: 12 }, // 13
+    { width: 12 }, // 14: HSN
+    { width: 14 }, // 15: Ship To / HSN
+    { width: 10 }, // 16
+    { width: 12 }, // 17: Tax Rate / Labels
+    { width: 14 }, // 18: Amount
+    { width: 16 }, // 19: Amount / Totals
   ];
 
-  // Helper to fill side-by-side or single section
-  const addHeaderRow = (text1: string, text2: string) => {
-    const row = ws.addRow(["", text1, "", "", "", "", "", "", "", "", "", text2]);
-    return row;
-  };
-
-  ws.addRow(["", "", "", "", "", "", "Original for Recipient", "", "", "", "", "", "", "", "", "", "Duplicate for Transporter"]);
-  const brandRow = ws.addRow(["", DEFAULT_AGENCY.name, "", "", "", "", "", "", "", "", "", DEFAULT_AGENCY.name]);
-  brandRow.font = { bold: true, size: 14, color: { argb: "FF1E1B4B" } };
-
-  ws.addRow(["", DEFAULT_AGENCY.tagline, "", "", "", "", "", "", "", "", "", DEFAULT_AGENCY.tagline]);
-  ws.addRow(["", DEFAULT_AGENCY.address, "", "", "", "", "", "", "", "", "", DEFAULT_AGENCY.address]);
-  ws.addRow(["", `GSTIN/UIN: ${DEFAULT_AGENCY.gstin}`, "", "", "", "", "", "", "", "", "", `GSTIN/UIN: ${DEFAULT_AGENCY.gstin}`]);
-
-  const docRow = ws.addRow(["", docType, "", "", "", "", "", "", "", "", "", docType]);
-  docRow.font = { bold: true, size: 12 };
-
-  ws.addRow(["", `Invoice No:- ${invNumber}`, "", "", "", "", "", "", "", "", "", `Invoice No:- ${invNumber}`]);
-  ws.addRow(["", "Date:", invDate, "", "", "", "", "", "", "", "", "Date:", invDate]);
-
-  ws.addRow(["", "Bill To,", "", "", "Ship To,", "", "", "", "", "", "", "Bill To,", "", "", "Ship To,"]);
-  ws.addRow(["", clientName, "", "", clientName, "", "", "", "", "", "", clientName, "", "", clientName]);
-  ws.addRow(["", clientAddr, "", "", clientAddr, "", "", "", "", "", "", clientAddr, "", "", clientAddr]);
-  ws.addRow(["", `Place of Supply:- ${placeOfSupply}`, "", "", "", "", "", "", "", "", "", `Place of Supply:- ${placeOfSupply}`]);
-  ws.addRow(["", `GSTIN/UIN: ${clientGstin}`, "", "", "", "", "", "", "", "", "", `GSTIN/UIN: ${clientGstin}`]);
-  ws.addRow([]);
-
-  // Table header
-  const tableHeaderRow = ws.addRow([
-    "", "Sr", "Description", "", "", "HSN/SAC", "Tax %", "Qty", "Rate", "Amount",
-    "", "Sr", "Description", "", "HSN/SAC", "Tax %", "Qty", "Rate", "Amount"
-  ]);
-  tableHeaderRow.font = { bold: true };
-  tableHeaderRow.fill = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FFF1F5F9" }
-  };
-
-  items.forEach((item, idx) => {
-    const amt = Number(item.qty || 1) * Number(item.unitPrice || 0);
-    const sac = item.hsnSac || "998361";
-    const rate = item.taxPercent || 18;
-    const desc = item.description || "Digital Marketing Services";
-    ws.addRow([
-      "", idx + 1, desc, "", "", sac, `${rate}%`, item.qty || 1, item.unitPrice || 0, amt,
-      "", idx + 1, desc, "", sac, `${rate}%`, item.qty || 1, item.unitPrice || 0, amt
-    ]);
+  grid.forEach((rowValues) => {
+    const row = ws.addRow(rowValues);
+    const firstCol = rowValues[1] || "";
+    if (firstCol === "BLINK BEYOND") {
+      row.font = { bold: true, size: 13, color: { argb: "FF1E1B4B" } };
+    } else if (firstCol === "TAX INVOICE" || firstCol === "PROFORMA INVOICE") {
+      row.font = { bold: true, size: 12 };
+    } else if (rowValues[2] === "Description" || rowValues[7] === "Original for Recipient") {
+      row.font = { bold: true };
+    } else if (rowValues[7] === "Gross Amount") {
+      row.font = { bold: true, size: 11 };
+    }
   });
 
-  // Empty spacing rows
-  ws.addRow([]);
-  ws.addRow([]);
-
-  // Totals & Bank
-  ws.addRow(["", "Bank Details", "", "", "", "", "Taxable", "", "", subtotal, "", "Bank Details", "", "", "Taxable", "", "", subtotal]);
-  ws.addRow(["", `Banking Name: ${DEFAULT_AGENCY.bankName}`, "", "", "", "", "CGST (9%)", "", "", cgst, "", `Banking Name: ${DEFAULT_AGENCY.bankName}`, "", "", "CGST (9%)", "", "", cgst]);
-  ws.addRow(["", `Account No:- ${DEFAULT_AGENCY.accountNo}`, "", "", "", "", "SGST (9%)", "", "", sgst, "", `Account No:- ${DEFAULT_AGENCY.accountNo}`, "", "", "SGST (9%)", "", "", sgst]);
-  ws.addRow(["", `IFSC Code:- ${DEFAULT_AGENCY.ifsc}`, "", "", "", "", "IGST (18%)", "", "", igst, "", `IFSC Code:- ${DEFAULT_AGENCY.ifsc}`, "", "", "IGST (18%)", "", "", igst]);
-  ws.addRow(["", "", "", "", "", "", "Round Off", "", "", roundOff, "", "", "", "", "Round Off", "", "", roundOff]);
-  
-  const grossRow = ws.addRow(["", "", "", "", "", "", "Gross Total", "", "", grossAmount, "", "", "", "", "Gross Total", "", "", grossAmount]);
-  grossRow.font = { bold: true, size: 12 };
-
-  ws.addRow(["", `Amount in Words: ${words}`, "", "", "", "", "", "", "", "", "", `Amount in Words: ${words}`]);
-  ws.addRow([]);
-  ws.addRow(["", "Thank you for choosing us.", "", "", "", "", "", "", "", "", "", "Thank you for choosing us."]);
-  ws.addRow(["", "Authorised Signatory", "", "", "", "", "", "", "", "", "", "Authorised Signatory"]);
-  ws.addRow(["", "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct."]);
-
   const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
