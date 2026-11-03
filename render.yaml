@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: agency-os
+    env: node
+    plan: starter
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm run build
+    startCommand: node dist/index.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVE_STATIC
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DEFAULT_ADMIN_EMAIL
+        value: admin@agencyos.com
+      - key: DEFAULT_ADMIN_NAME
+        value: Admin
+      - key: DEFAULT_ADMIN_PASSWORD
+        sync: false
