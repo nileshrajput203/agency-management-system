@@ -297,3 +297,4 @@ router.get("/:userId/payslip-pdf", requirePermission("users.view"), asyncHandler
 }));
 
 export default router;
+

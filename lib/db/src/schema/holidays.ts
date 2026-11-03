@@ -16,3 +16,4 @@ export const holidaysTable = pgTable("holidays", {
 export const insertHolidaySchema = createInsertSchema(holidaysTable).omit({ id: true, createdAt: true });
 export type InsertHoliday = z.infer<typeof insertHolidaySchema>;
 export type Holiday = typeof holidaysTable.$inferSelect;
+

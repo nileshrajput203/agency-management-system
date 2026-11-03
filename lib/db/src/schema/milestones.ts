@@ -18,3 +18,4 @@ export const projectMilestonesTable = pgTable("project_milestones", {
 ]);
 
 export type ProjectMilestone = typeof projectMilestonesTable.$inferSelect;
+

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import {
   useListLeads, useCreateLead, useUpdateLead, useDeleteLead,
   useGetPipelineSummary, getListLeadsQueryKey,
@@ -23,7 +24,7 @@ import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { useForm, Controller } from "react-hook-form";
 import {
   Plus, Trash2, IndianRupee, TrendingUp, Calendar, Phone,
-  PhoneCall, AlertCircle, Clock, Edit2, ListTodo,
+  PhoneCall, AlertCircle, Clock, Edit2, ListTodo, Rocket, CheckCircle2,
 } from "lucide-react";
 import { cn, formatDateOnly } from "@/lib/utils";
 import {
@@ -53,13 +54,15 @@ function callStatusBadge(status: string) {
 
 /* ─── Sortable lead card (matches task kanban animation) ─── */
 function SortableLeadCard({
-  lead, deleteMutation, isDragOverlay, onEdit,
+  lead, deleteMutation, isDragOverlay, onEdit, onConvert,
 }: {
   lead: any;
   deleteMutation?: any;
   isDragOverlay?: boolean;
   onEdit?: (lead: any) => void;
+  onConvert?: (lead: any) => void;
 }) {
+
   const {
     attributes, listeners, setNodeRef,
     transform, transition, isDragging,
@@ -157,7 +160,7 @@ function SortableLeadCard({
 }
 
 /* ─── Droppable stage column ─── */
-function DroppableStage({ stage, stageLeads, activeId, deleteMutation, onEdit }: any) {
+function DroppableStage({ stage, stageLeads, activeId, deleteMutation, onEdit, onConvert }: any) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.key });
 
   return (
@@ -587,8 +590,7 @@ export default function SalesPage() {
       </div>
 
       {tab === "tasks" ? (
-        <SalesTasksTab onEdit={openEdit}
-                      onConvert={(l: any) => setConvertLead(l)} />
+        <SalesTasksTab onEdit={openEdit} />
       ) : (
         <>
           {/* Pipeline summary */}
@@ -704,8 +706,8 @@ export default function SalesPage() {
           </form>
         </DialogContent>
       </Dialog>
-    
-      {/* Convert Lead to Client and Project Dialog */}
+
+      {/* Convert Lead to Client & Project Dialog */}
       <Dialog open={!!convertLead} onOpenChange={(open) => { if (!open) setConvertLead(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -782,9 +784,9 @@ export default function SalesPage() {
                   onClick={async () => {
                     try {
                       setIsConverting(true);
-                      const retainerVal = Number((document.getElementById("convert-retainer") as HTMLInputElement)?.value) || convertLead.value || 0;
-                      const templateVal = (document.getElementById("convert-template") as HTMLSelectElement)?.value || "SOCIAL_MEDIA";
-                      const docVal = (document.getElementById("convert-doc") as HTMLSelectElement)?.value || "INVOICE";
+                      const retainerVal = Number((document.getElementById("convert-retainer")).value) || convertLead.value || 0;
+                      const templateVal = (document.getElementById("convert-template")).value || "SOCIAL_MEDIA";
+                      const docVal = (document.getElementById("convert-doc")).value || "INVOICE";
                       const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
 
                       const res = await fetch(`/api/leads/${convertLead.id}/convert`, {
@@ -816,7 +818,7 @@ export default function SalesPage() {
                       qc.invalidateQueries({ queryKey: ["tasks"] });
                       setConvertLead(null);
                       setLocation(`/clients/${data.client?.id}`);
-                    } catch (err: any) {
+                    } catch (err) {
                       toast.error(err.message || "Failed to convert lead");
                     } finally {
                       setIsConverting(false);
@@ -824,13 +826,13 @@ export default function SalesPage() {
                   }}
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  {isConverting ? "Converting..." : "Confirm & Launch Client"}
+                  {isConverting ? "Converting..." : "Confirm & Launch Client 🚀"}
                 </Button>
               </DialogFooter>
             </div>
           )}
         </DialogContent>
       </Dialog>
-</div>
+    </div>
   );
 }

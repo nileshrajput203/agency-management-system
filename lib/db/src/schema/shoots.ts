@@ -45,3 +45,4 @@ export const shootsTable = pgTable("shoots", {
 export const insertShootSchema = createInsertSchema(shootsTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertShoot = z.infer<typeof insertShootSchema>;
 export type Shoot = typeof shootsTable.$inferSelect;
+

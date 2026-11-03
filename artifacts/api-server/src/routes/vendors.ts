@@ -127,3 +127,4 @@ router.delete("/:id", requirePermission("purchase_orders.delete"), asyncHandler(
 }));
 
 export default router;
+

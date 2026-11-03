@@ -51,3 +51,4 @@ router.delete("/:id", requirePermission("attendance.manage"), asyncHandler(async
 }));
 
 export default router;
+
