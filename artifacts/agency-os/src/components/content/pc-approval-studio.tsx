@@ -44,9 +44,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
   // Left pane filters
-  const [stageFilter, setStageFilter] = useState<string>("NEEDS_APPROVAL");
+  const [stageFilter, setStageFilter] = useState<string>("ALL");
   const [clientFilter, setClientFilter] = useState<string>("ALL");
   const [platformFilter, setPlatformFilter] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Center pane view mode
@@ -94,8 +95,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   // Filter queue items
   const filteredPosts = posts.filter((p) => {
     // Stage filtering
-    if (stageFilter === "NEEDS_APPROVAL") {
-      if (p.status !== "IN_REVIEW" && p.internalApprovalStatus !== "PENDING") return false;
+    if (stageFilter === "ALL") {
+      // show all posts in pipeline
+    } else if (stageFilter === "NEEDS_APPROVAL") {
+      if (p.status !== "IN_REVIEW" && !(p.internalApprovalStatus === "PENDING" && !["IDEA", "SCRIPTING", "SHOOTING", "ADMIN_APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status || ""))) return false;
     } else if (stageFilter === "REVISIONS") {
       if (p.needsRevision !== "true" && p.internalApprovalStatus !== "CHANGES_REQUESTED" && p.approvalStatus !== "NEEDS_CHANGES") return false;
     } else if (stageFilter === "IDEATION_SHOOT") {
@@ -108,12 +111,21 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
 
     if (clientFilter !== "ALL" && p.clientId !== clientFilter) return false;
     if (platformFilter !== "ALL" && p.platform !== platformFilter) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const match =
+        p.title?.toLowerCase().includes(q) ||
+        p.conceptHook?.toLowerCase().includes(q) ||
+        p.clientName?.toLowerCase().includes(q) ||
+        p.caption?.toLowerCase().includes(q);
+      if (!match) return false;
+    }
 
     return true;
   });
 
   // Keep a selected post
-  const activePost = posts.find((p) => p.id === selectedPostId) || filteredPosts[0] || posts[0] || null;
+  const activePost = filteredPosts.find((p) => p.id === selectedPostId) || filteredPosts[0] || posts.find((p) => p.id === selectedPostId) || posts[0] || null;
 
   useEffect(() => {
     if (activePost && !selectedPostId) {
@@ -510,6 +522,19 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
             </div>
             <div className="grid grid-cols-2 gap-1 text-[11px]">
               <button
+                onClick={() => setStageFilter("ALL")}
+                className={cn(
+                  "px-2 py-1.5 rounded-md text-left font-medium transition-all flex items-center justify-between col-span-2",
+                  stageFilter === "ALL" ? "bg-primary/15 text-primary font-bold shadow-2xs" : "hover:bg-muted text-muted-foreground"
+                )}
+              >
+                <span>📋 All Content</span>
+                <span className="text-[10px] bg-primary/20 px-1.5 rounded-full font-bold">
+                  {posts.length}
+                </span>
+              </button>
+
+              <button
                 onClick={() => setStageFilter("NEEDS_APPROVAL")}
                 className={cn(
                   "px-2 py-1.5 rounded-md text-left font-medium transition-all flex items-center justify-between",
@@ -518,7 +543,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               >
                 <span>🔔 Needs Review</span>
                 <span className="text-[10px] bg-amber-500/20 px-1.5 rounded-full font-bold">
-                  {posts.filter(p => p.status === "IN_REVIEW" || p.internalApprovalStatus === "PENDING").length}
+                  {posts.filter(p => p.status === "IN_REVIEW" || (p.internalApprovalStatus === "PENDING" && !["IDEA", "SCRIPTING", "SHOOTING", "ADMIN_APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status || ""))).length}
                 </span>
               </button>
 
@@ -531,7 +556,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               >
                 <span>⚠️ Revisions</span>
                 <span className="text-[10px] bg-rose-500/20 px-1.5 rounded-full font-bold">
-                  {posts.filter(p => p.needsRevision === "true" || p.internalApprovalStatus === "CHANGES_REQUESTED").length}
+                  {posts.filter(p => p.needsRevision === "true" || p.internalApprovalStatus === "CHANGES_REQUESTED" || p.approvalStatus === "NEEDS_CHANGES").length}
                 </span>
               </button>
 
@@ -595,6 +620,16 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                   <SelectItem value="FACEBOOK">Facebook</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Search within queue */}
+            <div className="pt-1">
+              <Input
+                placeholder="Search queue..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-7 text-xs bg-background"
+              />
             </div>
           </div>
 

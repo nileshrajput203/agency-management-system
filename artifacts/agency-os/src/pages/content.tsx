@@ -75,7 +75,7 @@ export default function ContentPage() {
   });
   const { data: posts, isLoading } = useListContentPosts({
     clientId: activeClientId || undefined,
-    month,
+    month: view === "calendar" ? month : undefined,
   });
   // Use the full client list only when the account has Clients access. Content
   // users without it can still choose clients already represented in content.
@@ -345,7 +345,7 @@ export default function ContentPage() {
   const totalNeedsRevision = (posts ?? []).filter((p) => (p as any).needsRevision === "true" || (p as any).approvalStatus === "NEEDS_CHANGES").length;
 
   const contentStatChips = [
-    { label: "Posts This Month", value: posts?.length ?? 0,  accent: "border-l-primary",     icon: <FileText className="h-4 w-4" /> },
+    { label: view === "calendar" ? "Posts This Month" : "Total Posts", value: posts?.length ?? 0,  accent: "border-l-primary",     icon: <FileText className="h-4 w-4" /> },
     { label: "Published",        value: totalPublished,       accent: "border-l-emerald-500", icon: <CheckCircle2 className="h-4 w-4" /> },
     { label: "Scheduled",        value: totalScheduled,       accent: "border-l-blue-500",    icon: <Clock className="h-4 w-4" /> },
     { label: "Needs Revision",   value: totalNeedsRevision,   accent: totalNeedsRevision > 0 ? "border-l-amber-400" : "border-l-slate-300", icon: <AlertTriangle className="h-4 w-4" /> },
@@ -358,7 +358,7 @@ export default function ContentPage() {
         <div>
           <h1 className="text-2xl font-bold font-heading">Content Calendar</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {activeClientId ? `${activeClient?.companyName} — ` : ""}{posts?.length ?? 0} posts this month
+            {activeClientId ? `${activeClient?.companyName} — ` : ""}{posts?.length ?? 0} {view === "calendar" ? "posts this month" : "posts in pipeline"}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
