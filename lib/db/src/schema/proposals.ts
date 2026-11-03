@@ -1,4 +1,4 @@
-import { pgTable, text, real, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, real, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { clientsTable } from "./clients";
@@ -15,6 +15,13 @@ export const proposalsTable = pgTable("proposals", {
   deliverables: text("deliverables"),
   timeline: text("timeline"),
   notes: text("notes"),
+  shareToken: text("share_token"),
+  pricingTiers: jsonb("pricing_tiers").$type<{ id: string; name: string; price: number; description: string; features: string[]; isPopular?: boolean }[]>().default([]),
+  optionalAddOns: jsonb("optional_add_ons").$type<{ id: string; name: string; price: number; description: string }[]>().default([]),
+  selectedTierId: text("selected_tier_id"),
+  selectedAddOnIds: jsonb("selected_add_on_ids").$type<string[]>().default([]),
+  signatureName: text("signature_name"),
+  signedAt: timestamp("signed_at"),
 
   // Audit fields
   createdAt: timestamp("created_at").defaultNow().notNull(),

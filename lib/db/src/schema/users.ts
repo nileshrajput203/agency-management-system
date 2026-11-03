@@ -1,4 +1,4 @@
-import { pgTable, text, boolean, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, boolean, timestamp, jsonb, real, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,6 +15,12 @@ export const usersTable = pgTable("users", {
   isDelegatedAdmin: boolean("is_delegated_admin").default(false),
   portalMode: text("portal_mode").default("MODE_1"),
   viewAllClients: boolean("view_all_clients").default(false),
+  hourlyCostRate: real("hourly_cost_rate").default(500),
+  monthlySalary: real("monthly_salary").default(0),
+  bankAccountNo: text("bank_account_no"),
+  bankIfsc: text("bank_ifsc"),
+  panNumber: text("pan_number"),
+  designation: text("designation"),
   
   // Audit fields
   createdAt: timestamp("created_at").defaultNow().notNull(),

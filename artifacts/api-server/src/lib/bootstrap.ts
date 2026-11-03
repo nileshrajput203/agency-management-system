@@ -296,6 +296,78 @@ export async function ensureSubprojectsTable(): Promise<void> {
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
       created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
       updated_by TEXT REFERENCES users(id) ON DELETE SET NULL
+    )`,
+    // Phase 2, 3, 4, 5, 6 additions
+    `ALTER TABLE clients ADD COLUMN IF NOT EXISTS monthly_retainer REAL DEFAULT 0`,
+    `ALTER TABLE clients ADD COLUMN IF NOT EXISTS deliverable_quotas JSONB DEFAULT '[]'::jsonb`,
+    `ALTER TABLE clients ADD COLUMN IF NOT EXISTS brand_kit JSONB DEFAULT '{}'::jsonb`,
+    `ALTER TABLE clients ADD COLUMN IF NOT EXISTS portal_token TEXT`,
+    `ALTER TABLE clients ADD COLUMN IF NOT EXISTS gstin TEXT`,
+    `ALTER TABLE clients ADD COLUMN IF NOT EXISTS state TEXT`,
+    `ALTER TABLE content_posts ADD COLUMN IF NOT EXISTS assignee_id TEXT`,
+    `ALTER TABLE content_posts ADD COLUMN IF NOT EXISTS linked_task_id TEXT`,
+    `ALTER TABLE content_posts ADD COLUMN IF NOT EXISTS asset_versions JSONB DEFAULT '[]'::jsonb`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS hourly_cost_rate REAL DEFAULT 500`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS monthly_salary REAL DEFAULT 0`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_account_no TEXT`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS bank_ifsc TEXT`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS pan_number TEXT`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS designation TEXT`,
+    `ALTER TABLE attendance ADD COLUMN IF NOT EXISTS work_mode TEXT DEFAULT 'WFO'`,
+    `ALTER TABLE attendance ADD COLUMN IF NOT EXISTS location_note TEXT`,
+    `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS vendor_type TEXT DEFAULT 'VENDOR'`,
+    `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS instagram_handle TEXT`,
+    `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS youtube_handle TEXT`,
+    `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS niche TEXT`,
+    `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS follower_count INTEGER DEFAULT 0`,
+    `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS engagement_rate TEXT`,
+    `ALTER TABLE vendors ADD COLUMN IF NOT EXISTS commercial_rate_per_reel REAL DEFAULT 0`,
+    `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS share_token TEXT`,
+    `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS pricing_tiers JSONB DEFAULT '[]'::jsonb`,
+    `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS optional_add_ons JSONB DEFAULT '[]'::jsonb`,
+    `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS selected_tier_id TEXT`,
+    `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS selected_add_on_ids JSONB DEFAULT '[]'::jsonb`,
+    `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signature_name TEXT`,
+    `ALTER TABLE proposals ADD COLUMN IF NOT EXISTS signed_at TIMESTAMP WITH TIME ZONE`,
+    `ALTER TABLE payments ADD COLUMN IF NOT EXISTS tds_amount REAL DEFAULT 0`,
+    `CREATE TABLE IF NOT EXISTS holidays (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      date TEXT NOT NULL,
+      type TEXT DEFAULT 'NATIONAL' NOT NULL,
+      is_paid BOOLEAN DEFAULT true NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS shoots (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      client_id TEXT REFERENCES clients(id) ON DELETE CASCADE,
+      project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
+      shoot_date TEXT NOT NULL,
+      start_time TEXT,
+      end_time TEXT,
+      location_name TEXT,
+      google_maps_url TEXT,
+      status TEXT DEFAULT 'PLANNED' NOT NULL,
+      crew_assignees JSONB DEFAULT '[]'::jsonb,
+      equipment_list JSONB DEFAULT '[]'::jsonb,
+      shot_list JSONB DEFAULT '[]'::jsonb,
+      call_sheet_notes TEXT,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+      created_by TEXT REFERENCES users(id) ON DELETE SET NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS project_milestones (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      description TEXT,
+      due_date TIMESTAMP WITH TIME ZONE,
+      status TEXT DEFAULT 'PENDING' NOT NULL,
+      completed_at TIMESTAMP WITH TIME ZONE,
+      order_index INTEGER DEFAULT 0,
+      created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
     )`
   ];
 
@@ -307,6 +379,32 @@ export async function ensureSubprojectsTable(): Promise<void> {
     }
   }
   logger.info("Bootstrap: subprojects table & task/subproject detail columns verified/created successfully.");
+
+  try {
+    const existingHolidays = await db.execute(sql.raw(`SELECT count(*) as cnt FROM holidays`));
+    const count = Number((existingHolidays.rows?.[0] as any)?.cnt || 0);
+    if (count === 0) {
+      const defaultHolidays = [
+        { name: "Republic Day", date: "2026-01-26", type: "NATIONAL" },
+        { name: "Holi", date: "2026-03-04", type: "FESTIVAL" },
+        { name: "Independence Day", date: "2026-08-15", type: "NATIONAL" },
+        { name: "Ganesh Chaturthi", date: "2026-09-14", type: "FESTIVAL" },
+        { name: "Gandhi Jayanti", date: "2026-10-02", type: "NATIONAL" },
+        { name: "Dussehra", date: "2026-10-20", type: "FESTIVAL" },
+        { name: "Diwali", date: "2026-11-08", type: "FESTIVAL" },
+        { name: "Christmas", date: "2026-12-25", type: "FESTIVAL" },
+      ];
+      for (const h of defaultHolidays) {
+        await db.execute(sql.raw(`
+          INSERT INTO holidays (id, name, date, type, is_paid)
+          VALUES ('${crypto.randomUUID()}', '${h.name}', '${h.date}', '${h.type}', true)
+        `));
+      }
+      logger.info("Bootstrap: seeded default Indian holidays.");
+    }
+  } catch (err) {
+    logger.warn({ err }, "Bootstrap: holiday seeding check warning");
+  }
 }
 
 /**

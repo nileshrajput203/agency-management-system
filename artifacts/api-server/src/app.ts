@@ -131,7 +131,7 @@ const publicLimiter = rateLimit({
   validate: { trustProxy: false },
 });
 
-app.use("/public", publicLimiter, publicRouter);
+app.use(["/public", "/api/public"], publicLimiter, publicRouter);
 app.use(["/api/auth", "/api/v1/auth"], authLimiter);
 app.use("/api/v1", apiLimiter, v1Router);
 app.use("/api", apiLimiter, router);

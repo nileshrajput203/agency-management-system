@@ -1,7 +1,15 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { projectsTable, subprojectsTable, clientsTable, usersTable, notifications, projectRequestsTable } from "@workspace/db/schema";
-import { eq, aliasedTable, sql, desc } from "drizzle-orm";
+import {
+  projectsTable,
+  subprojectsTable,
+  clientsTable,
+  usersTable,
+  notifications,
+  projectRequestsTable,
+  projectMilestonesTable,
+} from "@workspace/db/schema";
+import { eq, aliasedTable, sql, desc, asc, and } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
@@ -716,6 +724,83 @@ router.delete("/:projectId/subprojects/:subprojectId", requirePermission("projec
 
   await db.delete(subprojectsTable).where(eq(subprojectsTable.id, subprojectId as string));
 
+  return res.status(204).send();
+}));
+
+// ==========================================
+// PROJECT MILESTONES (PROGRESS & DELIVERABLE GATES)
+// ==========================================
+
+// GET /api/projects/:id/milestones — get milestones for project
+router.get("/:id/milestones", requirePermission("projects.view"), asyncHandler(async (req, res) => {
+  const projectId = req.params.id as string;
+  const rows = await db
+    .select()
+    .from(projectMilestonesTable)
+    .where(eq(projectMilestonesTable.projectId, projectId))
+    .orderBy(asc(projectMilestonesTable.orderIndex), asc(projectMilestonesTable.createdAt));
+
+  return res.json(rows);
+}));
+
+// POST /api/projects/:id/milestones — create milestone
+router.post("/:id/milestones", requirePermission("projects.edit"), asyncHandler(async (req, res) => {
+  const projectId = req.params.id as string;
+  const { title, description, dueDate, orderIndex = 0 } = req.body || {};
+
+  if (!title || typeof title !== "string" || !title.trim()) {
+    throw createError("Milestone title is required", 400);
+  }
+
+  const [milestone] = await db
+    .insert(projectMilestonesTable)
+    .values({
+      projectId,
+      title: title.trim(),
+      description: description || null,
+      dueDate: dueDate ? new Date(dueDate) : null,
+      orderIndex: Number(orderIndex) || 0,
+      status: "PENDING",
+    })
+    .returning();
+
+  return res.status(201).json(milestone);
+}));
+
+// PATCH /api/projects/:projectId/milestones/:milestoneId — update milestone
+router.patch("/:projectId/milestones/:milestoneId", requirePermission("projects.edit"), asyncHandler(async (req, res) => {
+  const { milestoneId } = req.params;
+  const { title, description, dueDate, status, orderIndex } = req.body || {};
+
+  const completedAt = status === "COMPLETED" ? new Date() : null;
+
+  const [updated] = await db
+    .update(projectMilestonesTable)
+    .set({
+      ...(title !== undefined && { title: title.trim() }),
+      ...(description !== undefined && { description }),
+      ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
+      ...(status !== undefined && { status }),
+      ...(status !== undefined && { completedAt }),
+      ...(orderIndex !== undefined && { orderIndex: Number(orderIndex) }),
+      updatedAt: new Date(),
+    })
+    .where(eq(projectMilestonesTable.id, milestoneId))
+    .returning();
+
+  if (!updated) throw createError("Milestone not found", 404);
+  return res.json(updated);
+}));
+
+// DELETE /api/projects/:projectId/milestones/:milestoneId — delete milestone
+router.delete("/:projectId/milestones/:milestoneId", requirePermission("projects.edit"), asyncHandler(async (req, res) => {
+  const { milestoneId } = req.params;
+  const [deleted] = await db
+    .delete(projectMilestonesTable)
+    .where(eq(projectMilestonesTable.id, milestoneId))
+    .returning({ id: projectMilestonesTable.id });
+
+  if (!deleted) throw createError("Milestone not found", 404);
   return res.status(204).send();
 }));
 

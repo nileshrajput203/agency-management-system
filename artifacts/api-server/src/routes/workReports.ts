@@ -7,8 +7,12 @@ import {
   workReportReopenRequestsTable,
   notificationsTable,
   usersTable,
+  tasksTable,
+  timeEntriesTable,
+  projectsTable,
+  clientsTable,
 } from "@workspace/db/schema";
-import { eq, desc, and, or, inArray } from "drizzle-orm";
+import { eq, desc, and, or, inArray, gte, lte, sql } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { requirePermission } from "../middleware/auth";
@@ -240,6 +244,151 @@ router.get(
     }));
 
     return res.json(reports);
+  })
+);
+
+/**
+ * GET /api/work-reports/auto-fill
+ * 1-Click Auto-Fill Work Report aggregating tasks, time entries, and project progress.
+ */
+router.get(
+  "/auto-fill",
+  asyncHandler(async (req: any, res) => {
+    const userId = req.user?.id;
+    if (!userId) throw createError("Unauthorized", 401);
+
+    const now = new Date();
+    const defaultStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    const startDateStr = req.query.startDate as string;
+    const endDateStr = req.query.endDate as string;
+
+    const startDate = startDateStr ? new Date(startDateStr) : defaultStart;
+    const endDate = endDateStr ? new Date(`${endDateStr}T23:59:59`) : defaultEnd;
+
+    // 1. Fetch user's tasks
+    const allUserTasks = await db
+      .select({
+        id: tasksTable.id,
+        title: tasksTable.title,
+        status: tasksTable.status,
+        projectId: tasksTable.projectId,
+        projectName: projectsTable.name,
+        clientId: projectsTable.clientId,
+        clientCompanyName: clientsTable.companyName,
+        dueDate: tasksTable.dueDate,
+        updatedAt: tasksTable.updatedAt,
+      })
+      .from(tasksTable)
+      .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
+      .leftJoin(clientsTable, eq(projectsTable.clientId, clientsTable.id))
+      .where(
+        or(
+          eq(tasksTable.assigneeId, userId),
+          sql`${tasksTable.coAssignees}::text LIKE ${`%"${userId}"%`}`
+        )
+      );
+
+    // 2. Fetch user's time entries in date range
+    const timeEntries = await db
+      .select({
+        id: timeEntriesTable.id,
+        projectId: timeEntriesTable.projectId,
+        durationMin: timeEntriesTable.durationMin,
+        startedAt: timeEntriesTable.startedAt,
+        note: timeEntriesTable.note,
+      })
+      .from(timeEntriesTable)
+      .where(
+        and(
+          eq(timeEntriesTable.userId, userId),
+          gte(timeEntriesTable.startedAt, startDate),
+          lte(timeEntriesTable.startedAt, endDate)
+        )
+      );
+
+    // Group time entries by projectId
+    const timeByProject = new Map<string, number>();
+    let totalMinutesLogged = 0;
+    for (const t of timeEntries) {
+      const mins = Number(t.durationMin) || 0;
+      totalMinutesLogged += mins;
+      const pId = t.projectId || "general";
+      timeByProject.set(pId, (timeByProject.get(pId) || 0) + mins);
+    }
+
+    // Group tasks by project
+    const projectGroups = new Map<string, {
+      projectId: string;
+      projectName: string;
+      clientName: string;
+      tasks: any[];
+    }>();
+
+    const clientSet = new Set<string>();
+
+    for (const t of allUserTasks) {
+      const pId = t.projectId || "unassigned";
+      const pName = t.projectName || "General Operations / Unassigned Project";
+      const cName = t.clientCompanyName || "Internal Agency";
+
+      if (t.clientCompanyName) clientSet.add(t.clientCompanyName);
+
+      if (!projectGroups.has(pId)) {
+        projectGroups.set(pId, {
+          projectId: pId,
+          projectName: pName,
+          clientName: cName,
+          tasks: [],
+        });
+      }
+      projectGroups.get(pId)!.tasks.push(t);
+    }
+
+    // Construct structured project deliverables
+    const projects: any[] = [];
+    let completedCount = 0;
+    let totalCount = 0;
+
+    for (const [pId, group] of projectGroups.entries()) {
+      const completedTasks = group.tasks.filter((t) => ["COMPLETED", "DONE"].includes(t.status));
+      const hours = Number(((timeByProject.get(pId) || 0) / 60).toFixed(1));
+      const pTotal = group.tasks.length;
+      const pDone = completedTasks.length;
+      const pct = pTotal > 0 ? Math.round((pDone / pTotal) * 100) : 100;
+
+      completedCount += pDone;
+      totalCount += pTotal;
+
+      const bulletPoints = completedTasks.length > 0
+        ? completedTasks.map((t) => `• ${t.title}`).join("\n")
+        : group.tasks.slice(0, 5).map((t) => `• [${t.status}] ${t.title}`).join("\n");
+
+      projects.push({
+        id: crypto.randomUUID(),
+        projectName: group.projectName,
+        clientName: group.clientName,
+        taskDescription: bulletPoints || "Active execution and operational tasks.",
+        completionPercentage: pct,
+        hoursSpent: hours > 0 ? hours : (pDone * 1.5),
+      });
+    }
+
+    const totalHours = Number((totalMinutesLogged / 60).toFixed(1));
+    const clientHandled = Array.from(clientSet).join(", ") || "General Agency Accounts";
+    const overallPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
+
+    const summary = `During this reporting cycle, successfully executed and delivered ${completedCount} completed tasks out of ${totalCount} assigned (${overallPct}% completion rate) across ${projects.length} project(s), logging ${totalHours > 0 ? `${totalHours} hours` : "full scheduled operational time"}. Focused on high-impact client deliverables, workflow consistency, and quality assurance.`;
+
+    return res.json({
+      projects,
+      clientHandled,
+      summary,
+      totalHours,
+      completedTasks: completedCount,
+      totalTasks: totalCount,
+    });
   })
 );
 

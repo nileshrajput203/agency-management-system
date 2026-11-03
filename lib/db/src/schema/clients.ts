@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, real, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -38,6 +38,12 @@ export const clientsTable = pgTable("clients", {
   logoUrl: text("logo_url"),
   onboardingDate: text("onboarding_date"),
   assignedTo: text("assigned_to").references(() => usersTable.id, { onDelete: "set null" }),
+  monthlyRetainer: real("monthly_retainer").default(0),
+  deliverableQuotas: jsonb("deliverable_quotas").$type<{ type: string; label: string; monthlyQuota: number }[]>().default([]),
+  brandKit: jsonb("brand_kit").$type<Record<string, any>>().default({}),
+  portalToken: text("portal_token"),
+  gstin: text("gstin"),
+  state: text("state"),
   
   // Audit fields
   createdAt: timestamp("created_at").defaultNow().notNull(),

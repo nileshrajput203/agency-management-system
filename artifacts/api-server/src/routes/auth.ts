@@ -9,6 +9,7 @@ import { createError } from "../middleware/errorHandler";
 import { requireAuth } from "../middleware/auth";
 import { authLogger } from "../lib/logger";
 import { syncUserEmployeeAndRole } from "../services/userService";
+import { NotificationService } from "../services/notificationService";
 
 function parseAllowedModules(val: unknown): string[] {
   if (Array.isArray(val)) return val as string[];
@@ -175,7 +176,7 @@ router.post("/auth/register", asyncHandler(async (req, res) => {
       name,
       email,
       password: passwordHash,
-      role: "EMPLOYEE",
+      role: "TEAM_MEMBER",
       systemRole: "TEAM_MEMBER",
       portalMode: "MODE_2",
       isActive: false,
@@ -190,6 +191,17 @@ router.post("/auth/register", asyncHandler(async (req, res) => {
     });
 
   await syncUserEmployeeAndRole(user);
+
+  try {
+    await NotificationService.notifyAdminsAndManagers({
+      type: "USER_REGISTERED",
+      title: "New User Registration Pending Approval",
+      body: `${user.name} (${user.email}) registered as TEAM_MEMBER and requires activation.`,
+      linkUrl: "/users",
+    });
+  } catch (notifErr) {
+    authLogger.warn({ notifErr }, "Failed to notify admins of user registration");
+  }
 
   return res.status(201).json({
     message: "Account created successfully. Please wait for administrator approval before logging in.",

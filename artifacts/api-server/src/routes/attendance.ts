@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { attendance, users, leaveRequests, agencySettings } from "@workspace/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { attendance, users, leaveRequests, agencySettings, holidaysTable, timeEntriesTable } from "@workspace/db/schema";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import { requirePermission, canManageEnabledSection } from "../middleware/auth";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
@@ -48,6 +48,20 @@ export async function processAutomaticAbsentMarking(targetDateStr?: string) {
     return {
       skipped: true,
       reason: `Date ${targetDate} is not a configured working day.`,
+      date: targetDate,
+    };
+  }
+
+  // Check if targetDate is a configured company or national holiday
+  const [holiday] = await db
+    .select()
+    .from(holidaysTable)
+    .where(eq(holidaysTable.date, targetDate));
+
+  if (holiday) {
+    return {
+      skipped: true,
+      reason: `Date ${targetDate} is a company holiday (${holiday.name}).`,
       date: targetDate,
     };
   }
@@ -208,6 +222,8 @@ router.post("/attendance/check-in", requirePermission("attendance.view"), asyncH
     isLate = true;
   }
 
+  const { workMode = "WFO", locationNote } = req.body || {};
+
   if (existing) {
     if (existing.status === "ABSENT") {
       const [updated] = await db.update(attendance)
@@ -215,6 +231,8 @@ router.post("/attendance/check-in", requirePermission("attendance.view"), asyncH
           checkInAt: now,
           status,
           isLate,
+          workMode,
+          locationNote: locationNote || null,
         })
         .where(eq(attendance.id, existing.id))
         .returning();
@@ -236,6 +254,8 @@ router.post("/attendance/check-in", requirePermission("attendance.view"), asyncH
     checkInAt: now,
     status,
     isLate,
+    workMode,
+    locationNote: locationNote || null,
     date: today,
   })
   .onConflictDoUpdate({
@@ -244,6 +264,8 @@ router.post("/attendance/check-in", requirePermission("attendance.view"), asyncH
       checkInAt: now,
       status,
       isLate,
+      workMode,
+      locationNote: locationNote || null,
     },
   })
   .returning();
@@ -340,7 +362,7 @@ router.get("/attendance/today", requirePermission("attendance.view"), asyncHandl
   });
 }));
 
-router.post("/attendance/start-break", requirePermission("attendance.view"), asyncHandler(async (req, res) => {
+router.post(["/attendance/start-break", "/attendance/break-start"], requirePermission("attendance.view"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
   const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, userId));
   if (!user) throw createError("Unauthorized", 401);
@@ -361,6 +383,26 @@ router.post("/attendance/start-break", requirePermission("attendance.view"), asy
   }
 
   const now = new Date();
+
+  // Smart Break Auto-Pause: pause any running task timer in time_entries
+  try {
+    const runningTimers = await db
+      .select()
+      .from(timeEntriesTable)
+      .where(and(eq(timeEntriesTable.userId, userId), isNull(timeEntriesTable.endedAt)));
+
+    for (const timer of runningTimers) {
+      const durMin = Math.max(1, Math.round((now.getTime() - new Date(timer.startedAt).getTime()) / 60000));
+      await db.update(timeEntriesTable).set({
+        endedAt: now,
+        durationMin: durMin,
+        note: timer.note ? `${timer.note} (Auto-paused on break)` : "Auto-paused during break",
+      }).where(eq(timeEntriesTable.id, timer.id));
+    }
+  } catch (timerErr) {
+    // Non-fatal if timer pause fails
+  }
+
   const [updated] = await db.update(attendance)
     .set({ breakStartAt: now, breakStatus: "ON_BREAK" })
     .where(eq(attendance.id, existing.id))
@@ -378,7 +420,7 @@ router.post("/attendance/start-break", requirePermission("attendance.view"), asy
   });
 }));
 
-router.post("/attendance/end-break", requirePermission("attendance.view"), asyncHandler(async (req, res) => {
+router.post(["/attendance/end-break", "/attendance/break-end"], requirePermission("attendance.view"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
   const [user] = await db.select({ id: users.id, name: users.name }).from(users).where(eq(users.id, userId));
   if (!user) throw createError("Unauthorized", 401);

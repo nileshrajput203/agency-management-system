@@ -487,7 +487,6 @@ const isSslRequired = process.env.DB_SSL === "true" || (!isLocalhost && process.
 const sslRejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED === "true";
 
 if (!sslRejectUnauthorized) {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
   if (poolConnectionString) {
     try {
       const u = new URL(poolConnectionString);

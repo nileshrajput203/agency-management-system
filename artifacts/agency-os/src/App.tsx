@@ -393,6 +393,9 @@ import NotificationsPage from "@/pages/notifications";
 import WorkReportsPage from "@/pages/work-reports";
 import PerformanceReportPage from "@/pages/performance-report";
 import ExpensesPage from "@/pages/expenses";
+import VendorsPage from "@/pages/vendors";
+import PayrollPage from "@/pages/payroll";
+import ProposalSharePage from "@/pages/proposal-share";
 
 // ─── Employee Portal imports ────────────────────────────────────
 import EmployeeLayout from "@/pages/employee/layout";
@@ -450,6 +453,8 @@ const ROUTE_MODULES: Record<string, string | null> = {
   "/expenses": "finance",
   "/excel-reports": "finance",
   "/users": "team",
+  "/vendors": "team",
+  "/payroll": "finance",
   "/settings": "settings",
 };
 
@@ -576,6 +581,7 @@ function AppRouter() {
     <Switch>
       <Route path="/content-calendar/share/:shareToken" component={PublicCalendarPage} />
       <Route path="/share/calendar/:shareToken" component={PublicCalendarPage} />
+      <Route path="/share/proposal/:token" component={ProposalSharePage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/portal/:clientId">
@@ -685,6 +691,24 @@ function AppRouter() {
           <ProtectedRoute>
             <DashboardLayout>
               <ProposalsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/vendors">
+        {() => (
+          <ProtectedRoute>
+            <DashboardLayout>
+              <VendorsPage />
+            </DashboardLayout>
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/payroll">
+        {() => (
+          <ProtectedRoute>
+            <DashboardLayout>
+              <PayrollPage />
             </DashboardLayout>
           </ProtectedRoute>
         )}

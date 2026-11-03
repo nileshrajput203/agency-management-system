@@ -1,12 +1,19 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { contentPostsTable, clientsTable, clientCalendarSharesTable } from "@workspace/db/schema";
+import {
+  contentPostsTable,
+  clientsTable,
+  clientCalendarSharesTable,
+  tasksTable,
+  projectsTable,
+} from "@workspace/db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate, isValidUUID, isPastDate } from "../lib/validation";
 import { requirePermission } from "../middleware/auth";
 import { logger } from "../lib/logger";
+import { NotificationService } from "../services/notificationService";
 
 const router = Router();
 
@@ -49,6 +56,9 @@ const CONTENT_COLUMNS = {
   referenceLinks: contentPostsTable.referenceLinks,
   customProperties: contentPostsTable.customProperties,
   comments: contentPostsTable.comments,
+  assigneeId: contentPostsTable.assigneeId,
+  linkedTaskId: contentPostsTable.linkedTaskId,
+  assetVersions: contentPostsTable.assetVersions,
   createdAt: contentPostsTable.createdAt,
 };
 
@@ -88,6 +98,45 @@ router.post("/", requirePermission("content.create"), asyncHandler(async (req, r
     throw createError("Shoot Date cannot be earlier than today's date. Please select today or a future date.", 400);
   }
 
+  // Preserve initial version in assetVersions if assetsLink is present
+  if (sanitized.assetsLink) {
+    sanitized.assetVersions = [
+      {
+        version: 1,
+        url: sanitized.assetsLink,
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: (req as any).userId || "system",
+      },
+    ];
+  }
+
+  // If assigneeId is provided and no linkedTaskId exists, auto-create SOP task in Task Board
+  if (sanitized.assigneeId && !sanitized.linkedTaskId) {
+    try {
+      const [clientProject] = sanitized.clientId
+        ? await db.select({ id: projectsTable.id }).from(projectsTable).where(eq(projectsTable.clientId, sanitized.clientId)).limit(1)
+        : [];
+
+      const [task] = await db.insert(tasksTable).values({
+        title: `[Content] ${sanitized.title || "Social Media Post"}`,
+        clientId: sanitized.clientId || null,
+        projectId: clientProject?.id || null,
+        assigneeId: sanitized.assigneeId,
+        dueDate: (sanitized.shootDate || sanitized.scheduledAt)
+          ? new Date(sanitized.shootDate || sanitized.scheduledAt)
+          : new Date(Date.now() + 5 * 86400000),
+        status: ["SCRIPTING", "DESIGNING", "PRODUCTION"].includes(sanitized.status) ? "IN_PROGRESS" : "TODO",
+        priority: "MEDIUM",
+        description: `Auto-linked from Content Studio: ${sanitized.format || sanitized.contentType || "Post"} for ${sanitized.platform || "Social"}.\n\nCaption/Hook: ${sanitized.caption || "None"}`,
+        createdBy: (req as any).userId,
+      }).returning();
+
+      sanitized.linkedTaskId = task.id;
+    } catch (err: any) {
+      logger.warn({ err }, "Could not auto-create linked task for content post");
+    }
+  }
+
   const [row] = await db.insert(contentPostsTable).values(sanitized).returning();
   return res.status(201).json(row);
 }));
@@ -98,7 +147,7 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
   const sanitized = sanitizeContentPost(body, true);
 
   const [existing] = await db
-    .select({ scheduledAt: contentPostsTable.scheduledAt, shootDate: contentPostsTable.shootDate })
+    .select()
     .from(contentPostsTable)
     .where(eq(contentPostsTable.id, contentId));
 
@@ -120,6 +169,81 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
     isPastDate(sanitized.shootDate)
   ) {
     throw createError("Shoot Date cannot be earlier than today's date. Please select today or a future date.", 400);
+  }
+
+  // Version tracking for Frame.io style proofing
+  if (sanitized.assetsLink && sanitized.assetsLink !== existing.assetsLink) {
+    const versions = Array.isArray(existing.assetVersions) ? [...(existing.assetVersions as any[])] : [];
+    versions.push({
+      version: versions.length + 1,
+      url: sanitized.assetsLink,
+      uploadedAt: new Date().toISOString(),
+      uploadedBy: (req as any).userId || "system",
+    });
+    sanitized.assetVersions = versions;
+  }
+
+  // Bi-directional Auto-Sync: create linked task if assignee was just added
+  let targetTaskId = existing.linkedTaskId || sanitized.linkedTaskId;
+  const effectiveAssignee = sanitized.assigneeId || existing.assigneeId;
+
+  if (!targetTaskId && effectiveAssignee) {
+    try {
+      const [clientProject] = (sanitized.clientId || existing.clientId)
+        ? await db.select({ id: projectsTable.id }).from(projectsTable).where(eq(projectsTable.clientId, sanitized.clientId || existing.clientId)).limit(1)
+        : [];
+
+      const [newTask] = await db.insert(tasksTable).values({
+        title: `[Content] ${sanitized.title || existing.title || "Social Post"}`,
+        clientId: sanitized.clientId || existing.clientId || null,
+        projectId: clientProject?.id || null,
+        assigneeId: effectiveAssignee,
+        dueDate: (sanitized.shootDate || sanitized.scheduledAt || existing.shootDate || existing.scheduledAt)
+          ? new Date(sanitized.shootDate || sanitized.scheduledAt || existing.shootDate || existing.scheduledAt)
+          : new Date(Date.now() + 5 * 86400000),
+        status: "TODO",
+        priority: "MEDIUM",
+        description: `Auto-linked from Content Studio: ${sanitized.title || existing.title || "Post"}`,
+        createdBy: (req as any).userId,
+      }).returning();
+
+      targetTaskId = newTask.id;
+      sanitized.linkedTaskId = newTask.id;
+    } catch (tErr) {
+      logger.warn({ tErr }, "Failed to auto-create task for content post");
+    }
+  }
+
+  // Sync stage to linked task & notifications
+  if (targetTaskId && sanitized.status) {
+    try {
+      if (["SCRIPTING", "DESIGNING", "PRODUCTION"].includes(sanitized.status)) {
+        await db.update(tasksTable).set({ status: "IN_PROGRESS" }).where(eq(tasksTable.id, targetTaskId));
+        if (effectiveAssignee && effectiveAssignee !== (req as any).userId) {
+          await NotificationService.createNotification({
+            userId: effectiveAssignee,
+            type: "TASK_ASSIGNED",
+            title: `🎨 Content Post In Progress: ${sanitized.title || existing.title}`,
+            message: `Post moved to ${sanitized.status}. You can work on it directly.`,
+            actionUrl: "/tasks",
+          }).catch(() => {});
+        }
+      } else if (sanitized.status === "IN_REVIEW") {
+        await db.update(tasksTable).set({ status: "IN_REVIEW" }).where(eq(tasksTable.id, targetTaskId));
+        await NotificationService.notifyAdminsAndManagers({
+          type: "CONTENT_IN_REVIEW",
+          title: `👀 Content In Review: ${sanitized.title || existing.title}`,
+          message: `Post submitted for review and approval.`,
+          actionUrl: "/content",
+        }).catch(() => {});
+      } else if (["ADMIN_APPROVED", "SCHEDULED", "PUBLISHED"].includes(sanitized.status)) {
+        await db.update(tasksTable).set({
+          status: "COMPLETED",
+        }).where(eq(tasksTable.id, targetTaskId));
+      }
+    } catch (syncErr) {
+      logger.warn({ syncErr }, "Failed to sync content status to linked task");
+    }
   }
 
   logger.info({
@@ -164,6 +288,41 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
     }, "[Content API] Revision update database execution failed");
     throw err;
   }
+}));
+
+// POST /api/content/:id/comments/pin — Frame.io style visual timestamped media proofing
+router.post("/:id/comments/pin", requirePermission("content.edit"), asyncHandler(async (req, res) => {
+  const contentId = req.params.id as string;
+  const { comment, timestampSec, frameCoordX, frameCoordY, version } = req.body || {};
+
+  if (!comment || typeof comment !== "string") {
+    throw createError("Comment text is required", 400);
+  }
+
+  const [post] = await db.select().from(contentPostsTable).where(eq(contentPostsTable.id, contentId));
+  if (!post) throw createError("Content post not found", 404);
+
+  const existingComments = Array.isArray(post.comments) ? [...(post.comments as any[])] : [];
+  const newComment = {
+    id: crypto.randomUUID(),
+    userId: (req as any).userId,
+    comment,
+    timestampSec: timestampSec !== undefined && timestampSec !== null ? Number(timestampSec) : null,
+    frameCoordX: frameCoordX !== undefined && frameCoordX !== null ? Number(frameCoordX) : null,
+    frameCoordY: frameCoordY !== undefined && frameCoordY !== null ? Number(frameCoordY) : null,
+    version: version || null,
+    createdAt: new Date().toISOString(),
+  };
+
+  existingComments.push(newComment);
+
+  const [updated] = await db
+    .update(contentPostsTable)
+    .set({ comments: existingComments })
+    .where(eq(contentPostsTable.id, contentId))
+    .returning();
+
+  return res.status(201).json({ success: true, comment: newComment, post: updated });
 }));
 
 router.delete("/:id", requirePermission("content.delete"), asyncHandler(async (req, res) => {

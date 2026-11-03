@@ -19,6 +19,8 @@ export const attendanceTable = pgTable("attendance", {
   overtimeCheckInAt: timestamp("overtime_check_in_at"),
   overtimeCheckOutAt: timestamp("overtime_check_out_at"),
   status: text("status").notNull().default("PRESENT"),
+  workMode: text("work_mode").default("WFO"), // WFO | WFH | CLIENT_SHOOT
+  locationNote: text("location_note"),
   date: text("date").notNull(),
 }, (table) => [
   uniqueIndex("attendance_user_id_date_idx").on(table.userId, table.date),

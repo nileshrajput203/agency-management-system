@@ -967,6 +967,32 @@ function WorkReportEditorView({
           <Button
             variant="outline"
             size="sm"
+            onClick={async () => {
+              try {
+                toast.info("Auto-filling report from your completed tasks and time logs...");
+                const res = await fetch(`/api/work-reports/auto-fill?startDate=${formData.startDate || ""}&endDate=${formData.endDate || ""}`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                });
+                if (!res.ok) throw new Error("Failed to auto-fill report");
+                const data = await res.json();
+                setFormData((prev: any) => ({
+                  ...prev,
+                  projects: data.projects && data.projects.length > 0 ? data.projects : prev.projects,
+                  summary: data.suggestedSummary || prev.summary,
+                  clientHandled: data.clientsHandled || prev.clientHandled,
+                }));
+                toast.success(`✨ Auto-filled ${data.projects?.length || 0} project entries from ${data.totalTasksCompleted || 0} completed tasks!`);
+              } catch (err: any) {
+                toast.error(err.message || "Failed to auto-fill");
+              }
+            }}
+            className="text-xs bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 font-semibold"
+          >
+            <Sparkles className="h-3.5 w-3.5 mr-1.5 text-emerald-600" /> Auto-Fill Tasks & Hours
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => downloadWorkReportPdf(reportId, report?.title)}
             title="Download PDF"
             className="text-xs bg-purple-600/10 hover:bg-purple-600/20 text-purple-700 dark:text-purple-300 border-purple-500/30 font-semibold"

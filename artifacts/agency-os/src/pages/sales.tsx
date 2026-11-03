@@ -417,6 +417,9 @@ export default function SalesPage() {
   const [editLead, setEditLead] = useState<any | null>(null);
   const [activeLead, setActiveLead] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [convertLead, setConvertLead] = useState<any | null>(null);
+  const [isConverting, setIsConverting] = useState(false);
+  const [, setLocation] = useLocation();
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -512,6 +515,10 @@ export default function SalesPage() {
     const newStage = over.id as string;
     const lead = leads.find((l: any) => l.id === leadId);
     if (lead && (lead as any).stage !== newStage && STAGES.some(s => s.key === newStage)) {
+      if (newStage === "WON") {
+        setConvertLead(lead);
+        return;
+      }
       qc.setQueryData(getListLeadsQueryKey(), (old: any) =>
         old ? old.map((l: any) => l.id === leadId ? { ...l, stage: newStage } : l) : old
       );
@@ -580,7 +587,8 @@ export default function SalesPage() {
       </div>
 
       {tab === "tasks" ? (
-        <SalesTasksTab onEdit={openEdit} />
+        <SalesTasksTab onEdit={openEdit}
+                      onConvert={(l: any) => setConvertLead(l)} />
       ) : (
         <>
           {/* Pipeline summary */}
@@ -696,6 +704,133 @@ export default function SalesPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    
+      {/* Convert Lead to Client and Project Dialog */}
+      <Dialog open={!!convertLead} onOpenChange={(open) => { if (!open) setConvertLead(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-emerald-600">
+              <Rocket className="h-5 w-5" />
+              Convert Lead to Retainer Client
+            </DialogTitle>
+          </DialogHeader>
+          {convertLead && (
+            <div className="space-y-4 pt-2">
+              <div className="p-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-xs">
+                <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+                  {convertLead.companyName || convertLead.title}
+                </p>
+                <p className="text-muted-foreground mt-0.5">
+                  Contact: {convertLead.contactName || "Direct"} • {convertLead.email || "No email"}
+                </p>
+                <p className="text-emerald-700 dark:text-emerald-400 mt-1">
+                  1-Click Automation: Auto-creates Client profile, Project workspace, and 8-12 standard agency SOP onboarding tasks.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Monthly Retainer (₹)</Label>
+                  <Input
+                    type="number"
+                    id="convert-retainer"
+                    defaultValue={convertLead.value || 50000}
+                    placeholder="50000"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Project Template</Label>
+                  <select
+                    id="convert-template"
+                    className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    defaultValue="SOCIAL_MEDIA"
+                  >
+                    <option value="SOCIAL_MEDIA">Social Media & Content (8 Tasks)</option>
+                    <option value="PERFORMANCE_ADS">Performance Ads & Funnel (6 Tasks)</option>
+                    <option value="WEBSITE">Website & Tech Build (10 Tasks)</option>
+                    <option value="BRANDING">Branding & Identity (8 Tasks)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Initial Finance Document</Label>
+                <select
+                  id="convert-doc"
+                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  defaultValue="INVOICE"
+                >
+                  <option value="INVOICE">Generate First Month Proforma Invoice</option>
+                  <option value="QUOTATION">Generate Proposal Quotation</option>
+                  <option value="NONE">Do Not Generate Document Yet</option>
+                </select>
+              </div>
+
+              <DialogFooter className="mt-6 flex justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setConvertLead(null)}
+                  disabled={isConverting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                  disabled={isConverting}
+                  onClick={async () => {
+                    try {
+                      setIsConverting(true);
+                      const retainerVal = Number((document.getElementById("convert-retainer") as HTMLInputElement)?.value) || convertLead.value || 0;
+                      const templateVal = (document.getElementById("convert-template") as HTMLSelectElement)?.value || "SOCIAL_MEDIA";
+                      const docVal = (document.getElementById("convert-doc") as HTMLSelectElement)?.value || "INVOICE";
+                      const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
+
+                      const res = await fetch(`/api/leads/${convertLead.id}/convert`, {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                          monthlyRetainer: retainerVal,
+                          projectTemplate: templateVal,
+                          createDocument: docVal,
+                        }),
+                      });
+
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}));
+                        throw new Error(err.error || "Failed to convert lead");
+                      }
+
+                      const data = await res.json();
+                      toast.success(
+                        `🎉 Successfully converted to Client "${data.client?.companyName}" with ${data.tasksCreated} SOP tasks!`
+                      );
+
+                      qc.invalidateQueries({ queryKey: getListLeadsQueryKey() });
+                      qc.invalidateQueries({ queryKey: ["clients"] });
+                      qc.invalidateQueries({ queryKey: ["projects"] });
+                      qc.invalidateQueries({ queryKey: ["tasks"] });
+                      setConvertLead(null);
+                      setLocation(`/clients/${data.client?.id}`);
+                    } catch (err: any) {
+                      toast.error(err.message || "Failed to convert lead");
+                    } finally {
+                      setIsConverting(false);
+                    }
+                  }}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {isConverting ? "Converting..." : "Confirm & Launch Client"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+</div>
   );
 }

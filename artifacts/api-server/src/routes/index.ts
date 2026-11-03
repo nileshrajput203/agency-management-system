@@ -31,6 +31,10 @@ import performanceRouter from "./performance";
 import rolesRouter from "./roles";
 import expensesRouter from "./expenses";
 import gstRouter from "./gst";
+import vendorsRouter from "./vendors";
+import holidaysRouter from "./holidays";
+import shootsRouter from "./shoots";
+import payrollRouter from "./payroll";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -70,5 +74,9 @@ router.use("/work-reports", workReportsRouter);
 router.use("/performance", performanceRouter);
 router.use("/expenses", expensesRouter);
 router.use("/gst", gstRouter);
+router.use("/vendors", vendorsRouter);
+router.use("/holidays", holidaysRouter);
+router.use("/shoots", shootsRouter);
+router.use("/payroll", payrollRouter);
 
 export default router;

@@ -7,6 +7,7 @@ export const paymentsTable = pgTable("payments", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   invoiceId: text("invoice_id").notNull().references(() => invoicesTable.id, { onDelete: "cascade" }),
   amount: real("amount").notNull(),
+  tdsAmount: real("tds_amount").default(0),
   paymentDate: timestamp("payment_date").defaultNow().notNull(),
   paymentMethod: text("payment_method"), // e.g. "BANK_TRANSFER", "UPI", "CASH", "CARD"
   referenceNumber: text("reference_number"), // txn ID or check number

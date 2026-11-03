@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, integer, real, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,6 +15,13 @@ export const vendorsTable = pgTable("vendors", {
   gstin: text("gstin"),
   pan: text("pan"),
   category: text("category"),
+  vendorType: text("vendor_type").default("VENDOR"), // VENDOR | FREELANCER | INFLUENCER
+  instagramHandle: text("instagram_handle"),
+  youtubeHandle: text("youtube_handle"),
+  niche: text("niche"),
+  followerCount: integer("follower_count").default(0),
+  engagementRate: text("engagement_rate"),
+  commercialRatePerReel: real("commercial_rate_per_reel").default(0),
   isActive: boolean("is_active").notNull().default(true),
   
   // Audit fields

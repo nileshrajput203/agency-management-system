@@ -97,4 +97,87 @@ router.get("/", requirePermission("time.view"), asyncHandler(async (req, res) =>
   return res.json(rows);
 }));
 
+// GET /api/time/active — get currently running timer for the authenticated user
+router.get("/active", requirePermission("time.view"), asyncHandler(async (req, res) => {
+  const userId = (req as any).userId;
+  if (!userId) return res.json(null);
+
+  const [active] = await db
+    .select()
+    .from(timeEntriesTable)
+    .where(and(eq(timeEntriesTable.userId, userId), isNull(timeEntriesTable.endedAt)))
+    .orderBy(desc(timeEntriesTable.startedAt))
+    .limit(1);
+
+  return res.json(active || null);
+}));
+
+// POST /api/time/start — 1-click start live task timer
+router.post("/start", requirePermission("time.log"), asyncHandler(async (req, res) => {
+  const userId = (req as any).userId;
+  if (!userId) throw createError("Unauthorized", 401);
+
+  const { taskId, projectId, note, billable = true } = req.body || {};
+
+  // Auto-stop any active timer first
+  const now = new Date();
+  const existingActive = await db
+    .select()
+    .from(timeEntriesTable)
+    .where(and(eq(timeEntriesTable.userId, userId), isNull(timeEntriesTable.endedAt)));
+
+  for (const t of existingActive) {
+    const durMin = Math.max(1, Math.round((now.getTime() - new Date(t.startedAt).getTime()) / 60000));
+    await db.update(timeEntriesTable).set({
+      endedAt: now,
+      durationMin: durMin,
+    }).where(eq(timeEntriesTable.id, t.id));
+  }
+
+  const [created] = await db
+    .insert(timeEntriesTable)
+    .values({
+      userId,
+      taskId: taskId || null,
+      projectId: projectId || null,
+      note: note || "Task work session",
+      startedAt: now,
+      endedAt: null,
+      isBillable: Boolean(billable),
+    })
+    .returning();
+
+  return res.status(201).json(created);
+}));
+
+// POST /api/time/stop — stop active timer and compute duration
+router.post("/stop", requirePermission("time.log"), asyncHandler(async (req, res) => {
+  const userId = (req as any).userId;
+  if (!userId) throw createError("Unauthorized", 401);
+
+  const now = new Date();
+  const [active] = await db
+    .select()
+    .from(timeEntriesTable)
+    .where(and(eq(timeEntriesTable.userId, userId), isNull(timeEntriesTable.endedAt)))
+    .orderBy(desc(timeEntriesTable.startedAt))
+    .limit(1);
+
+  if (!active) {
+    return res.json({ message: "No active timer running", stopped: null });
+  }
+
+  const durMin = Math.max(1, Math.round((now.getTime() - new Date(active.startedAt).getTime()) / 60000));
+  const [stopped] = await db
+    .update(timeEntriesTable)
+    .set({
+      endedAt: now,
+      durationMin: durMin,
+    })
+    .where(eq(timeEntriesTable.id, active.id))
+    .returning();
+
+  return res.json({ message: "Timer stopped", stopped });
+}));
+
 export default router;

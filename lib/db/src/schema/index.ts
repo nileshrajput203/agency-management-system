@@ -27,6 +27,9 @@ export * from "./auditLogs";
 export * from "./userHiddenItems";
 export * from "./workReports";
 export * from "./financeOperations";
+export * from "./holidays";
+export * from "./shoots";
+export * from "./milestones";
 
 export { usersTable as users } from "./users";
 export { clientsTable as clients } from "./clients";
@@ -57,5 +60,7 @@ export { leaveBalancesTable as leaveBalances } from "./leaveBalances";
 export { timeEntriesTable as timeEntries } from "./timeEntries";
 export { auditLogsTable as auditLogs } from "./auditLogs";
 export { userHiddenItemsTable as userHiddenItems } from "./userHiddenItems";
+export { holidaysTable as holidays } from "./holidays";
+export { shootsTable as shoots } from "./shoots";
 export { workReportsTable as workReports, workReportVersionsTable as workReportVersions, workReportAuditLogsTable as workReportAuditLogs, workReportReopenRequestsTable as workReportReopenRequests } from "./workReports";
 export { financeSequencesTable as financeSequences, proformaInvoicesTable as proformaInvoices, supplierBillsTable as supplierBills, supplierBillPaymentsTable as supplierBillPayments, employeeExpensesTable as employeeExpenses, clientLifecycleEventsTable as clientLifecycleEvents } from "./financeOperations";

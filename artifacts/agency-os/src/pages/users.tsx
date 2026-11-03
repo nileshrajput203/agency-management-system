@@ -251,8 +251,8 @@ export default function UsersPage() {
 
   return (
     <div className="p-6 animated-fade-in space-y-5">
-      <Tabs defaultValue="directory" className="w-full flex-col">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+      <Tabs defaultValue="directory" className="w-full flex flex-col space-y-4">
+        <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <h1 className="text-2xl font-bold font-heading">Team & Roles</h1>
             <p className="text-sm text-muted-foreground mt-0.5">Manage people, roles, and module access from one place.</p>
@@ -270,7 +270,7 @@ export default function UsersPage() {
           </div>
         </div>
 
-        <TabsContent value="directory" className="space-y-4">
+        <TabsContent value="directory" className="w-full space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Card className="bg-primary/[0.04] border-primary/15">
               <CardContent className="p-4 flex items-center gap-3">
@@ -402,7 +402,7 @@ export default function UsersPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="permissions">
+        <TabsContent value="permissions" className="w-full">
           <UserAccessManagement />
         </TabsContent>
       </Tabs>

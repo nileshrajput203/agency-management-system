@@ -1,7 +1,14 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { invoicesTable, invoiceItemsTable, clientsTable } from "@workspace/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import {
+  invoicesTable,
+  invoiceItemsTable,
+  clientsTable,
+  paymentsTable,
+  employeeExpensesTable,
+  agencySettings,
+} from "@workspace/db/schema";
+import { eq, desc, sql, and, isNull } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { syncParentInsert, syncParentUpdate } from "../lib/dbSync";
@@ -160,6 +167,116 @@ router.post("/", requirePermission("invoices.create"), asyncHandler(async (req, 
   return res.status(201).json(row);
 }));
 
+// 1-Click Generate Monthly Retainer Invoices for all active clients
+router.post("/generate-retainers", requirePermission("invoices.create"), asyncHandler(async (req, res) => {
+  const activeClients = await db
+    .select()
+    .from(clientsTable)
+    .where(and(eq(clientsTable.status, "ACTIVE"), sql`${clientsTable.monthlyRetainer} > 0`));
+
+  if (activeClients.length === 0) {
+    return res.json({ message: "No active clients with retainer amounts found", count: 0, invoices: [] });
+  }
+
+  const now = new Date();
+  const currentMonthStr = now.toLocaleString("default", { month: "long", year: "numeric" });
+  const invoiceDateStr = now.toISOString().split("T")[0];
+  const dueDateStr = new Date(Date.now() + 15 * 86400000).toISOString().split("T")[0];
+
+  const existingInvoices = await db.select({ number: invoicesTable.number }).from(invoicesTable);
+  const nums = existingInvoices
+    .map((r) => r.number)
+    .filter((n): n is string => !!n && n.startsWith("INV-"))
+    .map((n) => parseInt(n.replace("INV-", ""), 10))
+    .filter((n) => !isNaN(n));
+  let nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 1001;
+
+  const generatedInvoices = [];
+
+  for (const client of activeClients) {
+    const retainerAmount = Number(client.monthlyRetainer) || 0;
+    if (retainerAmount <= 0) continue;
+
+    // Check for unbilled billable expenses
+    const unbilledExpenses = await db
+      .select()
+      .from(employeeExpensesTable)
+      .where(and(eq(employeeExpensesTable.clientId, client.id), eq(employeeExpensesTable.reimbursable, true), eq(employeeExpensesTable.status, "APPROVED")));
+
+    const expenseSubtotal = unbilledExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const subtotal = retainerAmount + expenseSubtotal;
+
+    // Check tax type based on GSTIN state codes
+    const clientGstin = client.gstin || "";
+    const isInterstate = clientGstin && clientGstin.length >= 2 && clientGstin.slice(0, 2) !== "27"; // Default agency state 27 (MH)
+    const gstType = isInterstate ? "IGST" : "CGST_SGST";
+    const taxRate = 18;
+    const taxAmount = Number(((subtotal * taxRate) / 100).toFixed(2));
+    const total = subtotal + taxAmount;
+
+    const cgstAmount = isInterstate ? 0 : Number((taxAmount / 2).toFixed(2));
+    const sgstAmount = isInterstate ? 0 : Number((taxAmount / 2).toFixed(2));
+    const igstAmount = isInterstate ? taxAmount : 0;
+
+    const invNum = `INV-${nextNum++}`;
+
+    const [created] = await db
+      .insert(invoicesTable)
+      .values({
+        number: invNum,
+        clientId: client.id,
+        invoiceType: "TAX_INVOICE",
+        status: "DRAFT",
+        paymentStatus: "PENDING",
+        invoiceDate: invoiceDateStr,
+        dueDate: dueDateStr,
+        currency: "INR",
+        gstType,
+        clientGstin: client.gstin || null,
+        clientPhone: client.phone || null,
+        clientEmail: client.email || null,
+        subtotal,
+        taxAmount,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        total,
+        notes: `Monthly Retainer billing for ${currentMonthStr}.\nDeliverable Quotas: Active in AgencyOS Client Workspace.`,
+      })
+      .returning();
+
+    // Insert line item for retainer
+    await db.insert(invoiceItemsTable).values({
+      invoiceId: created.id,
+      description: `Monthly Digital Marketing & Creative Retainer (${currentMonthStr})`,
+      qty: 1,
+      unitPrice: retainerAmount,
+      taxPercent: taxRate,
+    });
+
+    // Insert line items for unbilled expenses if any
+    for (const exp of unbilledExpenses) {
+      await db.insert(invoiceItemsTable).values({
+        invoiceId: created.id,
+        description: `Reimbursable Expense: ${exp.description || exp.category}`,
+        qty: 1,
+        unitPrice: Number(exp.amount),
+        taxPercent: taxRate,
+      });
+      // Mark expense as billed/reimbursed
+      await db.update(employeeExpensesTable).set({ status: "REIMBURSED", reimbursedAt: new Date() }).where(eq(employeeExpensesTable.id, exp.id));
+    }
+
+    generatedInvoices.push(created);
+  }
+
+  return res.status(201).json({
+    message: `Generated ${generatedInvoices.length} monthly retainer invoices.`,
+    count: generatedInvoices.length,
+    invoices: generatedInvoices,
+  });
+}));
+
 // Convert Proforma Invoice to Tax Invoice
 router.post("/:id/convert-to-tax-invoice", requirePermission("invoices.edit"), asyncHandler(async (req, res) => {
   if (!isValidUUID(req.params.id)) {
@@ -255,6 +372,98 @@ router.delete("/:id", requirePermission("invoices.delete"), asyncHandler(async (
   }
   await db.delete(invoicesTable).where(eq(invoicesTable.id, (req.params.id as string)));
   return res.status(204).send();
+}));
+
+// GET /api/invoices/:id/payments — list all recorded payments & TDS
+router.get("/:id/payments", requirePermission("invoices.view"), asyncHandler(async (req, res) => {
+  const invoiceId = req.params.id as string;
+  if (!isValidUUID(invoiceId)) throw createError("Invalid invoice ID format", 400);
+
+  const rows = await db
+    .select()
+    .from(paymentsTable)
+    .where(and(eq(paymentsTable.invoiceId, invoiceId), isNull(paymentsTable.deletedAt)))
+    .orderBy(desc(paymentsTable.paymentDate));
+
+  const [inv] = await db.select({ total: invoicesTable.total }).from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+  const totalPaid = rows.reduce((acc, p) => acc + (Number(p.amount) || 0) + (Number(p.tdsAmount) || 0), 0);
+  const remaining = Math.max(0, (Number(inv?.total) || 0) - totalPaid);
+
+  return res.json({
+    payments: rows,
+    totalPaid,
+    remaining,
+    invoiceTotal: Number(inv?.total) || 0,
+  });
+}));
+
+// POST /api/invoices/:id/payments — record payment with optional TDS and auto-update invoice status
+router.post("/:id/payments", requirePermission("invoices.edit"), asyncHandler(async (req, res) => {
+  const invoiceId = req.params.id as string;
+  if (!isValidUUID(invoiceId)) throw createError("Invalid invoice ID format", 400);
+
+  const { amount, tdsAmount = 0, paymentMethod = "BANK_TRANSFER", referenceNumber, paymentDate, notes } = req.body || {};
+
+  const numAmount = Number(amount);
+  if (isNaN(numAmount) || numAmount <= 0) {
+    throw createError("Payment amount must be greater than zero", 400);
+  }
+
+  const [inv] = await db.select().from(invoicesTable).where(eq(invoicesTable.id, invoiceId));
+  if (!inv) throw createError("Invoice not found", 404);
+
+  const numTds = Number(tdsAmount) || 0;
+
+  const [payment] = await db
+    .insert(paymentsTable)
+    .values({
+      invoiceId,
+      amount: numAmount,
+      tdsAmount: numTds,
+      paymentMethod,
+      referenceNumber: referenceNumber || null,
+      paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+      status: "SUCCESS",
+      notes: notes || null,
+      createdBy: (req as any).userId,
+    })
+    .returning();
+
+  // Sum up all payments for this invoice
+  const allPayments = await db
+    .select({ amount: paymentsTable.amount, tdsAmount: paymentsTable.tdsAmount })
+    .from(paymentsTable)
+    .where(and(eq(paymentsTable.invoiceId, invoiceId), isNull(paymentsTable.deletedAt)));
+
+  const totalCollected = allPayments.reduce((sum, p) => sum + (Number(p.amount) || 0) + (Number(p.tdsAmount) || 0), 0);
+  const invoiceTotal = Number(inv.total) || 0;
+
+  let newPaymentStatus = "PENDING";
+  let newStatus = inv.status;
+
+  if (totalCollected >= invoiceTotal) {
+    newPaymentStatus = "PAID";
+    newStatus = "PAID";
+  } else if (totalCollected > 0) {
+    newPaymentStatus = "PARTIALLY_PAID";
+  }
+
+  await db
+    .update(invoicesTable)
+    .set({
+      status: newStatus,
+      paymentStatus: newPaymentStatus,
+      updatedAt: new Date(),
+    })
+    .where(eq(invoicesTable.id, invoiceId));
+
+  return res.status(201).json({
+    payment,
+    totalCollected,
+    remaining: Math.max(0, invoiceTotal - totalCollected),
+    status: newStatus,
+    paymentStatus: newPaymentStatus,
+  });
 }));
 
 export default router;

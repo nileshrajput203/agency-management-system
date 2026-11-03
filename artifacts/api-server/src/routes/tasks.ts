@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { tasksTable, projectsTable, usersTable } from "@workspace/db/schema";
+import { tasksTable, projectsTable, usersTable, contentPostsTable } from "@workspace/db/schema";
 import { and, eq, or, sql, desc, asc, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { asyncHandler } from "../lib/asyncHandler";
@@ -359,6 +359,24 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
     .where(eq(tasksTable.id, (req.params.id as string)))
     .returning();
   if (!row) throw createError("Not found", 404);
+
+  // Bi-directional Auto-Sync with Content Studio
+  try {
+    const [linkedPost] = await db
+      .select({ id: contentPostsTable.id, status: contentPostsTable.status })
+      .from(contentPostsTable)
+      .where(eq(contentPostsTable.linkedTaskId, row.id));
+
+    if (linkedPost) {
+      if (row.status === "IN_REVIEW" && linkedPost.status !== "IN_REVIEW") {
+        await db.update(contentPostsTable).set({ status: "IN_REVIEW" }).where(eq(contentPostsTable.id, linkedPost.id));
+      } else if (row.status === "COMPLETED" && linkedPost.status !== "ADMIN_APPROVED" && linkedPost.status !== "PUBLISHED") {
+        await db.update(contentPostsTable).set({ status: "ADMIN_APPROVED" }).where(eq(contentPostsTable.id, linkedPost.id));
+      }
+    }
+  } catch (syncPostErr) {
+    logger.warn({ syncPostErr }, "Failed to sync task status back to linked content post");
+  }
 
   logger.info({
     taskId: row.id,

@@ -13,10 +13,11 @@ import {
 import {
   LayoutDashboard, Users, TrendingUp, FolderKanban, CheckSquare,
   Calendar, Receipt, FileText, ShoppingCart, ClipboardList, Clock, Umbrella,
-  UserCog, Settings, Sun, Moon, LogOut, ChevronRight, Briefcase, Flame, Sheet, CalendarDays, BarChart3, Wallet,
+  UserCog, Settings, Sun, Moon, LogOut, ChevronRight, Briefcase, Flame, Sheet, CalendarDays, BarChart3, Wallet, Search,
 } from "lucide-react";
 import { NotificationsPopover } from "@/components/common/NotificationsPopover";
 import { CompanyLogo } from "@/components/common/CompanyLogo";
+import { CommandPalette } from "@/components/common/CommandPalette";
 import { getUserModules } from "@/lib/permissions";
 
 import { ENABLE_HAWAN_HUB, ENABLE_PROPOSALS } from "@/lib/constants";
@@ -58,6 +59,7 @@ const navGroups: NavGroup[] = [
       { label: "Quotations",      href: "/quotations",      icon: <FileText className="h-4 w-4" /> },
       { label: "Purchase Orders", href: "/purchase-orders", icon: <ShoppingCart className="h-4 w-4" /> },
       { label: "Expenses & Spends", href: "/expenses",      icon: <Wallet className="h-4 w-4 text-amber-500" /> },
+      { label: "Vendors & Creators", href: "/vendors",      icon: <Users className="h-4 w-4 text-indigo-400" /> },
       ...(ENABLE_PROPOSALS ? [{ label: "Proposals",       href: "/proposals",       icon: <ClipboardList className="h-4 w-4" /> }] : []),
       { label: "Excel Reports",   href: "/excel-reports",   icon: <Sheet className="h-4 w-4 text-green-600" /> },
     ],
@@ -68,6 +70,7 @@ const navGroups: NavGroup[] = [
       { label: "Work Reports", href: "/work-reports", icon: <FileText className="h-4 w-4 text-emerald-500" /> },
       { label: "Performance Report", href: "/performance-report", icon: <BarChart3 className="h-4 w-4 text-violet-500" /> },
       { label: "Attendance", href: "/attendance", icon: <Clock className="h-4 w-4" /> },
+      { label: "Payroll & Salaries", href: "/payroll", icon: <Wallet className="h-4 w-4 text-teal-500" /> },
       { label: "Leave Management", href: "/leaves", icon: <Umbrella className="h-4 w-4" /> },
       { label: "Team & Roles", href: "/users", icon: <UserCog className="h-4 w-4" /> },
     ],
@@ -119,6 +122,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "/quotations":          "finance",
     "/proposals":           "finance",
     "/purchase-orders":     "finance",
+    "/expenses":            "finance",
+    "/vendors":             "finance",
+    "/payroll":             "attendance",
     "/excel-reports":       "finance",
     "/settings":            "settings",
     "/users":               "team",
@@ -215,8 +221,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 overflow-y-auto bg-background flex flex-col">
         {/* Top Header Bar */}
         <header className="h-14 border-b border-border px-6 flex items-center justify-between shrink-0 bg-card/40 backdrop-blur-xs">
-          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-            <span className="capitalize">{location.replace("/", "") || "dashboard"}</span>
+          <div className="flex items-center gap-3">
+            <span className="capitalize text-xs font-semibold text-foreground/80">{location.replace("/", "") || "dashboard"}</span>
+            <button
+              onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true }))}
+              className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-md border border-border/80 bg-background/50 hover:bg-muted text-xs text-muted-foreground transition-all cursor-pointer shadow-2xs"
+            >
+              <Search className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>Quick search...</span>
+              <kbd className="font-mono text-[10px] bg-muted px-1.5 py-0.5 rounded border border-border">Ctrl K</kbd>
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <NotificationsPopover />
@@ -225,6 +239,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Button>
           </div>
         </header>
+
+        <CommandPalette />
 
         <div className="flex-1">
           {children}

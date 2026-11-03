@@ -29,6 +29,9 @@ export const contentPostsTable = pgTable("content_posts", {
   approvedAt: timestamp("approved_at"),
   rejectionNote: text("rejection_note"),
   mediaUrls: json("media_urls").$type<string[]>(),
+  assigneeId: text("assignee_id").references(() => usersTable.id, { onDelete: "set null" }),
+  linkedTaskId: text("linked_task_id"),
+  assetVersions: json("asset_versions").$type<{ version: number; url: string; uploadedAt: string; uploadedBy?: string }[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("content_posts_client_id_idx").on(table.clientId),

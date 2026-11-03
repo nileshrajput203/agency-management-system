@@ -160,9 +160,34 @@ export default function InvoicesPage() {
             Manage Tax Invoices, Proforma Invoices (PI), GST Collections, and Client Payment Delays.
           </p>
         </div>
-        <Button onClick={() => { setEditInvoice(null); setBuilderOpen(true); }} className="gap-2 shadow-sm">
-          <Plus className="h-4 w-4" /> New Invoice / Proforma
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50"
+            onClick={async () => {
+              try {
+                toast.info("Generating monthly retainers & pulling unbilled expenses...");
+                const res = await fetch("/api/invoices/generate-retainers", {
+                  method: "POST",
+                  headers: authHeaders(true),
+                  body: JSON.stringify({}),
+                });
+                if (!res.ok) throw new Error("Failed to generate retainers");
+                const data = await res.json();
+                toast.success(`🎉 Generated ${data.count} monthly retainer invoices!`);
+                qc.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
+                qc.invalidateQueries({ queryKey: getGetFinancialSummaryQueryKey() });
+              } catch (err: any) {
+                toast.error(err.message || "Failed to generate retainers");
+              }
+            }}
+          >
+            <RefreshCw className="h-4 w-4" /> Generate Monthly Retainers
+          </Button>
+          <Button onClick={() => { setEditInvoice(null); setBuilderOpen(true); }} className="gap-2 shadow-sm">
+            <Plus className="h-4 w-4" /> New Invoice / Proforma
+          </Button>
+        </div>
       </div>
 
       {/* Accountant GST & Net Liability Banner */}
