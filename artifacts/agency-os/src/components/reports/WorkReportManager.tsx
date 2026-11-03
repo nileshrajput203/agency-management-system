@@ -53,11 +53,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 async function downloadWorkReportPdf(reportId: string, title?: string) {
   try {
     const token = typeof window !== "undefined" ? (localStorage.getItem("agency_token") || localStorage.getItem("token")) : null;
-    toast.info("Preparing PDF...");
+    toast.info("Preparing printable report...");
     const res = await fetch(`/api/work-reports/${reportId}/pdf`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -66,27 +67,22 @@ async function downloadWorkReportPdf(reportId: string, title?: string) {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
-      throw new Error(errText || `Failed to download PDF (${res.status})`);
+      throw new Error(errText || `Failed to generate report view (${res.status})`);
     }
 
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    const cleanTitle = title ? title.replace(/[^a-zA-Z0-9_-]/g, "_") : `Work_Report_${reportId}`;
-    link.download = `${cleanTitle}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Open object URL in new tab for instant view/print
-    window.open(url, "_blank");
-
-    toast.success("PDF downloaded successfully!");
+    const html = await res.text();
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
+      toast.success("Printable report opened! Use Print to save as PDF.");
+    } else {
+      toast.error("Popup blocked. Please allow popups for printable reports.");
+    }
   } catch (err: any) {
-    console.error("Error downloading PDF:", err);
-    toast.error(err.message || "Failed to download PDF");
+    console.error("Error opening printable report:", err);
+    toast.error(err.message || "Failed to open printable report");
   }
 }
 
@@ -1142,7 +1138,7 @@ function WorkReportEditorView({
               <Select
                 disabled={!isEditable}
                 value={formData.period}
-                onValueChange={(v) => setFormData({ ...formData, period: v })}
+                onValueChange={(v: string) => setFormData({ ...formData, period: v })}
               >
                 <SelectTrigger className="h-10 text-sm w-full">
                   <SelectValue />
@@ -1370,7 +1366,7 @@ function WorkReportEditorView({
                       <Select
                         disabled={!isEditable}
                         value={proj.status || "In Progress"}
-                        onValueChange={(v) => updateProject(proj.id, "status", v)}
+                        onValueChange={(v: string) => updateProject(proj.id, "status", v)}
                       >
                         <SelectTrigger className="h-10 text-sm w-full">
                           <SelectValue />
