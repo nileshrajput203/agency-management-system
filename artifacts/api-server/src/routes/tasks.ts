@@ -645,13 +645,15 @@ router.post("/notify-daily-summary", requirePermission("tasks.view"), asyncHandl
   const todaysTasks = allTasks.filter((t) => {
     if (t.status === "DONE" || t.status === "COMPLETED") return false;
     if (!t.dueDate) return false;
-    return t.dueDate.startsWith(todayStr);
+    const dueStr = t.dueDate instanceof Date ? t.dueDate.toISOString().split("T")[0] : String(t.dueDate).split("T")[0];
+    return dueStr === todayStr;
   });
 
   const pendingOverdueTasks = allTasks.filter((t) => {
     if (t.status === "DONE" || t.status === "COMPLETED") return false;
     if (!t.dueDate) return false;
-    return t.dueDate < todayStr;
+    const dueStr = t.dueDate instanceof Date ? t.dueDate.toISOString().split("T")[0] : String(t.dueDate).split("T")[0];
+    return dueStr < todayStr;
   });
 
   // Group by employee

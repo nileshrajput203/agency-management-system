@@ -13,9 +13,13 @@
     "strictPropertyInitialization": false,
     "noImplicitAny": false,
     "noEmitOnError": false,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true
   },
-  "include": [],
+  "include": [
+    "src/**/*"
+  ],
   "references": [
     {
       "path": "../../lib/db"
