@@ -14,9 +14,10 @@ import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Plus, Trash2, Receipt, ArrowLeft, UploadCloud, ImageIcon, X as XIcon,
-  IndianRupee, Building2, User, FileText, Banknote, Download,
+  IndianRupee, Building2, User, FileText, Banknote, Download, Sheet, Sparkles,
 } from "lucide-react";
 import { openPrintWindow, buildInvoiceHtml, type InvoiceData } from "@/lib/pdf-print";
+import { exportInvoiceToExcel, exportInvoiceToCsv } from "@/lib/invoice-excel-export";
 import { CompanyLogo } from "@/components/common/CompanyLogo";
 import {
   sym, amountToWords, authHeaders, LineItem, BuilderForm,
@@ -60,14 +61,14 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
     invoiceNumber: "", invoiceDate: new Date().toISOString().split("T")[0], dueDate: "",
     currency: "INR", gstType: "CGST_SGST",
     logoUrl: (editData?.logoUrl as string) ?? biz.logoUrl ?? "",
-    businessName: (editData?.businessName as string) ?? biz.businessName ?? "",
-    businessPhone: (editData?.businessPhone as string) ?? biz.businessPhone ?? "",
-    businessGstin: (editData?.companyGstin as string) ?? biz.businessGstin ?? "",
-    businessAddress: (editData?.businessAddress as string) ?? biz.businessAddress ?? "",
-    businessCity: (editData?.businessCity as string) ?? biz.businessCity ?? "",
-    businessPostalCode: (editData?.businessPostalCode as string) ?? biz.businessPostalCode ?? "",
-    businessState: (editData?.businessState as string) ?? biz.businessState ?? "",
-    businessEmail: (editData?.businessEmail as string) ?? biz.businessEmail ?? "",
+    businessName: (editData?.businessName as string) ?? biz.businessName ?? "BLINK BEYOND",
+    businessPhone: (editData?.businessPhone as string) ?? biz.businessPhone ?? "+91 95455 56009",
+    businessGstin: (editData?.companyGstin as string) ?? biz.businessGstin ?? "27ABGFB9280J1Z0",
+    businessAddress: (editData?.businessAddress as string) ?? biz.businessAddress ?? "Ground Floor, Shop No. 07, Ali Chamber Apt., Manor Road, Near Kotak Mahindra Bank, Palghar West",
+    businessCity: (editData?.businessCity as string) ?? biz.businessCity ?? "Palghar",
+    businessPostalCode: (editData?.businessPostalCode as string) ?? biz.businessPostalCode ?? "401404",
+    businessState: (editData?.businessState as string) ?? biz.businessState ?? "Maharashtra",
+    businessEmail: (editData?.businessEmail as string) ?? biz.businessEmail ?? "billing@blinkbeyond.com",
     businessPan: (editData?.businessPan as string) ?? biz.businessPan ?? "",
     clientId: (editData?.clientId as string) ?? "",
     clientPhone: (editData?.clientPhone as string) ?? "",
@@ -83,10 +84,10 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
     discountType: (editData?.discountType as string) ?? "FIXED",
     termsAndConditions: (editData?.termsAndConditions as string) ?? "",
     notes: (editData?.notes as string) ?? "",
-    bankName: (editData?.bankDetails as Record<string, string>)?.bankName ?? biz.bankName ?? "",
-    bankAccount: (editData?.bankDetails as Record<string, string>)?.accountNumber ?? biz.bankAccount ?? "",
-    bankIfsc: (editData?.bankDetails as Record<string, string>)?.ifsc ?? biz.bankIfsc ?? "",
-    bankAccountName: (editData?.bankDetails as Record<string, string>)?.accountName ?? biz.bankAccountName ?? "",
+    bankName: (editData?.bankDetails as Record<string, string>)?.bankName ?? biz.bankName ?? "HDFC BANK LIMITED",
+    bankAccount: (editData?.bankDetails as Record<string, string>)?.accountNumber ?? biz.bankAccount ?? "50200121903920",
+    bankIfsc: (editData?.bankDetails as Record<string, string>)?.ifsc ?? biz.bankIfsc ?? "HDFC0000663",
+    bankAccountName: (editData?.bankDetails as Record<string, string>)?.accountName ?? biz.bankAccountName ?? "BLINK BEYOND",
     signatureUrl: (editData?.signatureUrl as string) ?? "",
     ...(!editData && {
       invoiceNumber: "",
@@ -187,7 +188,45 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
           <ArrowLeft className="h-4 w-4" /> Back to Invoices
         </button>
         <h1 className="font-bold font-heading text-base">{editData ? "Edit Invoice" : "New Invoice"}</h1>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+            onClick={() => {
+              const activeClient = (clients ?? []).find(c => c.id === watched.clientId);
+              exportInvoiceToExcel({
+                ...watched,
+                clientName: activeClient?.companyName || (watched as any).clientName,
+                subtotal,
+                taxAmount: totalTax,
+                total: grandTotal,
+              });
+              toast.success("Downloaded Excel Invoice (.xlsx)!");
+            }}
+          >
+            <Sheet className="h-3.5 w-3.5 text-emerald-600" /> Excel
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs text-blue-700 dark:text-blue-400 border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+            onClick={() => {
+              const activeClient = (clients ?? []).find(c => c.id === watched.clientId);
+              exportInvoiceToCsv({
+                ...watched,
+                clientName: activeClient?.companyName || (watched as any).clientName,
+                subtotal,
+                taxAmount: totalTax,
+                total: grandTotal,
+              });
+              toast.success("Downloaded CSV Invoice (.csv)!");
+            }}
+          >
+            <Download className="h-3.5 w-3.5 text-blue-600" /> CSV
+          </Button>
           {editData && (
             <Button
               variant="outline" size="sm" className="gap-1.5"
@@ -380,7 +419,44 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
                   <>
                     <Label className="text-xs">Client *</Label>
                     <Controller control={control} name="clientId" render={({ field }) => (
-                      <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                      <Select
+                        value={field.value ?? ""}
+                        onValueChange={(val) => {
+                          field.onChange(val);
+                          const selected = (clients ?? []).find(c => c.id === val);
+                          if (selected) {
+                            setValue("clientPhone", selected.phone || "");
+                            setValue("clientEmail", selected.email || "");
+                            setValue("clientGstin", (selected as any).gstin || "");
+                            setValue("clientAddress", (selected as any).billingAddress || (selected as any).address || "");
+                            setValue("clientCity", (selected as any).city || "");
+                            setValue("clientState", (selected as any).state || "Maharashtra");
+                            setValue("clientPostalCode", (selected as any).postalCode || "");
+                            setValue("clientPan", (selected as any).panNumber || "");
+
+                            const cState = ((selected as any).state || "").trim().toLowerCase();
+                            const cGstin = (selected as any).gstin || "";
+                            const isInterstate = (!cState.includes("maharashtra") && !cState.includes("mh") && !cGstin.startsWith("27") && cState.length > 0);
+                            setValue("gstType", isInterstate ? "IGST" : "CGST_SGST");
+
+                            if ((selected as any).monthlyRetainer) {
+                              const ret = Number((selected as any).monthlyRetainer);
+                              if (ret > 0) {
+                                setValue("lineItems", [{
+                                  description: `Digital Marketing & Social Media Retainer - ${new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}`,
+                                  hsnSac: "998361",
+                                  taxPercent: 18,
+                                  qty: 1,
+                                  unitPrice: ret,
+                                }]);
+                                toast.success(`✨ Auto-filled ${selected.companyName} retainer (₹${ret.toLocaleString("en-IN")}) with SAC 998361!`);
+                              }
+                            } else {
+                              toast.success(`✨ Auto-filled ${selected.companyName} address & GSTIN!`);
+                            }
+                          }
+                        }}
+                      >
                         <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
                         <SelectContent>
                           {(clients ?? []).map(c => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}

@@ -15,9 +15,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { Plus, Trash2, Receipt, Download, RefreshCw, Clock, CheckCircle, AlertTriangle, ArrowRight, FileCheck, Landmark } from "lucide-react";
+import { Plus, Trash2, Receipt, Download, RefreshCw, Clock, CheckCircle, AlertTriangle, ArrowRight, FileCheck, Landmark, Sheet } from "lucide-react";
 import { format } from "date-fns";
 import { openPrintWindow, buildInvoiceHtml, type InvoiceData } from "@/lib/pdf-print";
+import { exportInvoiceToExcel, exportInvoiceToCsv } from "@/lib/invoice-excel-export";
 import { InvoiceBuilder } from "@/components/invoices/invoice-builder";
 import { STATUS_CONFIG, sym, authHeaders } from "@/components/invoices/invoice-helpers";
 
@@ -437,6 +438,16 @@ export default function InvoicesPage() {
                           }}
                         >
                           Payment
+                        </Button>
+                        <Button
+                          size="icon" variant="ghost" className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                          title="Export to Excel (.xlsx)"
+                          onClick={() => {
+                            exportInvoiceToExcel(inv as any);
+                            toast.success("Excel Invoice downloaded!");
+                          }}
+                        >
+                          <Sheet className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           size="icon" variant="ghost" className="h-7 w-7"

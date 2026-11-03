@@ -21,11 +21,11 @@ export interface LetterheadConfig {
 
 export const DEFAULT_LETTERHEAD_CONFIG: LetterheadConfig = {
   brandName: "BLINK BEYOND",
-  brandSubtitle: "Website | Social Media | Marketing",
-  contactLine1: "HO–PALGHAR, 401404, MUMBAI, MAHARASTRA",
-  contactLine2: "+91 95455 56009 | SUPPORT@BLINKBEYOND.CO.IN",
+  brandSubtitle: "Digital Marketing Agency",
+  contactLine1: "Ground Floor, Shop No. 07, Ali Chamber Apt., Manor Road, Near Kotak Mahindra Bank, Palghar West, Palghar - 401404",
+  contactLine2: "GSTIN/UIN: 27ABGFB9280J1Z0 | SUPPORT@BLINKBEYOND.CO.IN",
   contactLine3: "WWW.BLINKBEYOND.CO.IN",
-  footerBarText: "BLINK BEYOND | SUPPORT@BLINKBEYOND.CO.IN | WWW.BLINKBEYOND.CO.IN | +91 95455 56009",
+  footerBarText: "BLINK BEYOND | GSTIN: 27ABGFB9280J1Z0 | HDFC BANK A/C: 50200121903920 | IFSC: HDFC0000663",
   watermarkText: "BLINK BEYOND",
   primaryColor: "#3451FF",
   accentColor: "#e0e7ff",
@@ -494,8 +494,9 @@ export function buildInvoiceHtml(inv: InvoiceData): string {
       ${inv.billingAddress ? `<div style="font-size:11.5px;color:#475569;margin-top:2px;line-height:1.4">${esc(inv.billingAddress)}${clientAddrLine ? ", "+clientAddrLine : ""}</div>` : ""}
       ${inv.clientPhone ? `<div style="font-size:11.5px;color:#475569">Ph: ${esc(inv.clientPhone)}</div>` : ""}
       ${inv.clientEmail ? `<div style="font-size:11.5px;color:#475569">${esc(inv.clientEmail)}</div>` : ""}
-      ${inv.clientGstin ? `<div style="font-size:11px;font-family:monospace;color:#64748b;margin-top:2px">GSTIN: ${esc(inv.clientGstin)}</div>` : ""}
+      ${inv.clientGstin ? `<div style="font-size:11px;font-family:monospace;color:#64748b;margin-top:2px">GSTIN/UIN: ${esc(inv.clientGstin)}</div>` : ""}
       ${inv.clientPan ? `<div style="font-size:11px;font-family:monospace;color:#64748b">PAN: ${esc(inv.clientPan)}</div>` : ""}
+      <div style="font-size:11px;color:#334155;margin-top:2px"><strong>Place of Supply:</strong> ${esc(inv.clientState || "Maharashtra")}</div>
     </div>
 
     <!-- Line Items Table -->
