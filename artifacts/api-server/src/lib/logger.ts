@@ -34,16 +34,20 @@ export class RotatingLogManager {
   private cleanupInterval?: NodeJS.Timeout;
 
   constructor() {
-    this.logDir = process.env.LOG_DIRECTORY || path.resolve(process.cwd(), "logs");
+    this.logDir = process.env.LOG_DIRECTORY || (process.env.VERCEL ? "/tmp/logs" : path.resolve(process.cwd(), "logs"));
     this.maxSizeBytes = parseMaxSize(process.env.LOG_MAX_SIZE || "10m");
     this.retentionDays = parseInt(process.env.LOG_RETENTION_DAYS || "14", 10);
 
-    this.ensureDir();
-    this.runRetentionCleanup();
+    try {
+      this.ensureDir();
+      this.runRetentionCleanup();
+    } catch (_) {}
 
     // Periodic retention check every 6 hours
     this.cleanupInterval = setInterval(() => {
-      this.runRetentionCleanup();
+      try {
+        this.runRetentionCleanup();
+      } catch (_) {}
     }, 6 * 60 * 60 * 1000);
     if (this.cleanupInterval.unref) {
       this.cleanupInterval.unref();
@@ -51,9 +55,11 @@ export class RotatingLogManager {
   }
 
   private ensureDir() {
-    if (!fs.existsSync(this.logDir)) {
-      fs.mkdirSync(this.logDir, { recursive: true });
-    }
+    try {
+      if (!fs.existsSync(this.logDir)) {
+        fs.mkdirSync(this.logDir, { recursive: true });
+      }
+    } catch (_) {}
   }
 
   private getDateString(): string {
@@ -70,16 +76,20 @@ export class RotatingLogManager {
     const filePath = path.join(this.logDir, `${category}.log`);
 
     if (!state) {
+      this.ensureDir();
       let currentSize = 0;
       if (fs.existsSync(filePath)) {
         try {
           currentSize = fs.statSync(filePath).size;
         } catch (_) {}
       }
-      const writeStream = fs.createWriteStream(filePath, { flags: "a" });
-      writeStream.on("error", (err) => {
-        console.error(`[LogManager Error] Failed writing to ${filePath}:`, err.message);
-      });
+      let writeStream: any;
+      try {
+        writeStream = fs.createWriteStream(filePath, { flags: "a" });
+        writeStream.on("error", () => {});
+      } catch (_) {
+        writeStream = { write: () => true, end: () => {} };
+      }
 
       state = { currentPath: filePath, writeStream, currentSize, currentDate };
       this.streams.set(category, state);
@@ -106,18 +116,14 @@ export class RotatingLogManager {
       }
 
       const newStream = fs.createWriteStream(state.currentPath, { flags: "a" });
-      newStream.on("error", (err) => {
-        console.error(`[LogManager Error] Failed writing to ${state.currentPath}:`, err.message);
-      });
+      newStream.on("error", () => {});
 
       state.writeStream = newStream;
       state.currentSize = 0;
       state.currentDate = newDate;
 
       setImmediate(() => this.runRetentionCleanup());
-    } catch (err: any) {
-      console.error(`[LogManager Error] Failed to rotate log for ${category}:`, err.message);
-    }
+    } catch (_) {}
   }
 
   public writeLogLine(line: string) {
@@ -146,9 +152,13 @@ export class RotatingLogManager {
   }
 
   private writeCategory(category: string, line: string, bytes: number) {
-    const state = this.getStreamState(category);
-    state.writeStream.write(line);
-    state.currentSize += bytes;
+    try {
+      const state = this.getStreamState(category);
+      if (state && state.writeStream) {
+        state.writeStream.write(line);
+        state.currentSize += bytes;
+      }
+    } catch (_) {}
   }
 
   public runRetentionCleanup() {

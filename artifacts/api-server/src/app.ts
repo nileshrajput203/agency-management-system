@@ -140,9 +140,13 @@ app.use("/api", apiLimiter, router);
 const getPublicDir = () => {
   const possiblePaths = [
     path.resolve(process.cwd(), "dist/public"),
+    path.resolve(process.cwd(), "dist"),
     path.resolve(__dirname, "public"),
+    path.resolve(__dirname, "dist"),
     path.resolve(__dirname, "dist/public"),
+    path.resolve(__dirname, "../../agency-os/dist"),
     path.resolve(__dirname, "../../agency-os/dist/public"),
+    path.resolve(process.cwd(), "artifacts/agency-os/dist"),
     path.resolve(process.cwd(), "artifacts/agency-os/dist/public"),
   ];
   return possiblePaths.find((p) => fs.existsSync(p));
