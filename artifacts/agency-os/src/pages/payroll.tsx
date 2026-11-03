@@ -30,8 +30,8 @@ export default function PayrollPage() {
   });
 
   const employees = summary?.employees || [];
-  const totalOutflow = summary?.totalOutflow || 0;
-  const totalDaysInMonth = summary?.totalDaysInMonth || 30;
+  const totalOutflow = summary?.totalOutflow ?? summary?.totalGrossPayout ?? 0;
+  const totalDaysInMonth = summary?.totalDaysInMonth ?? summary?.workingDaysInMonth ?? 30;
 
   return (
     <div className="p-6 animated-fade-in space-y-6">
@@ -138,59 +138,78 @@ export default function PayrollPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {employees.map((emp: any) => (
-                  <tr key={emp.userId} className="hover:bg-muted/20 transition-colors">
-                    <td className="py-3 px-4 font-semibold text-foreground">
-                      {emp.userName}
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">
-                      {emp.designation || emp.role}
-                    </td>
-                    <td className="py-3 px-4 text-right font-medium">
-                      ₹{(emp.baseSalary || 0).toLocaleString("en-IN")}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                        {emp.paidDays}
-                      </span>{" "}
-                      / {emp.totalDaysInMonth}
-                      {emp.unpaidLeaves > 0 && (
-                        <span className="ml-1 text-[10px] text-red-500 font-bold">
-                          ({emp.unpaidLeaves} LOP)
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right text-red-600 font-medium">
-                      {emp.lopDeduction > 0 ? `-₹${emp.lopDeduction.toLocaleString("en-IN")}` : "₹0"}
-                    </td>
-                    <td className="py-3 px-4 text-right font-bold text-primary">
-                      ₹{(emp.netSalary || 0).toLocaleString("en-IN")}
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground text-[11px]">
-                      {emp.bankAccountNo ? (
-                        <div>
-                          <span>A/C: {emp.bankAccountNo}</span>
-                          <span className="block text-[10px] opacity-75">IFSC: {emp.bankIfsc || "—"}</span>
+                {employees.map((emp: any) => {
+                  const empName = emp.name || emp.userName || emp.employeeName || emp.email || "Employee";
+                  const initials = empName.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase() || "EM";
+                  const paidDays = emp.paidDays ?? emp.effectiveDays ?? emp.presentDays ?? 0;
+                  const totalDays = emp.totalDaysInMonth ?? emp.workingDays ?? totalDaysInMonth;
+                  const unpaidLeaves = emp.unpaidLeaves ?? emp.unpaidAbsentDays ?? 0;
+                  const baseSalary = emp.baseSalary ?? emp.monthlySalary ?? 0;
+                  const netSalary = emp.netSalary ?? emp.netPayable ?? 0;
+                  const lop = emp.lopDeduction ?? 0;
+
+                  return (
+                    <tr key={emp.userId} className="hover:bg-muted/20 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-7 w-7 rounded-full bg-primary/10 text-primary font-bold text-[11px] flex items-center justify-center shrink-0">
+                            {initials}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-foreground text-xs truncate">{empName}</div>
+                            {emp.email && <div className="text-[10px] text-muted-foreground truncate">{emp.email}</div>}
+                          </div>
                         </div>
-                      ) : (
-                        <span className="italic opacity-60">Not configured</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
-                        onClick={() => {
-                          window.open(`/api/payroll/${emp.userId}/payslip-pdf?month=${selectedMonth}`, "_blank");
-                        }}
-                      >
-                        <Printer className="h-3.5 w-3.5" />
-                        Payslip
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground">
+                        {emp.designation || emp.role || "Team Member"}
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium">
+                        ₹{Number(baseSalary).toLocaleString("en-IN")}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {paidDays}
+                        </span>{" "}
+                        / {totalDays}
+                        {unpaidLeaves > 0 && (
+                          <span className="ml-1 text-[10px] text-red-500 font-bold">
+                            ({unpaidLeaves} LOP)
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right text-red-600 font-medium">
+                        {lop > 0 ? `-₹${Number(lop).toLocaleString("en-IN")}` : "₹0"}
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-primary">
+                        ₹{Number(netSalary).toLocaleString("en-IN")}
+                      </td>
+                      <td className="py-3 px-4 text-muted-foreground text-[11px]">
+                        {emp.bankAccountNo && emp.bankAccountNo !== "Not provided" ? (
+                          <div>
+                            <span>A/C: {emp.bankAccountNo}</span>
+                            <span className="block text-[10px] opacity-75">IFSC: {emp.bankIfsc || "—"}</span>
+                          </div>
+                        ) : (
+                          <span className="italic opacity-60">Not configured</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
+                          onClick={() => {
+                            window.open(`/api/payroll/${emp.userId}/payslip-pdf?month=${selectedMonth}`, "_blank");
+                          }}
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                          Payslip
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
