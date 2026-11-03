@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { SearchBar } from "@/components/common/SearchBar";
 import {
   useListContentPosts, useCreateContentPost, useUpdateContentPost, useDeleteContentPost,
-  getListContentPostsQueryKey, useListClients,
+  getListContentPostsQueryKey, useListClients, useListUsers,
   useCreateCalendarShare, useListCalendarShares,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Plus, ChevronLeft, ChevronRight, Calendar, Trash2, Link2,
   Share2, Copy, Check, FileText, CheckCircle2, Clock, AlertTriangle, RotateCcw, Building2,
-   Download, FileX, Sheet, Printer,
+   Download, FileX, Sheet, Printer, Film, Zap,
 } from "lucide-react";
 import { format, addMonths, subMonths, getDaysInMonth, startOfMonth, getDay } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ import {
 } from "@/components/content/content-constants";
 import { ContentShareDialog } from "@/components/content/content-share-dialog";
 import { ContentPostDrawer } from "@/components/content/content-post-drawer";
+import { PCApprovalStudio } from "@/components/content/pc-approval-studio";
 import { esc, openPrintWindow } from "@/lib/pdf-print";
 
 async function copyShareLink(url: string) {
@@ -54,13 +55,15 @@ export default function ContentPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [activeClientId, setActiveClientId] = useState<string>("");
   const [shareClientId, setShareClientId] = useState("");
-  const [view, setView] = useState<"calendar" | "list">("list");
+  const [view, setView] = useState<"studio" | "list" | "calendar">("studio");
   const [searchQuery, setSearchQuery] = useState("");
   const [panel, setPanel] = useState<PanelState>({ mode: "closed" });
   const [draft, setDraft] = useState(emptyDraft());
   const [newComment, setNewComment] = useState("");
   const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  const { data: users } = useListUsers();
 
   const month = format(currentMonth, "yyyy-MM");
   const canViewClientDirectory = canManageModule(user, "clients");
@@ -363,6 +366,15 @@ export default function ContentPage() {
           {/* View toggle */}
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
             <button
+              onClick={() => setView("studio")}
+              className={cn(
+                "px-3 py-1 rounded-md text-sm font-semibold transition-colors flex items-center gap-1.5",
+                view === "studio" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Film className="h-3.5 w-3.5" /> PC Approval Studio
+            </button>
+            <button
               onClick={() => setView("list")}
               className={cn("px-3 py-1 rounded-md text-sm font-medium transition-colors", view === "list" ? "bg-card shadow text-foreground" : "text-muted-foreground")}
             >List</button>
@@ -390,89 +402,99 @@ export default function ContentPage() {
         </div>
       </div>
 
-      {/* Stat chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {contentStatChips.map(({ label, value, accent, icon }) => (
-          <div key={label} className={cn("bg-card border border-l-[3px] rounded-xl p-4 scale-hover shadow-xs", accent)}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-                <p className="text-2xl font-bold font-heading mt-1">{value}</p>
-              </div>
-              <div className="p-2 rounded-xl bg-primary/10 text-primary shrink-0">{icon}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Existing share links for this client */}
-      {activeClientId && existingShares && existingShares.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {existingShares.map((share) => (
-            <div key={share.id} className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-1.5">
-              <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
-              <span className="text-xs text-muted-foreground truncate max-w-[200px]">{share.label}</span>
-              <button
-                className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
-                onClick={() => copyExistingShare(share.shareToken, share.id)}
-              >
-                {copiedShareId === share.id
-                  ? <Check className="h-3.5 w-3.5 text-emerald-500" />
-                  : <Copy className="h-3.5 w-3.5" />}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Client Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
-        {/* Month nav on the left */}
-        <div className="flex items-center gap-1 bg-muted/50 rounded-lg px-2 py-1.5 shrink-0 mr-2">
-          <button onClick={() => setCurrentMonth((m) => subMonths(m, 1))} className="p-0.5 hover:text-primary">
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="text-sm font-semibold min-w-28 text-center">{format(currentMonth, "MMMM yyyy")}</span>
-          <button onClick={() => setCurrentMonth((m) => addMonths(m, 1))} className="p-0.5 hover:text-primary">
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-1.5 flex-1 overflow-x-auto scrollbar-none">
-          <button
-            onClick={() => setActiveClientId("")}
-            className={cn(
-              "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border",
-              activeClientId === ""
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-muted/50 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
-            )}
-          >
-            All Clients
-          </button>
-          {(clients ?? []).map((client) => (
-            <button
-              key={client.id}
-              onClick={() => setActiveClientId(client.id)}
-              className={cn(
-                "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap",
-                activeClientId === client.id
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-muted/50 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
-              )}
-            >
-              {client.companyName}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Content */}
       {isLoading ? (
         <div className="grid grid-cols-1 gap-2">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
         </div>
-      ) : view === "list" ? (
+      ) : view === "studio" ? (
+        <PCApprovalStudio
+          posts={(posts ?? []) as PostRecord[]}
+          clients={clients}
+          users={(users ?? []) as any[]}
+          onRefresh={() => qc.invalidateQueries({ queryKey: getListContentPostsQueryKey() })}
+          onOpenEdit={(post) => openEdit(post)}
+        />
+      ) : (
+        <>
+          {/* Stat chips */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {contentStatChips.map(({ label, value, accent, icon }) => (
+              <div key={label} className={cn("bg-card border border-l-[3px] rounded-xl p-4 scale-hover shadow-xs", accent)}>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+                    <p className="text-2xl font-bold font-heading mt-1">{value}</p>
+                  </div>
+                  <div className="p-2 rounded-xl bg-primary/10 text-primary shrink-0">{icon}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Existing share links for this client */}
+          {activeClientId && existingShares && existingShares.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {existingShares.map((share) => (
+                <div key={share.id} className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-1.5">
+                  <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                  <span className="text-xs text-muted-foreground truncate max-w-[200px]">{share.label}</span>
+                  <button
+                    className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
+                    onClick={() => copyExistingShare(share.shareToken, share.id)}
+                  >
+                    {copiedShareId === share.id
+                      ? <Check className="h-3.5 w-3.5 text-emerald-500" />
+                      : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Client Tabs */}
+          <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+            {/* Month nav on the left */}
+            <div className="flex items-center gap-1 bg-muted/50 rounded-lg px-2 py-1.5 shrink-0 mr-2">
+              <button onClick={() => setCurrentMonth((m) => subMonths(m, 1))} className="p-0.5 hover:text-primary">
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="text-sm font-semibold min-w-28 text-center">{format(currentMonth, "MMMM yyyy")}</span>
+              <button onClick={() => setCurrentMonth((m) => addMonths(m, 1))} className="p-0.5 hover:text-primary">
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-1 overflow-x-auto scrollbar-none">
+              <button
+                onClick={() => setActiveClientId("")}
+                className={cn(
+                  "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border",
+                  activeClientId === ""
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/50 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+              >
+                All Clients
+              </button>
+              {(clients ?? []).map((client) => (
+                <button
+                  key={client.id}
+                  onClick={() => setActiveClientId(client.id)}
+                  className={cn(
+                    "shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border whitespace-nowrap",
+                    activeClientId === client.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted/50 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
+                  )}
+                >
+                  {client.companyName}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {view === "list" ? (
         <div className="space-y-2">
           {filteredPosts.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
@@ -622,6 +644,8 @@ export default function ContentPage() {
             })}
           </div>
         </div>
+      )}
+      </>
       )}
 
       {/* Slide-over Panel */}

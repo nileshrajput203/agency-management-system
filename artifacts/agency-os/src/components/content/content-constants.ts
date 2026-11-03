@@ -57,7 +57,9 @@ export function parseClientRevision(comments: any[], rejectionNote?: string | nu
 export const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   IDEA: { label: "Idea", className: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
   SCRIPTING: { label: "Scripting", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  SHOOTING: { label: "Shooting", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
   DESIGNING: { label: "Designing", className: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
+  PRODUCTION: { label: "Production", className: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" },
   IN_REVIEW: { label: "In Review", className: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
   ADMIN_APPROVED: { label: "Approved", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
   SCHEDULED: { label: "Scheduled", className: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300" },
@@ -100,7 +102,32 @@ export type PostRecord = {
   title?: string | null;
   rejectionNote?: string | null;
   customProperties?: { key: string; value: string }[] | null;
-  comments?: { id: string; text: string; createdAt: string }[] | null;
+  comments?: any[] | null;
+  ideationAssignedTo?: string | null;
+  videographerId?: string | null;
+  editorId?: string | null;
+  approverId?: string | null;
+  currentOwnerId?: string | null;
+  conceptHook?: string | null;
+  scriptBody?: string | null;
+  scriptScenes?: any[] | null;
+  referenceLinks?: any[] | null;
+  trendingAudioUrl?: string | null;
+  shotList?: any[] | null;
+  shootLocation?: string | null;
+  shootTimeSlot?: string | null;
+  shootEquipmentProps?: any[] | null;
+  rawFootageUrl?: string | null;
+  shootCompletedAt?: string | null;
+  videographerNotes?: string | null;
+  mediaFiles?: string[] | null;
+  coverImageUrl?: string | null;
+  assetVersions?: any[] | null;
+  qcChecklist?: Record<string, boolean> | null;
+  internalApprovalStatus?: string | null;
+  internalApprovedBy?: string | null;
+  internalApprovedAt?: string | null;
+  isFastTrack?: string | boolean | null;
   createdAt?: string | null;
 };
 
