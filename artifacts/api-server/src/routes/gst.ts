@@ -108,7 +108,7 @@ router.get("/ledger-summary", requirePermission("invoices.view"), asyncHandler(a
     inputTaxablePo += sub;
     inputTaxPo += tax;
 
-    const itcEligible = po.itcEligible !== "false" && po.itcEligible !== false;
+    const itcEligible = po.itcEligible !== "false" && (po.itcEligible as any) !== false;
     if (itcEligible) {
       inputItcPo += tax;
     }

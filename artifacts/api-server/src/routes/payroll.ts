@@ -137,7 +137,7 @@ router.get("/summary", requirePermission("users.view"), asyncHandler(async (req,
 
 // GET /api/payroll/:userId/payslip-pdf?month=YYYY-MM — printable salary slip view
 router.get("/:userId/payslip-pdf", requirePermission("users.view"), asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+  const userId = req.params.userId as string;
   const targetMonth = (req.query.month as string) || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()).slice(0, 7);
   const [yearStr, monthStr] = targetMonth.split("-");
   const year = parseInt(yearStr, 10);

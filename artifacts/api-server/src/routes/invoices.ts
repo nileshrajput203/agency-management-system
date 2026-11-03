@@ -279,7 +279,7 @@ router.post("/generate-retainers", requirePermission("invoices.create"), asyncHa
 
 // Convert Proforma Invoice to Tax Invoice
 router.post("/:id/convert-to-tax-invoice", requirePermission("invoices.edit"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid invoice ID format", 400);
   }
 
@@ -312,7 +312,7 @@ router.post("/:id/convert-to-tax-invoice", requirePermission("invoices.edit"), a
 
 // Record payment & track delayed payment behaviour
 router.patch("/:id/payment", requirePermission("invoices.edit"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid invoice ID format", 400);
   }
 
@@ -356,7 +356,7 @@ router.patch("/:id/payment", requirePermission("invoices.edit"), asyncHandler(as
 }));
 
 router.patch("/:id", requirePermission("invoices.edit"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid invoice ID format", 400);
   }
   const { id: _id, createdAt: _ts, ...body } = req.body;
@@ -367,7 +367,7 @@ router.patch("/:id", requirePermission("invoices.edit"), asyncHandler(async (req
 }));
 
 router.delete("/:id", requirePermission("invoices.delete"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid invoice ID format", 400);
   }
   await db.delete(invoicesTable).where(eq(invoicesTable.id, (req.params.id as string)));

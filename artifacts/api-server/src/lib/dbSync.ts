@@ -33,10 +33,10 @@ export async function syncParentInsert(
 
   return await db.transaction(async (tx) => {
     // 1. Insert parent
-    const [insertedParent] = await tx
+    const [insertedParent] = (await tx
       .insert(config.parentTable)
       .values(filteredParentValues)
-      .returning();
+      .returning()) as any[];
 
     if (!insertedParent) {
       throw new Error("Failed to insert parent record");

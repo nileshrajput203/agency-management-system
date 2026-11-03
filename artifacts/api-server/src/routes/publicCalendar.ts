@@ -404,7 +404,7 @@ router.post("/calendar/:shareToken/posts/:postId/pin-comment", async (req, res) 
 // ─── Public Client Portal (Deliverables, Content, Projects, Invoices) ───
 router.get(["/portal/:token", "/client-portal/:token"], async (req, res) => {
   try {
-    const token = req.params.token;
+    const token = req.params.token as string;
     const [client] = await db
       .select()
       .from(clientsTable)
@@ -491,7 +491,7 @@ router.get(["/portal/:token", "/client-portal/:token"], async (req, res) => {
 // ─── Public Interactive Web Proposal & E-Signature ───────────────
 router.get(["/proposals/:token", "/proposal/:token"], async (req, res) => {
   try {
-    const token = req.params.token;
+    const token = req.params.token as string;
     const [proposal] = await db
       .select()
       .from(proposalsTable)
@@ -509,7 +509,7 @@ router.get(["/proposals/:token", "/proposal/:token"], async (req, res) => {
 
     return res.json({
       ...proposal,
-      clientName: client?.companyName || proposal.clientName,
+      clientName: client?.companyName || "Client",
       pricingTiers: proposal.pricingTiers || [],
       optionalAddOns: proposal.optionalAddOns || [],
       selectedTierId: proposal.selectedTierId || null,
@@ -525,7 +525,7 @@ router.get(["/proposals/:token", "/proposal/:token"], async (req, res) => {
 
 router.post(["/proposals/:token/accept", "/proposals/:token/sign"], async (req, res) => {
   try {
-    const token = req.params.token;
+    const token = req.params.token as string;
     const { signatureName, selectedTierId, selectedAddOnIds = [] } = req.body || {};
 
     if (!signatureName || typeof signatureName !== "string" || !signatureName.trim()) {
@@ -559,11 +559,11 @@ router.post(["/proposals/:token/accept", "/proposals/:token/sign"], async (req, 
     // Auto-create draft quotation for accounting
     try {
       const qNum = `Q-${Date.now().toString().slice(-6)}`;
-      const totalAmount = Number(proposal.total) || 50000;
+      const totalAmount = Number(proposal.value) || 50000;
       await db.insert(quotationsTable).values({
         number: qNum,
         clientId: proposal.clientId,
-        clientName: proposal.clientName || "Client",
+        clientName: "Client",
         quotationDate: now.toISOString().split("T")[0],
         status: "APPROVED",
         currency: "INR",
@@ -577,7 +577,7 @@ router.post(["/proposals/:token/accept", "/proposals/:token/sign"], async (req, 
     // Notify agency team
     NotificationService.notifyAdminsAndManagers({
       title: "🎉 Proposal Accepted & Digitally Signed!",
-      message: `"${proposal.title}" was approved & signed by ${signatureName.trim()} (${proposal.clientName || "Client"}).`,
+      message: `"${proposal.title}" was approved & signed by ${signatureName.trim()}.`,
       type: "FINANCE",
       priority: "URGENT",
       actionUrl: `/proposals`,

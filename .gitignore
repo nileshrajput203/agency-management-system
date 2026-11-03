@@ -61,3 +61,6 @@ local_db.json
 logs/
 *.zip
 
+
+.vercel
+.env*

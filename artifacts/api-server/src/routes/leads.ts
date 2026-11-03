@@ -219,7 +219,7 @@ router.post("/:id/convert", requirePermission("sales.edit"), asyncHandler(async 
       category: "RETAINER",
       status: "ACTIVE",
       monthlyRetainer: retainerAmount,
-      assignedTo: lead.assignedTo || requesterId || null,
+      assignedTo: (lead as any).assignedTo || requesterId || null,
       notes: lead.notes ? `Converted from Lead: ${lead.title}\n\n${lead.notes}` : `Converted from Lead: ${lead.title}`,
       portalToken,
       deliverableQuotas: [
@@ -249,7 +249,7 @@ router.post("/:id/convert", requirePermission("sales.edit"), asyncHandler(async 
         description: `Client onboarding project auto-generated upon winning lead "${lead.title}".`,
         startDate: new Date(),
         dueDate: new Date(Date.now() + 30 * 86400000),
-        assignedTo: lead.assignedTo || requesterId || null,
+        assignedTo: (lead as any).assignedTo || requesterId || null,
         createdBy: requesterId,
       }).returning();
 
@@ -302,8 +302,7 @@ router.post("/:id/convert", requirePermission("sales.edit"), asyncHandler(async 
         const [task] = await db.insert(tasksTable).values({
           title: t.title,
           projectId: proj.id,
-          clientId: client.id,
-          assigneeId: lead.assignedTo || requesterId || null,
+          assigneeId: (lead as any).assignedTo || requesterId || null,
           status: "TODO",
           priority: t.priority,
           description: t.desc,
@@ -335,15 +334,6 @@ router.post("/:id/convert", requirePermission("sales.edit"), asyncHandler(async 
         total,
         notes: `Retainer quotation generated from won lead ${lead.title}`,
         termsAndConditions: "1. 50% advance payment required to commence onboarding.\n2. Invoices are payable within 7 days of issue.\n3. GST @ 18% applicable on all agency services.",
-        items: [
-          {
-            description: `${clientCompany} — Monthly Agency Retainer`,
-            quantity: 1,
-            unitPrice: subtotal,
-            total: subtotal,
-            taxRate: 18,
-          },
-        ] as any,
       }).returning();
       createdDocument = quotation;
     } else if (createDocument === "INVOICE") {
@@ -364,15 +354,6 @@ router.post("/:id/convert", requirePermission("sales.edit"), asyncHandler(async 
         taxAmount,
         total,
         notes: `Initial retainer invoice generated from won lead ${lead.title}`,
-        items: [
-          {
-            description: `${clientCompany} — Initial Retainer Onboarding`,
-            quantity: 1,
-            unitPrice: subtotal,
-            total: subtotal,
-            taxRate: 18,
-          },
-        ] as any,
       }).returning();
       createdDocument = invoice;
     }
@@ -380,7 +361,7 @@ router.post("/:id/convert", requirePermission("sales.edit"), asyncHandler(async 
 
   // Audit Log
   try {
-    await db.insert(auditLogsTable).values({
+    await db.insert(auditLogsTable as any).values({
       userId: requesterId,
       action: "CONVERT_LEAD",
       entity: "lead",
@@ -400,8 +381,8 @@ router.post("/:id/convert", requirePermission("sales.edit"), asyncHandler(async 
     await NotificationService.notifyAdminsAndManagers({
       type: "LEAD_CONVERTED",
       title: `🎉 Lead Won & Converted: ${lead.title}`,
-      body: `Converted to client "${createdClient?.companyName || lead.title}" with ${createdTasks.length} onboarding SOP tasks created.`,
-      linkUrl: createdClient ? `/clients/${createdClient.id}` : "/sales",
+      message: `Converted to client "${createdClient?.companyName || lead.title}" with ${createdTasks.length} onboarding SOP tasks created.`,
+      actionUrl: createdClient ? `/clients/${createdClient.id}` : "/sales",
     }, requesterId);
   } catch (_) {}
 

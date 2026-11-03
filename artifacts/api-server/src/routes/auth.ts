@@ -196,8 +196,8 @@ router.post("/auth/register", asyncHandler(async (req, res) => {
     await NotificationService.notifyAdminsAndManagers({
       type: "USER_REGISTERED",
       title: "New User Registration Pending Approval",
-      body: `${user.name} (${user.email}) registered as TEAM_MEMBER and requires activation.`,
-      linkUrl: "/users",
+      message: `${user.name} (${user.email}) registered as TEAM_MEMBER and requires activation.`,
+      actionUrl: "/users",
     });
   } catch (notifErr) {
     authLogger.warn({ notifErr }, "Failed to notify admins of user registration");

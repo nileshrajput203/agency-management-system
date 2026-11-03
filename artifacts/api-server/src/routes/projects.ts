@@ -769,7 +769,7 @@ router.post("/:id/milestones", requirePermission("projects.edit"), asyncHandler(
 
 // PATCH /api/projects/:projectId/milestones/:milestoneId — update milestone
 router.patch("/:projectId/milestones/:milestoneId", requirePermission("projects.edit"), asyncHandler(async (req, res) => {
-  const { milestoneId } = req.params;
+  const milestoneId = req.params.milestoneId as string;
   const { title, description, dueDate, status, orderIndex } = req.body || {};
 
   const completedAt = status === "COMPLETED" ? new Date() : null;
@@ -794,7 +794,7 @@ router.patch("/:projectId/milestones/:milestoneId", requirePermission("projects.
 
 // DELETE /api/projects/:projectId/milestones/:milestoneId — delete milestone
 router.delete("/:projectId/milestones/:milestoneId", requirePermission("projects.edit"), asyncHandler(async (req, res) => {
-  const { milestoneId } = req.params;
+  const milestoneId = req.params.milestoneId as string;
   const [deleted] = await db
     .delete(projectMilestonesTable)
     .where(eq(projectMilestonesTable.id, milestoneId))

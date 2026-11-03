@@ -191,6 +191,6 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload {
   if (payload.type !== "refresh") {
     throw new Error("Invalid refresh token type");
   }
-  return payload as RefreshTokenPayload;
+  return payload as unknown as RefreshTokenPayload;
 }
 

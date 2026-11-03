@@ -87,7 +87,7 @@ router.get("/", requirePermission("proposals.view"), asyncHandler(async (req, re
 }));
 
 router.get("/:id", requirePermission("proposals.view"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid proposal ID format", 400);
   }
   const [row] = await db
@@ -132,7 +132,7 @@ router.post("/", requirePermission("proposals.create"), asyncHandler(async (req,
 }));
 
 router.patch("/:id", requirePermission("proposals.edit"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid proposal ID format", 400);
   }
   const { id: _id, createdAt: _ts, ...body } = req.body;
@@ -143,7 +143,7 @@ router.patch("/:id", requirePermission("proposals.edit"), asyncHandler(async (re
 }));
 
 router.delete("/:id", requirePermission("proposals.delete"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid proposal ID format", 400);
   }
   await db.delete(proposalsTable).where(eq(proposalsTable.id, (req.params.id as string)));

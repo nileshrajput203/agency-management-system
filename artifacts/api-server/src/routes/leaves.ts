@@ -115,7 +115,7 @@ router.post("/leaves", requirePermission("leave.apply"), asyncHandler(async (req
 }));
 
 router.post("/leaves/:id/approve", requirePermission("leave.approve"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid leave request ID format", 400);
   }
   const userId = (req as any).userId;
@@ -223,7 +223,7 @@ router.post("/leaves/:id/approve", requirePermission("leave.approve"), asyncHand
 }));
 
 router.post("/leaves/:id/reject", requirePermission("leave.approve"), asyncHandler(async (req, res) => {
-  if (!isValidUUID(req.params.id)) {
+  if (!isValidUUID(req.params.id as string)) {
     throw createError("Invalid leave request ID format", 400);
   }
   const userId = (req as any).userId;

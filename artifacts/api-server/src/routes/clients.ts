@@ -261,7 +261,6 @@ router.post("/:id/close-contract", requirePermission("clients.edit"), asyncHandl
     toStatus: targetStatus,
     effectiveDate: now.toISOString().split("T")[0],
     reason: reason || (action === "PAUSE" ? "Contract Paused" : "Contract Closed"),
-    notes: notes || null,
     createdBy: currentUserId,
   });
 
@@ -305,7 +304,6 @@ router.post("/:id/revive", requirePermission("clients.edit"), asyncHandler(async
     toStatus: "ACTIVE",
     effectiveDate: now.toISOString().split("T")[0],
     reason: "Contract Revived / Deal Reactivated",
-    notes: notes || null,
     createdBy: currentUserId,
   });
 

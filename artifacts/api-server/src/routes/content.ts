@@ -175,7 +175,6 @@ router.post("/", requirePermission("content.create"), asyncHandler(async (req, r
 
       const [task] = await db.insert(tasksTable).values({
         title: `[Content] ${sanitized.title || "Social Media Post"}`,
-        clientId: sanitized.clientId || null,
         projectId: clientProject?.id || null,
         assigneeId: effectiveAssignee,
         dueDate: (sanitized.shootDate || sanitized.scheduledAt)
@@ -740,7 +739,6 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
 
       const [newTask] = await db.insert(tasksTable).values({
         title: `[Content] ${sanitized.title || existing.title || "Social Post"}`,
-        clientId: sanitized.clientId || existing.clientId || null,
         projectId: clientProject?.id || null,
         assigneeId: effectiveAssignee,
         dueDate: (sanitized.shootDate || sanitized.scheduledAt || existing.shootDate || existing.scheduledAt)
@@ -925,7 +923,7 @@ router.get("/shares", requirePermission("content.view"), asyncHandler(async (req
 }));
 
 router.post("/shares/:id/regenerate", requirePermission("content.create"), asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { randomUUID } = await import("crypto");
   const newShareToken = randomUUID();
 
@@ -943,7 +941,7 @@ router.post("/shares/:id/regenerate", requirePermission("content.create"), async
 }));
 
 router.patch("/shares/:id", requirePermission("content.edit"), asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const { label, expiresAt, isRevoked } = req.body;
 
   const updateData: any = {};
@@ -962,7 +960,7 @@ router.patch("/shares/:id", requirePermission("content.edit"), asyncHandler(asyn
 }));
 
 router.delete("/shares/:id", requirePermission("content.delete"), asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   await db.delete(clientCalendarSharesTable).where(eq(clientCalendarSharesTable.id, id));
   return res.status(204).send();
 }));
