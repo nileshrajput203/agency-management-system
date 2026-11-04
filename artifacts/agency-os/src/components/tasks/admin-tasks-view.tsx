@@ -358,13 +358,14 @@ export function AdminTasksView() {
 
   // Group tasks by team member / employee ("where admin can see how is everyone working")
   const teamWorkloadList = (users ?? []).map((member: any) => {
+    const memberId = String(member?.id || member?.user?.id || "");
     const memberTasks = (tasks ?? []).filter((t: any) =>
-      t.assigneeId === member.id || (Array.isArray(t.coAssignees) && t.coAssignees.includes(member.id))
+      String(t.assigneeId || "") === memberId || (Array.isArray(t.coAssignees) && t.coAssignees.map(String).includes(memberId))
     );
-    const memberToday = memberTasks.filter((t: any) => !isCompletedTask(t.status) && t.dueDate && t.dueDate.startsWith(todayStr));
+    const memberToday = memberTasks.filter((t: any) => !isCompletedTask(t.status) && t.dueDate && String(t.dueDate).startsWith(todayStr));
     const memberPending = memberTasks.filter((t: any) => !isCompletedTask(t.status));
     const memberCompleted = memberTasks.filter((t: any) => isCompletedTask(t.status));
-    const memberOverdue = memberTasks.filter((t: any) => !isCompletedTask(t.status) && t.dueDate && isBefore(parseISO(t.dueDate), startOfDay(new Date())));
+    const memberOverdue = memberTasks.filter((t: any) => !isCompletedTask(t.status) && t.dueDate && isBefore(parseISO(String(t.dueDate).split("T")[0]), startOfDay(new Date())));
 
     return {
       user: member,
@@ -825,12 +826,13 @@ export function AdminTasksView() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
                     {teamWorkloadList.map((member) => {
-                      const isExpanded = expandedUserId === member.user.id;
+                      const memberId = member.id || member.user?.id;
+                      const isExpanded = expandedUserId === memberId;
                       const hasActiveWork = member.todayTasks.length > 0 || member.pendingTasks.length > 0;
 
                       return (
                         <Card
-                          key={member.user.id}
+                          key={memberId}
                           className={cn(
                             "border transition-all bg-card overflow-hidden shadow-2xs hover:border-primary/40",
                             member.overdueTasks.length > 0 ? "border-rose-300 dark:border-rose-900/50" : "border-border"
@@ -916,7 +918,7 @@ export function AdminTasksView() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setExpandedUserId(isExpanded ? null : member.user.id)}
+                              onClick={() => setExpandedUserId(isExpanded ? null : (member.id || member.user?.id))}
                               className="w-full h-7 text-xs text-muted-foreground hover:text-foreground justify-between px-2 pt-1 border-t"
                             >
                               <span>{isExpanded ? "Hide Assigned Tasks" : `View Assigned Tasks (${member.tasks.length})`}</span>

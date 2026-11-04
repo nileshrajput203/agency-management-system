@@ -17,7 +17,8 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Phone, Mail, Globe, Instagram, Camera, Loader2, RefreshCw, Plus, MessageSquare, Phone as PhoneIcon, Mail as MailIcon, Calendar, FileText, AlertCircle, Activity, Pencil } from "lucide-react";
+import { ArrowLeft, Phone, Mail, Globe, Instagram, Camera, Loader2, RefreshCw, Plus, MessageSquare, Phone as PhoneIcon, Mail as MailIcon, Calendar, FileText, AlertCircle, Activity, Pencil, Video, Layers, CheckCircle2, Sparkles, ExternalLink } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { format, formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn, formatDateOnly, extractClientFields } from "@/lib/utils";
@@ -122,6 +123,51 @@ export default function ClientDetailPage({ id }: { id: string }) {
       return res.json();
     },
   });
+
+  const { data: contentPosts = [] } = useQuery<any[]>({
+    queryKey: ["client-content-posts", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/content-posts?clientId=${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7);
+  const thisMonthPosts = (contentPosts || []).filter((p) => {
+    const d = p.scheduledAt || p.shootDate || p.createdAt || "";
+    return d.slice(0, 7) === currentMonthPrefix;
+  });
+
+  const isApproved = (p: any) =>
+    p.status === "ADMIN_APPROVED" ||
+    p.status === "SCHEDULED" ||
+    p.status === "PUBLISHED" ||
+    p.approvalStatus === "APPROVED";
+
+  const reelsPosts = thisMonthPosts.filter(
+    (p) => p.format === "REEL" || p.contentType === "REEL" || p.format === "VIDEO"
+  );
+  const reelsApproved = reelsPosts.filter(isApproved).length;
+  const reelsTarget = Math.max(reelsPosts.length, 12);
+
+  const carouselPosts = thisMonthPosts.filter(
+    (p) => p.format === "CAROUSEL" || p.format === "GRAPHIC" || p.contentType === "CAROUSEL" || p.format === "PHOTO"
+  );
+  const carouselsApproved = carouselPosts.filter(isApproved).length;
+  const carouselsTarget = Math.max(carouselPosts.length, 8);
+
+  const storiesPosts = thisMonthPosts.filter(
+    (p) => p.format === "STORY" || p.contentType === "STORY"
+  );
+  const storiesApproved = storiesPosts.filter(isApproved).length;
+  const storiesTarget = Math.max(storiesPosts.length, 10);
+
+  const totalDelivered = reelsApproved + carouselsApproved + storiesApproved;
+  const totalTarget = reelsTarget + carouselsTarget + storiesTarget;
+  const totalPercentage = totalTarget > 0 ? Math.round((totalDelivered / totalTarget) * 100) : 0;
 
   const updateMutation = useUpdateClient({
     mutation: {
@@ -495,6 +541,75 @@ export default function ClientDetailPage({ id }: { id: string }) {
 
         {/* Right: Projects + invoices + contracts */}
         <div className="lg:col-span-2 space-y-5">
+          {/* Monthly Retainer Deliverable Quotas */}
+          <Card className="border-primary/20 bg-gradient-to-br from-card via-card to-primary/[0.03] shadow-xs">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-0.5">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Monthly Retainer Deliverable Quotas
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  {format(new Date(), "MMMM yyyy")} Pipeline • {totalDelivered} of {totalTarget} deliverables approved ({totalPercentage}%)
+                </p>
+              </div>
+              <Link href="/content">
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
+                  <span>Open Studio</span>
+                  <ExternalLink className="h-3 w-3" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold flex items-center gap-1.5 text-foreground">
+                    <Video className="h-3.5 w-3.5 text-rose-500" />
+                    Reels & Short-Form Videos
+                  </span>
+                  <span className="font-bold text-foreground">
+                    <span className="text-emerald-600 dark:text-emerald-400">{reelsApproved}</span> / {reelsTarget}
+                    <span className="text-muted-foreground font-normal ml-1">
+                      ({reelsTarget > 0 ? Math.round((reelsApproved / reelsTarget) * 100) : 0}%)
+                    </span>
+                  </span>
+                </div>
+                <Progress value={reelsTarget > 0 ? Math.min(100, Math.round((reelsApproved / reelsTarget) * 100)) : 0} className="h-2" />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold flex items-center gap-1.5 text-foreground">
+                    <Layers className="h-3.5 w-3.5 text-violet-500" />
+                    Carousels, Graphics & Stills
+                  </span>
+                  <span className="font-bold text-foreground">
+                    <span className="text-emerald-600 dark:text-emerald-400">{carouselsApproved}</span> / {carouselsTarget}
+                    <span className="text-muted-foreground font-normal ml-1">
+                      ({carouselsTarget > 0 ? Math.round((carouselsApproved / carouselsTarget) * 100) : 0}%)
+                    </span>
+                  </span>
+                </div>
+                <Progress value={carouselsTarget > 0 ? Math.min(100, Math.round((carouselsApproved / carouselsTarget) * 100)) : 0} className="h-2" />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold flex items-center gap-1.5 text-foreground">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-amber-500" />
+                    Stories & Daily Snaps
+                  </span>
+                  <span className="font-bold text-foreground">
+                    <span className="text-emerald-600 dark:text-emerald-400">{storiesApproved}</span> / {storiesTarget}
+                    <span className="text-muted-foreground font-normal ml-1">
+                      ({storiesTarget > 0 ? Math.round((storiesApproved / storiesTarget) * 100) : 0}%)
+                    </span>
+                  </span>
+                </div>
+                <Progress value={storiesTarget > 0 ? Math.min(100, Math.round((storiesApproved / storiesTarget) * 100)) : 0} className="h-2" />
+              </div>
+            </CardContent>
+          </Card>
           {canViewFinance && contracts && contracts.length > 0 && (
             <Card>
               <CardHeader><CardTitle className="text-base">Content Contracts</CardTitle></CardHeader>

@@ -204,6 +204,70 @@ async function notifyManagers({
 }
 
 /**
+ * GET /api/work-reports/auto-fill?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+ * Aggregates the logged-in user's completed/active tasks and time entries within the date range.
+ */
+router.get(
+  "/auto-fill",
+  asyncHandler(async (req: any, res) => {
+    const user = req.user;
+    const { startDate, endDate } = req.query;
+
+    const start = startDate ? new Date(String(startDate) + "T00:00:00") : new Date(Date.now() - 7 * 86400000);
+    const end = endDate ? new Date(String(endDate) + "T23:59:59") : new Date();
+
+    // 1. Fetch user's tasks
+    const allTasks = await db.select().from(tasksTable);
+    const userTasks = allTasks.filter((t: any) => {
+      const isAssigned = String(t.assigneeId || "") === String(user.id) ||
+        (Array.isArray(t.coAssignees) && t.coAssignees.map(String).includes(String(user.id)));
+      if (!isAssigned) return false;
+      if (t.updatedAt && new Date(t.updatedAt) >= start && new Date(t.updatedAt) <= end) return true;
+      if (t.dueDate && new Date(t.dueDate) >= start && new Date(t.dueDate) <= end) return true;
+      return t.status !== "DONE";
+    });
+
+    // 2. Fetch user's time entries
+    const timeEntries = await db
+      .select()
+      .from(timeEntriesTable)
+      .where(eq(timeEntriesTable.userId, user.id));
+    
+    const userTimes = timeEntries.filter((te: any) => {
+      const d = te.date ? new Date(te.date + "T00:00:00") : te.createdAt ? new Date(te.createdAt) : null;
+      return d && d >= start && d <= end;
+    });
+
+    const totalHours = userTimes.reduce((acc: number, te: any) => acc + (Number(te.hours) || 0), 0);
+    const completedTasks = userTasks.filter((t: any) => t.status === "DONE");
+    const activeTasks = userTasks.filter((t: any) => t.status !== "DONE");
+
+    const completedBullets = completedTasks.map((t: any) => `• ${t.title || "Task"} (${t.status})`).join("\n");
+    const inProgressBullets = activeTasks.map((t: any) => `• ${t.title || "Task"} [Priority: ${t.priority || "Medium"}]`).join("\n");
+    const timeNotes = userTimes.map((te: any) => `• ${te.description || "Work log"} - ${te.hours}h`).slice(0, 8).join("\n");
+
+    const tasksSummary = [
+      completedTasks.length > 0 ? `Completed Deliverables (${completedTasks.length}):\n${completedBullets}` : "",
+      activeTasks.length > 0 ? `In Progress / Next Sprint (${activeTasks.length}):\n${inProgressBullets}` : "",
+      timeNotes ? `Time Logged (${totalHours.toFixed(1)} hrs):\n${timeNotes}` : "",
+    ].filter(Boolean).join("\n\n");
+
+    return res.json({
+      startDate: start.toISOString().split("T")[0],
+      endDate: end.toISOString().split("T")[0],
+      totalHours: Number(totalHours.toFixed(1)),
+      tasksCompletedCount: completedTasks.length,
+      tasksActiveCount: activeTasks.length,
+      tasksCompleted: tasksSummary || "Completed assigned sprint deliverables and logged project hours.",
+      tasksPlanned: inProgressBullets || "Continue active sprint deliverables and client review follow-ups.",
+      challenges: activeTasks.some((t: any) => t.priority === "HIGH") ? "High-priority client deliverables under active iteration." : "No major blockers encountered.",
+      keyAchievements: `Successfully delivered ${completedTasks.length} tasks with ${totalHours.toFixed(1)} recorded working hours.`,
+      learnings: "Optimized turnaround time and streamlined asset handoffs.",
+    });
+  })
+);
+
+/**
  * GET /api/work-reports
  * Fetch reports accessible to the current user.
  */

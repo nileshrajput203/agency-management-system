@@ -878,6 +878,44 @@ function WorkReportEditorView({
   const totalHours = formData.projects.reduce((acc: number, p: any) => acc + (Number(p.hoursSpent) || 0), 0);
   const completedCount = formData.projects.filter((p: any) => p.status === "Completed" || Number(p.completionPercentage) === 100).length;
 
+  const [isAutoFilling, setIsAutoFilling] = useState(false);
+  const handleAutoFill = async () => {
+    setIsAutoFilling(true);
+    try {
+      const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
+      const res = await fetch(`/api/work-reports/auto-fill?startDate=${formData.startDate || ""}&endDate=${formData.endDate || ""}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Could not fetch tasks summary");
+      const autoData = await res.json();
+      
+      setFormData((prev: any) => ({
+        ...prev,
+        keyAchievements: autoData.keyAchievements || prev.keyAchievements,
+        learnings: autoData.learnings || prev.learnings,
+        challenges: autoData.challenges || prev.challenges,
+        projects: prev.projects.length === 0 ? [
+          {
+            id: crypto.randomUUID(),
+            projectId: "none",
+            projectName: "Sprint Deliverables & Tasks",
+            clientName: "Assigned Clients",
+            taskDescription: autoData.tasksCompleted,
+            completionPercentage: autoData.tasksCompletedCount > 0 ? 100 : 50,
+            hoursSpent: autoData.totalHours || 0,
+            status: autoData.tasksCompletedCount > 0 ? "Completed" : "In Progress",
+            managerComment: "",
+          }
+        ] : prev.projects,
+      }));
+      toast.success(`Auto-filled ${autoData.tasksCompletedCount} completed tasks and ${autoData.totalHours} hrs from your system activity!`);
+    } catch (e: any) {
+      toast.error(e.message || "Auto-fill failed");
+    } finally {
+      setIsAutoFilling(false);
+    }
+  };
+
   const addProject = () => {
     const newProj = {
       id: crypto.randomUUID(),
@@ -1209,9 +1247,21 @@ function WorkReportEditorView({
             </CardDescription>
           </div>
           {isEditable && (
-            <Button size="sm" onClick={addProject} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs">
-              <Plus className="h-4 w-4 mr-1.5" /> Add Project Entry
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleAutoFill}
+                disabled={isAutoFilling}
+                className="text-xs border-primary/30 text-primary hover:bg-primary/10 gap-1.5"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {isAutoFilling ? "Auto-filling..." : "✨ Auto-Fill from Tasks"}
+              </Button>
+              <Button size="sm" onClick={addProject} className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs">
+                <Plus className="h-4 w-4 mr-1.5" /> Add Project Entry
+              </Button>
+            </div>
           )}
         </CardHeader>
         <CardContent className="p-6">

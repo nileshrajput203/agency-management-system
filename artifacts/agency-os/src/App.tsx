@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider, MutationCache } from "@tanstack/react
 import { Toaster } from "sonner";
 import { useEffect, useState, createContext, useContext, Component, ErrorInfo, ReactNode } from "react";
 import type { User } from "@workspace/api-client-react";
+import { GlobalCommandPalette } from "@/components/common/command-palette";
 
 // ─── React Error Boundary ──────────────────────────────────────
 interface ErrorBoundaryProps {
@@ -961,6 +962,7 @@ function App() {
           <AuthProvider>
             <WouterRouter base={BASE}>
               <AppRouter />
+              <GlobalCommandPalette />
             </WouterRouter>
             <Toaster richColors position="top-right" />
           </AuthProvider>

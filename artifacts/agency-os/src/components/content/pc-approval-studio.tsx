@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { STATUS_CONFIG, PLATFORM_ICON, PostRecord } from "./content-constants";
+import { STATUS_CONFIG, PLATFORM_ICON, PostRecord, isNeedsRevision } from "./content-constants";
 
 interface UserOption {
   id: string;
@@ -64,21 +64,31 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // Check if post is within 2 days of scheduled posting date (or overdue/today)
+  // Check if post is within 2 days of scheduled posting date (upcoming 1-2 days)
   const isWithinApprovalWindow = (scheduledAt?: string | null) => {
     if (!scheduledAt) return false;
     const postDate = new Date(scheduledAt);
     const now = new Date();
     const diffDays = Math.ceil((postDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays <= 2;
+    return diffDays >= 0 && diffDays <= 2;
+  };
+
+  const isOverdueApproval = (post: any) => {
+    if (!post?.scheduledAt) return false;
+    const postDate = new Date(post.scheduledAt);
+    const now = new Date();
+    const diffDays = Math.ceil((postDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays < 0 && !["ADMIN_APPROVED", "SCHEDULED", "PUBLISHED", "POSTED"].includes(post.status);
   };
 
   // Filter posts month-wise (if ALL, shows all months)
   const monthPosts = selectedMonth === "ALL"
     ? posts
     : posts.filter((p) => {
-        if (!p.scheduledAt) return true;
-        return p.scheduledAt.startsWith(selectedMonth);
+        const rawDate = p.scheduledAt || p.shootDate || p.createdAt;
+        if (!rawDate) return false;
+        const dateStr = typeof rawDate === "string" ? rawDate : new Date(rawDate).toISOString();
+        return dateStr.slice(0, 7) === selectedMonth;
       });
 
   // Center pane view mode
@@ -134,7 +144,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
       const isInternalPending = p.internalApprovalStatus === "PENDING" && !["ADMIN_APPROVED", "SCHEDULED", "PUBLISHED"].includes(p.status || "");
       if (p.status !== "IN_REVIEW" && !isInternalPending && !isUrgentDue) return false;
     } else if (stageFilter === "REVISIONS") {
-      if (p.needsRevision !== "true" && p.internalApprovalStatus !== "CHANGES_REQUESTED" && p.approvalStatus !== "NEEDS_CHANGES") return false;
+      if (!isNeedsRevision(p.needsRevision) && p.internalApprovalStatus !== "CHANGES_REQUESTED" && p.approvalStatus !== "NEEDS_CHANGES") return false;
     } else if (stageFilter === "IDEATION_SHOOT") {
       if (!["IDEA", "SCRIPTING", "SHOOTING"].includes(p.status || "")) return false;
     } else if (stageFilter === "EDITING") {
@@ -166,7 +176,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
     (isWithinApprovalWindow(p.scheduledAt) && p.internalApprovalStatus !== "APPROVED")
   ).length;
   const countRevisions = monthPosts.filter(p =>
-    p.needsRevision === "true" || p.internalApprovalStatus === "CHANGES_REQUESTED" || p.approvalStatus === "NEEDS_CHANGES"
+    isNeedsRevision(p.needsRevision) || p.internalApprovalStatus === "CHANGES_REQUESTED" || p.approvalStatus === "NEEDS_CHANGES"
   ).length;
   const countShootBriefs = monthPosts.filter(p =>
     ["IDEA", "SCRIPTING", "SHOOTING"].includes(p.status || "")
@@ -630,8 +640,8 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                 variant="ghost"
                 className="h-6 w-6 shrink-0"
                 onClick={() => {
-                  if (selectedMonth === "ALL") return;
-                  const [y, m] = selectedMonth.split("-").map(Number);
+                  const baseMonth = selectedMonth === "ALL" ? format(new Date(), "yyyy-MM") : selectedMonth;
+                  const [y, m] = baseMonth.split("-").map(Number);
                   const prev = new Date(y, m - 2, 1);
                   setSelectedMonth(format(prev, "yyyy-MM"));
                 }}
@@ -664,8 +674,8 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                 variant="ghost"
                 className="h-6 w-6 shrink-0"
                 onClick={() => {
-                  if (selectedMonth === "ALL") return;
-                  const [y, m] = selectedMonth.split("-").map(Number);
+                  const baseMonth = selectedMonth === "ALL" ? format(new Date(), "yyyy-MM") : selectedMonth;
+                  const [y, m] = baseMonth.split("-").map(Number);
                   const next = new Date(y, m, 1);
                   setSelectedMonth(format(next, "yyyy-MM"));
                 }}
@@ -854,12 +864,17 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                         <span>{p.scheduledAt ? p.scheduledAt.split("T")[0] : p.shootDate ? `Shoot: ${p.shootDate}` : "Unscheduled"}</span>
                       </div>
 
-                      {isWithinApprovalWindow(p.scheduledAt) && p.internalApprovalStatus !== "APPROVED" && (
+                      {isOverdueApproval(p) ? (
+                        <div className="mt-1 flex items-center gap-1 text-[9px] font-bold text-rose-700 dark:text-rose-300 bg-rose-500/15 px-1.5 py-0.5 rounded border border-rose-500/30">
+                          <AlertTriangle className="h-2.5 w-2.5 shrink-0 text-rose-600" />
+                          <span>⚠️ Overdue Approval</span>
+                        </div>
+                      ) : isWithinApprovalWindow(p.scheduledAt) && p.internalApprovalStatus !== "APPROVED" ? (
                         <div className="mt-1 flex items-center gap-1 text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30">
                           <Clock className="h-2.5 w-2.5 shrink-0 text-amber-600" />
                           <span>Manager Approval Due (≤ 2d)</span>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -1358,7 +1373,15 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                   </Badge>
                 </div>
 
-                {isWithinApprovalWindow(activePost.scheduledAt) && activePost.internalApprovalStatus !== "APPROVED" && (
+                {isOverdueApproval(activePost) ? (
+                  <div className="p-2 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-800 dark:text-rose-200 text-xs font-medium flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-bold text-[11px]">⚠️ Scheduled Date Passed / Overdue</p>
+                      <p className="text-[10px] opacity-90">This post was scheduled for the past and still requires approval.</p>
+                    </div>
+                  </div>
+                ) : isWithinApprovalWindow(activePost.scheduledAt) && activePost.internalApprovalStatus !== "APPROVED" ? (
                   <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs font-medium flex items-start gap-2">
                     <Clock className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                     <div>
@@ -1366,7 +1389,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                       <p className="text-[10px] opacity-90">Manager internal approval must be completed before sharing with client.</p>
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* Step 1: Manager Internal Approval */}
                 <div className="p-2.5 rounded-lg border bg-card space-y-1.5">

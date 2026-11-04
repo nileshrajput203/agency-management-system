@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { STATUS_CONFIG, PLATFORM_ICON } from "@/components/content/content-constants";
+import { STATUS_CONFIG, PLATFORM_ICON, isNeedsRevision } from "@/components/content/content-constants";
 
 export default function EmployeeContentPage() {
   const { user } = useAuth();
@@ -89,7 +89,7 @@ export default function EmployeeContentPage() {
 
   // Editing posts (for Video Editors & Designers)
   const editingPosts = (posts ?? []).filter((p: any) =>
-    ["PRODUCTION", "DESIGNING"].includes(p.status) || (p.needsRevision === "true" && p.editorId === user?.id)
+    ["PRODUCTION", "DESIGNING"].includes(p.status) || (isNeedsRevision(p.needsRevision) && p.editorId === user?.id)
   );
 
   // Teleprompter scroll loop
@@ -231,7 +231,7 @@ export default function EmployeeContentPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {myQueuePosts.map((p: any) => {
                 const sc = STATUS_CONFIG[p.status || "IDEA"] || STATUS_CONFIG.IDEA;
-                const isRevision = p.needsRevision === "true" || p.internalApprovalStatus === "CHANGES_REQUESTED";
+                const isRevision = isNeedsRevision(p.needsRevision) || p.internalApprovalStatus === "CHANGES_REQUESTED";
 
                 // Action badge label
                 let actionBadge = "View Details";

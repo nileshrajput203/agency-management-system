@@ -142,7 +142,7 @@ export default function PayrollPage() {
                   const empName = emp.name || emp.userName || emp.employeeName || emp.email || "Employee";
                   const initials = empName.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase() || "EM";
                   const paidDays = emp.paidDays ?? emp.effectiveDays ?? emp.presentDays ?? 0;
-                  const totalDays = emp.totalDaysInMonth ?? emp.workingDays ?? totalDaysInMonth;
+                  const totalDays = emp.totalDays ?? emp.totalDaysInMonth ?? emp.workingDays ?? totalDaysInMonth ?? 26;
                   const unpaidLeaves = emp.unpaidLeaves ?? emp.unpaidAbsentDays ?? 0;
                   const baseSalary = emp.baseSalary ?? emp.monthlySalary ?? 0;
                   const netSalary = emp.netSalary ?? emp.netPayable ?? 0;

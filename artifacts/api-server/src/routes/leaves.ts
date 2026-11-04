@@ -5,6 +5,7 @@ import {
   usersTable as users,
   leaveBalancesTable,
   attendanceTable,
+  holidaysTable as holidays,
 } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { requirePermission } from "../middleware/auth";
@@ -39,8 +40,9 @@ router.get("/leaves", requirePermission("leave.view"), asyncHandler(async (req, 
   const requesterId = (req as any).userId;
   const requesterRole = (req as any).userRole;
 
+  const isEmployee = ["EMPLOYEE", "TEAM_MEMBER", "EXTERNAL"].includes(String(requesterRole || "").toUpperCase());
   const conditions = [];
-  if (requesterRole === "EMPLOYEE") {
+  if (isEmployee) {
     conditions.push(eq(leaveRequests.userId, requesterId));
   } else if (userId) {
     if (!isValidUUID(userId)) {
@@ -125,8 +127,23 @@ router.post("/leaves/:id/approve", requirePermission("leave.approve"), asyncHand
     .returning();
   if (!updated) throw createError("Not found", 404);
 
-  const days = getDateRange(updated.startDate, updated.endDate);
-  const numDays = days.length;
+  const allDays = getDateRange(updated.startDate, updated.endDate);
+  
+  // Exclude Sundays and declared holidays from deducted leave count
+  let holidaySet = new Set<string>();
+  try {
+    const holidayRows = await db.select({ date: holidays.date }).from(holidays);
+    holidaySet = new Set(holidayRows.map(h => h.date));
+  } catch (_) {}
+
+  const workingDays = allDays.filter((dStr) => {
+    const d = new Date(dStr + "T00:00:00");
+    if (d.getDay() === 0) return false; // Sunday
+    if (holidaySet.has(dStr)) return false; // Declared Company/National Holiday
+    return true;
+  });
+
+  const numDays = workingDays.length > 0 ? workingDays.length : allDays.length;
   const startYear = parseInt(updated.startDate.slice(0, 4), 10) || new Date().getFullYear();
 
   // 1. Update/Upsert leave balances
@@ -176,7 +193,7 @@ router.post("/leaves/:id/approve", requirePermission("leave.approve"), asyncHand
 
   // 2. Mark attendance as ON_LEAVE for all days in range
   try {
-    for (const dStr of days) {
+    for (const dStr of (workingDays.length > 0 ? workingDays : allDays)) {
       const [existingAtt] = await db
         .select()
         .from(attendanceTable)

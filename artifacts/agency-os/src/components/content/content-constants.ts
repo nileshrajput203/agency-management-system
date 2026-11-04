@@ -54,6 +54,10 @@ export function parseClientRevision(comments: any[], rejectionNote?: string | nu
   return null;
 }
 
+export const isNeedsRevision = (val: unknown): boolean => {
+  return val === true || val === "true" || val === 1 || val === "1";
+};
+
 export const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   IDEA: { label: "Idea", className: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
   SCRIPTING: { label: "Scripting", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },

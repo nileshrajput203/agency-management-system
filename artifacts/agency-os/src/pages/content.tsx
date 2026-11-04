@@ -21,7 +21,7 @@ import { format, addMonths, subMonths, getDaysInMonth, startOfMonth, getDay } fr
 import { cn } from "@/lib/utils";
 import {
   STATUS_CONFIG, PLATFORM_ICON, DAYS, emptyDraft, buildShareUrl, getPostDateKey,
-  PostRecord, PanelState, isPastDate, getPostAttachmentUrl, triggerFileDownload,
+  PostRecord, PanelState, isPastDate, getPostAttachmentUrl, triggerFileDownload, isNeedsRevision,
 } from "@/components/content/content-constants";
 import { ContentShareDialog } from "@/components/content/content-share-dialog";
 import { ContentPostDrawer } from "@/components/content/content-post-drawer";
@@ -187,7 +187,7 @@ export default function ContentPage() {
       clientId: freshPost.clientId ?? "",
       assetsLink: freshPost.assetsLink ?? "",
       format: freshPost.format ?? "",
-      needsRevision: freshPost.needsRevision === "true",
+      needsRevision: isNeedsRevision(freshPost.needsRevision),
       approvalStatus: (freshPost as any).approvalStatus ?? "PENDING",
       rejectionNote: freshPost.rejectionNote ?? "",
       customProperties: freshPost.customProperties ?? [],
@@ -342,7 +342,7 @@ export default function ContentPage() {
 
   const totalPublished   = (posts ?? []).filter((p) => p.status === "PUBLISHED").length;
   const totalScheduled   = (posts ?? []).filter((p) => p.status === "SCHEDULED").length;
-  const totalNeedsRevision = (posts ?? []).filter((p) => (p as any).needsRevision === "true" || (p as any).approvalStatus === "NEEDS_CHANGES").length;
+  const totalNeedsRevision = (posts ?? []).filter((p) => isNeedsRevision((p as any).needsRevision) || (p as any).approvalStatus === "NEEDS_CHANGES").length;
 
   const contentStatChips = [
     { label: view === "calendar" ? "Posts This Month" : "Total Posts", value: posts?.length ?? 0,  accent: "border-l-primary",     icon: <FileText className="h-4 w-4" /> },
@@ -533,7 +533,7 @@ export default function ContentPage() {
                         {!activeClientId && (post as any).clientName && (
                           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{(post as any).clientName}</span>
                         )}
-                        {((post as any).needsRevision === "true" || (post as any).approvalStatus === "NEEDS_CHANGES") && (
+                        {(isNeedsRevision((post as any).needsRevision) || (post as any).approvalStatus === "NEEDS_CHANGES") && (
                           <Badge className="text-[11px] bg-amber-500 text-white font-semibold border-amber-600 shadow-2xs">
                             <RotateCcw className="h-3 w-3 mr-1" />Client Revision Requested
                           </Badge>
@@ -604,7 +604,7 @@ export default function ContentPage() {
                   </div>
                   <div className="space-y-0.5">
                     {dayPosts.slice(0, 3).map((p) => {
-                      const isRevision = (p as any).needsRevision === "true" || (p as any).approvalStatus === "NEEDS_CHANGES";
+                      const isRevision = isNeedsRevision((p as any).needsRevision) || (p as any).approvalStatus === "NEEDS_CHANGES";
                       const pFileUrl = getPostAttachmentUrl(p);
                       return (
                         <div

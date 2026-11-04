@@ -889,15 +889,14 @@ router.post("/:id/client-approve", requirePermission("content.edit"), asyncHandl
 router.post("/check-upcoming-approvals", requirePermission("content.view"), asyncHandler(async (_req, res) => {
   const allPosts = await db.select(CONTENT_COLUMNS).from(contentPostsTable);
   const now = new Date();
-  const twoDaysFromNow = new Date();
-  twoDaysFromNow.setDate(now.getDate() + 2);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const twoDaysFromNow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 23, 59, 59, 999);
 
   const pendingApprovalPosts = allPosts.filter((p) => {
     if (!p.scheduledAt) return false;
     if (p.internalApprovalStatus === "APPROVED") return false;
     const sched = new Date(p.scheduledAt);
-    // Scheduled within 2 days or already due/overdue
-    return sched <= twoDaysFromNow;
+    return sched >= startOfToday && sched <= twoDaysFromNow;
   });
 
   // Notify managers for each urgent post

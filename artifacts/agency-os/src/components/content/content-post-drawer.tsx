@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import {
   STATUS_CONFIG, FORMAT_OPTIONS, PLATFORM_OPTIONS, parseClientRevision,
-  PanelState, PostRecord, getTodayDateString, triggerFileDownload,
+  PanelState, PostRecord, getTodayDateString, triggerFileDownload, isNeedsRevision,
 } from "./content-constants";
 
 interface ContentPostDrawerProps {
@@ -115,7 +115,7 @@ export function ContentPostDrawer({
             const revision = parseClientRevision(draft.comments, activePost?.rejectionNote);
             const isApproved = approvalStatus === "APPROVED";
             const isRejected = !isApproved && approvalStatus === "REJECTED";
-            const isNeedsChanges = !isApproved && !isRejected && (draft.needsRevision === true || (approvalStatus === "NEEDS_CHANGES" && draft.needsRevision !== false) || (!!revision && draft.needsRevision !== false));
+            const isNeedsChanges = !isApproved && !isRejected && (isNeedsRevision(draft.needsRevision) || approvalStatus === "NEEDS_CHANGES" || !!revision);
 
             if (isApproved) {
               return (
@@ -505,7 +505,7 @@ export function ContentPostDrawer({
                 <p className="text-xs text-muted-foreground">Flag this post for pending revisions or team attention</p>
               </div>
             </div>
-            <Switch checked={draft.needsRevision as boolean} onCheckedChange={(v) => setField("needsRevision", v)} />
+            <Switch checked={isNeedsRevision(draft.needsRevision)} onCheckedChange={(v) => setField("needsRevision", v)} />
           </div>
 
           {/* Custom Properties */}
@@ -605,12 +605,12 @@ export function ContentPostDrawer({
                   </div>
                 ) : (
                   <div className="relative">
-                    <div className={cn("absolute -left-[21px] top-0.5 h-2.5 w-2.5 rounded-full ring-4 ring-background", draft.needsRevision ? "bg-amber-500" : "bg-blue-500")} />
+                    <div className={cn("absolute -left-[21px] top-0.5 h-2.5 w-2.5 rounded-full ring-4 ring-background", isNeedsRevision(draft.needsRevision) ? "bg-amber-500" : "bg-blue-500")} />
                     <p className="text-xs font-semibold text-foreground">
                       Current Status: {STATUS_CONFIG[draft.status ?? "IDEA"]?.label || draft.status}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {draft.needsRevision ? "Needs Changes (Revision Flag Active)" : "Pending Review / Active"}
+                      {isNeedsRevision(draft.needsRevision) ? "Needs Changes (Revision Flag Active)" : "Pending Review / Active"}
                     </p>
                   </div>
                 )}
