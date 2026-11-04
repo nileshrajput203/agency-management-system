@@ -4,6 +4,7 @@ import {
   useCheckIn,
   useCheckOut,
   useListAttendance,
+  useListUsers,
   getGetTodayAttendanceQueryKey,
   getListAttendanceQueryKey,
   useOvertimeCheckIn,
@@ -11,16 +12,17 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/App";
-import { canManageModule } from "@/lib/permissions";
+import { canManageModule, isManagerOrAdminRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Clock, CheckCircle2, AlertTriangle, Users, Download, Coffee, PauseCircle, PlayCircle } from "lucide-react";
+import { Clock, CheckCircle2, AlertTriangle, Users, Download, Coffee, PauseCircle, PlayCircle, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { formatDateOnly } from "@/lib/utils";
 
@@ -84,11 +86,19 @@ function exportAttendanceCSV(records: any[]) {
 export default function AttendancePage() {
   const qc = useQueryClient();
   const { user } = useAuth();
-  const { data: todayStatus, isLoading: todayLoading } = useGetTodayAttendance();
-  const { data: attendanceHistory, isLoading: historyLoading } = useListAttendance();
-  const [isBreakPending, setIsBreakPending] = useState(false);
+  const isUserAdminOrManager = isManagerOrAdminRole(user);
+  const [selectedUserId, setSelectedUserId] = useState<string>("ALL");
+  const { data: usersList } = useListUsers({ query: { enabled: isUserAdminOrManager } });
 
-  const isUserAdminOrManager = canManageModule(user, "attendance");
+  const queryParams = !isUserAdminOrManager && user?.id
+    ? { userId: user.id }
+    : selectedUserId !== "ALL"
+    ? { userId: selectedUserId }
+    : undefined;
+
+  const { data: todayStatus, isLoading: todayLoading } = useGetTodayAttendance();
+  const { data: attendanceHistory, isLoading: historyLoading } = useListAttendance(queryParams);
+  const [isBreakPending, setIsBreakPending] = useState(false);
 
   const checkInMutation = useCheckIn({
     mutation: {
@@ -546,8 +556,32 @@ export default function AttendancePage() {
 
       {/* Attendance Logs & History Table */}
       <Card className="shadow-sm border border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold">Attendance Logs & History</CardTitle>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between flex-wrap gap-2">
+          <div>
+            <CardTitle className="text-base font-semibold">Attendance Logs & History</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {isUserAdminOrManager
+                ? "Company-wide employee attendance & shift records"
+                : "Your personal attendance & shift logs"}
+            </p>
+          </div>
+          {isUserAdminOrManager && (
+            <div className="flex items-center gap-2">
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger className="h-8 text-xs w-52 bg-background">
+                  <SelectValue placeholder="All Team Members" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">👥 All Team Members</SelectItem>
+                  {(usersList ?? []).map((u: any) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name} ({u.systemRole || u.role || "Employee"})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {historyLoading ? (

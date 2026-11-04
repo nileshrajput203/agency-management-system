@@ -65,6 +65,23 @@ export function isSuperAdminRole(role?: string | null): boolean {
   return role === "SUPER_ADMIN";
 }
 
+export function isManagerOrAdminRole(user: any): boolean {
+  if (!user) return false;
+  if (user.isDelegatedAdmin) return true;
+  const role = String(user.systemRole || user.role || "").trim().toUpperCase();
+  const managerOrAdminRoles = [
+    "SUPER_ADMIN",
+    "ADMIN",
+    "MANAGER",
+    "ACCOUNT_MANAGER",
+    "PROJECT_MANAGER",
+    "HR",
+    "DIRECTOR",
+    "LEAD",
+  ];
+  return managerOrAdminRoles.includes(role);
+}
+
 export function canManageModule(user: any, module: string): boolean {
   const role = user?.systemRole ?? user?.role;
   return isSuperAdminRole(role) || hasExplicitModuleAccess(user?.allowedModules, module);

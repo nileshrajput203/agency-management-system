@@ -126,19 +126,47 @@ export async function processAutomaticAbsentMarking(targetDateStr?: string) {
   };
 }
 
+export function isManagerOrAdmin(
+  systemRole?: string | null,
+  isDelegatedAdmin?: boolean,
+  userRole?: string | null,
+): boolean {
+  if (isDelegatedAdmin) return true;
+  const normalizedSystem = String(systemRole || "").trim().toUpperCase();
+  const normalizedRole = String(userRole || "").trim().toUpperCase();
+
+  const managerOrAdminRoles = [
+    "SUPER_ADMIN",
+    "ADMIN",
+    "MANAGER",
+    "ACCOUNT_MANAGER",
+    "PROJECT_MANAGER",
+    "HR",
+    "DIRECTOR",
+    "LEAD",
+  ];
+
+  return (
+    managerOrAdminRoles.includes(normalizedSystem) ||
+    normalizedRole === "ADMIN" ||
+    normalizedRole === "MANAGER"
+  );
+}
+
 router.get("/attendance", requirePermission("attendance.view"), asyncHandler(async (req, res) => {
   const { userId, month } = req.query as Record<string, string>;
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isFullAdmin = canManageEnabledSection(
-    requesterSystemRole,
-    "attendance",
-    (req as any).userConfiguredModules,
-  );
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+
+  // Only Managers and Admins can view other employees' attendance.
+  // Regular employees can ONLY see their own attendance records.
+  const canViewAll = isManagerOrAdmin(requesterSystemRole, isDelegatedAdmin, requesterRole);
 
   const conditions = [];
-  if (!isFullAdmin) {
-    // Non-super-admin roles (ACCOUNT_MANAGER, DESIGNER, etc.) only see their own records
+  if (!canViewAll) {
+    // Strict isolation: regular employees can NEVER access other users' attendance records
     conditions.push(eq(attendance.userId, requesterId));
   } else if (userId) {
     if (!isValidUUID(userId)) {
@@ -280,6 +308,14 @@ router.post("/attendance/check-in", requirePermission("attendance.view"), asyncH
 }));
 
 router.post("/attendance/process-absent", requirePermission("attendance.manage"), asyncHandler(async (req, res) => {
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+
+  if (!isManagerOrAdmin(requesterSystemRole, isDelegatedAdmin, requesterRole)) {
+    throw createError("Forbidden: Only managers and admins can trigger absent processing", 403);
+  }
+
   const { date } = req.body || {};
   const result = await processAutomaticAbsentMarking(date);
   return res.json(result);
