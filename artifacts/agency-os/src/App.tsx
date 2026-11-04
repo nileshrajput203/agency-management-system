@@ -581,6 +581,8 @@ function AppRouter() {
     <Switch>
       <Route path="/content-calendar/share/:shareToken" component={PublicCalendarPage} />
       <Route path="/share/calendar/:shareToken" component={PublicCalendarPage} />
+      <Route path="/share/content/:shareToken" component={PublicCalendarPage} />
+      <Route path="/share/content" component={PublicCalendarPage} />
       <Route path="/share/proposal/:token" component={ProposalSharePage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />

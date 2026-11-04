@@ -10,6 +10,7 @@ import v1Router from "./routes/v1";
 import { logger, accessLogger } from "./lib/logger";
 import publicRouter from "./routes/publicCalendar";
 import { errorHandler } from "./middleware/errorHandler";
+import { serveUploadedFile } from "./routes/uploads";
 
 const app: Express = express();
 
@@ -104,6 +105,7 @@ try {
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 } catch (_) {}
 app.use(["/api/uploads", "/api/v1/uploads"], express.static(uploadsDir));
+app.get(["/api/uploads/:filename", "/api/v1/uploads/:filename"], serveUploadedFile);
 
 const rateLimitWindowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS || "900000", 10);
 

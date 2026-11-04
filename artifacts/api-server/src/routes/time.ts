@@ -61,7 +61,8 @@ router.get("/", requirePermission("time.view"), asyncHandler(async (req, res) =>
   const requesterId = (req as any).userId;
   const requesterRole = (req as any).userRole;
 
-  const targetUserId = requesterRole === "EMPLOYEE" ? requesterId : (userId || null);
+  const isEmployeeRole = ["EMPLOYEE", "TEAM_MEMBER", "EXTERNAL"].includes(String(requesterRole || "").toUpperCase());
+  const targetUserId = isEmployeeRole ? requesterId : (userId || null);
 
   const conditions = [isNull(timeEntriesTable.deletedAt)];
 

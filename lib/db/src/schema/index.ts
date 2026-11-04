@@ -30,6 +30,7 @@ export * from "./financeOperations";
 export * from "./holidays";
 export * from "./shoots";
 export * from "./milestones";
+export * from "./storedFiles";
 
 export { usersTable as users } from "./users";
 export { clientsTable as clients } from "./clients";

@@ -206,7 +206,8 @@ export function ContentShareDialog({
           ) : existingShares && existingShares.length > 0 ? (
             <div className="space-y-3 max-h-[360px] overflow-y-auto overflow-x-hidden pr-1 w-full">
               {existingShares.map((share: any) => {
-                const shareUrl = buildShareUrl(share.shareToken);
+                const token = share.shareToken || share.id || "";
+                const shareUrl = buildShareUrl(token);
                 const isRevoked = share.isRevoked === "true";
 
                 return (

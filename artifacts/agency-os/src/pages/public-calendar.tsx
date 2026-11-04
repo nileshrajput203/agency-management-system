@@ -69,8 +69,9 @@ interface SharedCalendarData {
   posts: any[];
 }
 
-export default function PublicCalendarPage({ params }: { params: { shareToken: string } }) {
-  const { shareToken } = params;
+export default function PublicCalendarPage({ params }: { params?: { shareToken?: string; token?: string } }) {
+  const queryToken = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("token") : null;
+  const shareToken = params?.shareToken || params?.token || queryToken || "";
   const [data, setData] = useState<SharedCalendarData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,7 +113,8 @@ export default function PublicCalendarPage({ params }: { params: { shareToken: s
 
   const fetchCalendar = () => {
     setIsLoading(true);
-    fetch(`/public/calendar/${shareToken}`)
+    const querySuffix = queryToken ? `?token=${encodeURIComponent(queryToken)}` : "";
+    fetch(`/public/calendar/${shareToken}${querySuffix}`)
       .then((res) => {
         if (!res.ok) {
           if (res.status === 410) throw new Error("This share link has expired or been revoked.");

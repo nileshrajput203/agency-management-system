@@ -17,11 +17,68 @@ import { logger, notificationLogger } from "../lib/logger";
 
 const router = Router();
 
-async function getValidShare(shareToken: string) {
-  const [share] = await db
+function getParam(val: unknown): string {
+  if (Array.isArray(val)) return String(val[0] || "");
+  return val ? String(val) : "";
+}
+
+function getQueryParam(val: unknown): string | undefined {
+  if (Array.isArray(val)) return val[0] ? String(val[0]) : undefined;
+  return val ? String(val) : undefined;
+}
+
+async function getValidShare(rawToken: string, queryToken?: string) {
+  const token = (rawToken || queryToken || "").trim();
+  if (!token) {
+    return { error: "Share token or post identifier is required", status: 400 };
+  }
+
+  // 1. Try matching by shareToken directly
+  let [share] = await db
     .select()
     .from(clientCalendarSharesTable)
-    .where(eq(clientCalendarSharesTable.shareToken, shareToken));
+    .where(eq(clientCalendarSharesTable.shareToken, token));
+
+  // 2. Try matching by primary key share ID
+  if (!share) {
+    [share] = await db
+      .select()
+      .from(clientCalendarSharesTable)
+      .where(eq(clientCalendarSharesTable.id, token));
+  }
+
+  // 3. Fallback: if token is actually a post ID, or queryToken was passed (?token=...)
+  if (!share) {
+    const [post] = await db
+      .select({ clientId: contentPostsTable.clientId })
+      .from(contentPostsTable)
+      .where(eq(contentPostsTable.id, token));
+
+    if (post && post.clientId) {
+      if (queryToken) {
+        [share] = await db
+          .select()
+          .from(clientCalendarSharesTable)
+          .where(and(eq(clientCalendarSharesTable.clientId, post.clientId), eq(clientCalendarSharesTable.shareToken, queryToken.trim())));
+      }
+      if (!share) {
+        [share] = await db
+          .select()
+          .from(clientCalendarSharesTable)
+          .where(and(eq(clientCalendarSharesTable.clientId, post.clientId), eq(clientCalendarSharesTable.isRevoked, "false")))
+          .orderBy(desc(clientCalendarSharesTable.createdAt))
+          .limit(1);
+      }
+    }
+  }
+
+  // 4. Try matching queryToken directly if provided
+  if (!share && queryToken) {
+    [share] = await db
+      .select()
+      .from(clientCalendarSharesTable)
+      .where(eq(clientCalendarSharesTable.shareToken, queryToken.trim()));
+  }
 
   if (!share) {
     return { error: "Share link not found", status: 404 };
@@ -39,10 +96,11 @@ async function getValidShare(shareToken: string) {
 }
 
 // ─── GET Client Shared Calendar ──────────────────────────────
-router.get("/calendar/:shareToken", async (req, res) => {
+router.get(["/calendar/:shareToken", "/content/:shareToken", "/content-calendar/:shareToken"], async (req, res) => {
   try {
-    const { shareToken } = req.params;
-    const result = await getValidShare(shareToken);
+    const shareToken = getParam(req.params.shareToken);
+    const queryToken = getQueryParam(req.query.token);
+    const result = await getValidShare(shareToken, queryToken);
 
     if ("error" in result) {
       return res.status(result.status).json({ error: result.error });
@@ -79,10 +137,12 @@ router.get("/calendar/:shareToken", async (req, res) => {
 });
 
 // ─── Approve Post ──────────────────────────────────────────────
-router.post("/calendar/:shareToken/approve/:postId", async (req, res) => {
+router.post(["/calendar/:shareToken/approve/:postId", "/content/:shareToken/approve/:postId", "/content-calendar/:shareToken/approve/:postId"], async (req, res) => {
   try {
-    const { shareToken, postId } = req.params;
-    const result = await getValidShare(shareToken);
+    const shareToken = getParam(req.params.shareToken);
+    const postId = getParam(req.params.postId);
+    const queryToken = getQueryParam(req.query.token);
+    const result = await getValidShare(shareToken, queryToken);
     if ("error" in result) {
       return res.status(result.status).json({ error: result.error });
     }
@@ -133,12 +193,14 @@ router.post("/calendar/:shareToken/approve/:postId", async (req, res) => {
 });
 
 // ─── Reject Post ──────────────────────────────────────────────
-router.post("/calendar/:shareToken/reject/:postId", async (req, res) => {
+router.post(["/calendar/:shareToken/reject/:postId", "/content/:shareToken/reject/:postId", "/content-calendar/:shareToken/reject/:postId"], async (req, res) => {
   try {
-    const { shareToken, postId } = req.params;
+    const shareToken = getParam(req.params.shareToken);
+    const postId = getParam(req.params.postId);
+    const queryToken = getQueryParam(req.query.token);
     const { reason } = req.body as { reason?: string };
 
-    const result = await getValidShare(shareToken);
+    const result = await getValidShare(shareToken, queryToken);
     if ("error" in result) {
       return res.status(result.status).json({ error: result.error });
     }
@@ -190,9 +252,11 @@ router.post("/calendar/:shareToken/reject/:postId", async (req, res) => {
 });
 
 // ─── Request Changes ──────────────────────────────────────────
-router.post("/calendar/:shareToken/request-changes/:postId", async (req, res) => {
+router.post(["/calendar/:shareToken/request-changes/:postId", "/content/:shareToken/request-changes/:postId", "/content-calendar/:shareToken/request-changes/:postId"], async (req, res) => {
   try {
-    const { shareToken, postId } = req.params;
+    const shareToken = getParam(req.params.shareToken);
+    const postId = getParam(req.params.postId);
+    const queryToken = getQueryParam(req.query.token);
     const { subject, category, description, priority, attachmentUrl } = req.body as {
       subject?: string;
       category?: string;
@@ -201,7 +265,7 @@ router.post("/calendar/:shareToken/request-changes/:postId", async (req, res) =>
       attachmentUrl?: string;
     };
 
-    const result = await getValidShare(shareToken);
+    const result = await getValidShare(shareToken, queryToken);
     if ("error" in result) {
       return res.status(result.status).json({ error: result.error });
     }
@@ -291,9 +355,10 @@ router.post("/calendar/:shareToken/request-changes/:postId", async (req, res) =>
 });
 
 // ─── Submit Content Idea ─────────────────────────────────────
-router.post("/calendar/:shareToken/ideas", async (req, res) => {
+router.post(["/calendar/:shareToken/ideas", "/content/:shareToken/ideas", "/content-calendar/:shareToken/ideas"], async (req, res) => {
   try {
-    const { shareToken } = req.params;
+    const shareToken = getParam(req.params.shareToken);
+    const queryToken = getQueryParam(req.query.token);
     const { title, description, platform, contentType, category } = req.body as {
       title?: string;
       description?: string;
@@ -306,7 +371,7 @@ router.post("/calendar/:shareToken/ideas", async (req, res) => {
       return res.status(400).json({ error: "Idea title is required" });
     }
 
-    const result = await getValidShare(shareToken);
+    const result = await getValidShare(shareToken, queryToken);
     if ("error" in result) {
       return res.status(result.status).json({ error: result.error });
     }
@@ -350,16 +415,18 @@ router.post("/calendar/:shareToken/ideas", async (req, res) => {
 });
 
 // ─── Public Frame.io-Style Pin Comment on Video/Image ───────────
-router.post("/calendar/:shareToken/posts/:postId/pin-comment", async (req, res) => {
+router.post(["/calendar/:shareToken/posts/:postId/pin-comment", "/content/:shareToken/posts/:postId/pin-comment", "/content-calendar/:shareToken/posts/:postId/pin-comment"], async (req, res) => {
   try {
-    const { shareToken, postId } = req.params;
+    const shareToken = getParam(req.params.shareToken);
+    const postId = getParam(req.params.postId);
+    const queryToken = getQueryParam(req.query.token);
     const { comment, timestampSec, frameCoordX, frameCoordY, authorName } = req.body || {};
 
     if (!comment || typeof comment !== "string" || !comment.trim()) {
       return res.status(400).json({ error: "Comment text is required" });
     }
 
-    const result = await getValidShare(shareToken);
+    const result = await getValidShare(shareToken, queryToken);
     if ("error" in result) {
       return res.status(result.status).json({ error: result.error });
     }
