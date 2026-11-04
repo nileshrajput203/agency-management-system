@@ -33,13 +33,6 @@
       }
     },
     {
-      "source": "/((?!api/|public/|assets/|templates/|.*\\..*$).*)",
-      "destination": {
-        "service": "agency-os",
-        "path": "/index.html"
-      }
-    },
-    {
       "source": "/(.*)",
       "destination": {
         "service": "agency-os"
