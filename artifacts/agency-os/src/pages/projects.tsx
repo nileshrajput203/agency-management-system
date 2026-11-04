@@ -206,13 +206,13 @@ export default function ProjectsPage() {
   };
 
   const { data: projects, isLoading } = useListProjects();
-  const canViewClients = isManagerOrAdminRole(user) || canManageModule(user, "clients");
-  const canViewUsers = isManagerOrAdminRole(user) || canManageModule(user, "team");
+  const canViewClients = isManagerOrAdminRole(user) || canManageModule(user, "clients") || isAdmin;
+  const canViewUsers = isManagerOrAdminRole(user) || canManageModule(user, "team") || isAdmin;
   const { data: clients } = useListClients(undefined, {
-    query: { enabled: canViewClients },
+    query: { enabled: Boolean(user) },
   });
   const { data: users } = useListUsers({
-    query: { enabled: canViewUsers },
+    query: { enabled: Boolean(user) },
   });
 
   const createMutation = useCreateProject({

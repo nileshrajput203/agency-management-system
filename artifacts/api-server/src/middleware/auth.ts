@@ -313,7 +313,7 @@ export function requirePermission(permission: Permission) {
     (req as any).userSystemRole = user.systemRole;
     (req as any).userIsDelegatedAdmin = isDelegated;
     (req as any).userPortalMode = user.portalMode || "MODE_1";
-    (req as any).userViewAllClients = Boolean(user.viewAllClients) || isSuperAdmin;
+    (req as any).userViewAllClients = Boolean(user.viewAllClients) || isSuperAdmin || isManager;
     (req as any).userAllowedModules = allowedModulesList;
     (req as any).userConfiguredModules = configuredModulesList ?? [];
 

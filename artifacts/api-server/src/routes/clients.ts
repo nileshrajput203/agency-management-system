@@ -17,7 +17,8 @@ import { eq, ilike, or, and, inArray, desc, asc, sql, isNull } from "drizzle-orm
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate, isValidUUID } from "../lib/validation";
-import { requirePermission } from "../middleware/auth";
+import { requirePermission, isManagerRole } from "../middleware/auth";
+import { canManageModuleSection } from "../middleware/moduleAccess";
 
 function sanitizeClient(body: any, isUpdate = false) {
   if (body.assignedTo === "UNASSIGNED" || body.assignedTo === "") {
@@ -71,8 +72,9 @@ function calcHealthScore(invoices: { status: string | null; dueDate: string | nu
 const router = Router();
 
 function canManageClientSection(req: any): boolean {
-  return req.userSystemRole === "SUPER_ADMIN" ||
-    (Array.isArray(req.userConfiguredModules) && req.userConfiguredModules.includes("clients"));
+  const role = req.userSystemRole || req.userRole;
+  if (isManagerRole(role) || Boolean(req.userIsDelegatedAdmin)) return true;
+  return canManageModuleSection(role, "clients", req.userConfiguredModules);
 }
 
 router.get("/", requirePermission("clients.view"), asyncHandler(async (req, res) => {
@@ -80,8 +82,10 @@ router.get("/", requirePermission("clients.view"), asyncHandler(async (req, res)
   const userId = (req as any).userId;
   const userAllowedModules = (req as any).userAllowedModules ?? [];
   const userViewAllClients = (req as any).userViewAllClients;
-  const hasClientModuleAccess = canManageClientSection(req);
-  const canViewAllClients = hasClientModuleAccess || Boolean(userViewAllClients);
+  const role = (req as any).userSystemRole || (req as any).userRole;
+  const isManager = isManagerRole(role) || Boolean((req as any).userIsDelegatedAdmin);
+  const hasClientModuleAccess = canManageClientSection(req) || isManager;
+  const canViewAllClients = hasClientModuleAccess || Boolean(userViewAllClients) || isManager;
 
   const conditions = [];
   if (search) {
@@ -149,7 +153,9 @@ router.post("/", requirePermission("clients.create"), asyncHandler(async (req, r
 router.get("/:id", requirePermission("clients.view"), asyncHandler(async (req, res) => {
   const userId = (req as any).userId;
   const userViewAllClients = (req as any).userViewAllClients;
-  const canViewAllClients = canManageClientSection(req) || Boolean(userViewAllClients);
+  const role = (req as any).userSystemRole || (req as any).userRole;
+  const isManager = isManagerRole(role) || Boolean((req as any).userIsDelegatedAdmin);
+  const canViewAllClients = canManageClientSection(req) || Boolean(userViewAllClients) || isManager;
 
   const [row] = await db.select().from(clientsTable).where(eq(clientsTable.id, (req.params.id as string)));
   if (!row) throw createError("Not found", 404);
