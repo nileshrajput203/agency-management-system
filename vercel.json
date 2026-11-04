@@ -12,6 +12,12 @@
   },
   "rewrites": [
     {
+      "source": "/(health|healthz)",
+      "destination": {
+        "service": "api-server"
+      }
+    },
+    {
       "source": "/api/(.*)",
       "destination": {
         "service": "api-server"
@@ -36,9 +42,22 @@
       }
     },
     {
-      "source": "/(.*)",
+      "source": "/js/(.*)",
       "destination": {
         "service": "agency-os"
+      }
+    },
+    {
+      "source": "/(.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|json|txt|woff|woff2|ttf|eot|xlsx|pdf|xml|css|js|map))",
+      "destination": {
+        "service": "agency-os"
+      }
+    },
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "agency-os",
+        "path": "/index.html"
       }
     }
   ]

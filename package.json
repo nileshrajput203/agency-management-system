@@ -9,7 +9,7 @@
     "lib/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=@workspace/api-zod && npm run build --workspace=@workspace/db && npm run build --workspace=@workspace/agency-os && npm run build --workspace=@workspace/api-server && node -e \"const fs=require('fs'); fs.mkdirSync('dist', {recursive: true}); fs.cpSync('artifacts/api-server/dist', 'dist', {recursive: true}); if (fs.existsSync('artifacts/agency-os/dist/public')) fs.cpSync('artifacts/agency-os/dist/public', 'dist/public', {recursive: true});\"",
+    "build": "npm run build --workspace=@workspace/api-zod && npm run build --workspace=@workspace/db && npm run build --workspace=@workspace/agency-os && npm run build --workspace=@workspace/api-server && node -e \"const fs=require('fs'); fs.mkdirSync('dist', {recursive: true}); fs.cpSync('artifacts/api-server/dist', 'dist', {recursive: true}); if (fs.existsSync('artifacts/agency-os/dist')) fs.cpSync('artifacts/agency-os/dist', 'dist/public', {recursive: true});\"",
     "start": "SERVE_STATIC=true node dist/index.mjs",
     "dev": "node -e \"if (!require('fs').existsSync('dist/index.mjs')) require('child_process').execSync('npm run build', {stdio: 'inherit'});\" && SERVE_STATIC=true PORT=3000 node dist/index.mjs",
     "lint": "npm run build",
