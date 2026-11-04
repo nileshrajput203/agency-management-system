@@ -6,6 +6,8 @@
     "build",
     "dist",
     "**/*.test.ts",
+    "src/app/**/*",
+    "src/proxy.ts",
     "src/components/automation/**/*",
     "src/components/client/**/*",
     "src/components/content/**/*",

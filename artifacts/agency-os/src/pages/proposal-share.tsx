@@ -7,9 +7,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, IndianRupee, Sparkles, Building2, ShieldCheck, PenTool } from "lucide-react";
 
-export default function ProposalSharePage() {
-  const [, params] = useRoute("/share/proposal/:token");
-  const token = params?.token;
+export default function ProposalSharePage({ params: propParams }: { params?: { token?: string } } = {}) {
+  const [, routeParams] = useRoute("/share/proposal/:token");
+  const queryToken = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("proposal") || new URLSearchParams(window.location.search).get("token")
+    : null;
+  const token = propParams?.token || routeParams?.token || queryToken;
 
   const [loading, setLoading] = useState(true);
   const [proposal, setProposal] = useState<any>(null);

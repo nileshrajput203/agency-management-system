@@ -96,8 +96,6 @@ export interface Client {
   /** @nullable */
   email?: string | null;
   /** @nullable */
-  phone?: string | null;
-  /** @nullable */
   category?: string | null;
   /** @nullable */
   health?: string | null;
@@ -127,8 +125,6 @@ export interface ClientInput {
   phone?: string | null;
   /** @nullable */
   email?: string | null;
-  /** @nullable */
-  phone?: string | null;
   /** @nullable */
   category?: string | null;
   /** @nullable */

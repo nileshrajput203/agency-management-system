@@ -655,9 +655,7 @@ export default function SalesPage() {
               </div>
               <DragOverlay>
                 {activeLead ? (
-                  <div className="bg-card border border-border rounded-lg p-3 shadow-lg opacity-90 cursor-grabbing min-w-[200px]">
-                    <LeadCardContent lead={activeLead} isDragOverlay />
-                  </div>
+                  <SortableLeadCard lead={activeLead} isDragOverlay />
                 ) : null}
               </DragOverlay>
             </DndContext>
@@ -791,9 +789,12 @@ export default function SalesPage() {
                   onClick={async () => {
                     try {
                       setIsConverting(true);
-                      const retainerVal = Number((document.getElementById("convert-retainer")).value) || convertLead.value || 0;
-                      const templateVal = (document.getElementById("convert-template")).value || "SOCIAL_MEDIA";
-                      const docVal = (document.getElementById("convert-doc")).value || "INVOICE";
+                      const retainerEl = document.getElementById("convert-retainer") as HTMLInputElement | null;
+                      const retainerVal = Number(retainerEl?.value) || convertLead.value || 0;
+                      const templateEl = document.getElementById("convert-template") as HTMLSelectElement | null;
+                      const templateVal = templateEl?.value || "SOCIAL_MEDIA";
+                      const docEl = document.getElementById("convert-doc") as HTMLSelectElement | null;
+                      const docVal = docEl?.value || "INVOICE";
                       const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
 
                       const res = await fetch(`/api/leads/${convertLead.id}/convert`, {
@@ -825,8 +826,8 @@ export default function SalesPage() {
                       qc.invalidateQueries({ queryKey: ["tasks"] });
                       setConvertLead(null);
                       setLocation(`/clients/${data.client?.id}`);
-                    } catch (err) {
-                      toast.error(err.message || "Failed to convert lead");
+                    } catch (err: any) {
+                      toast.error(err?.message || "Failed to convert lead");
                     } finally {
                       setIsConverting(false);
                     }
