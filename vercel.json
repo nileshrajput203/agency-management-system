@@ -1,18 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true,
   "services": {
     "agency-os": {
       "root": "artifacts/agency-os",
-      "framework": "vite",
-      "bindings": [
-        {
-          "type": "service",
-          "service": "api-server",
-          "format": "url",
-          "env": "API_SERVER_URL"
-        }
-      ]
+      "framework": "vite"
     },
     "api-server": {
       "root": "artifacts/api-server",
@@ -47,8 +38,7 @@
     {
       "source": "/(.*)",
       "destination": {
-        "service": "agency-os",
-        "path": "/index.html"
+        "service": "agency-os"
       }
     }
   ]

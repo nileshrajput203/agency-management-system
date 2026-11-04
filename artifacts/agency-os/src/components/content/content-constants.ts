@@ -194,7 +194,7 @@ export function emptyDraft(defaultDate?: string, clientId = "") {
 
 export function buildShareUrl(shareToken: string) {
   const base = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
-  return `${window.location.origin}${base}/share/content/${shareToken}`;
+  return `${window.location.origin}${base}/?token=${shareToken}`;
 }
 
 export function getPostDateKey(scheduledAt: string | Date | null | undefined): string | null {

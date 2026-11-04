@@ -935,7 +935,18 @@ function AppRouter() {
       </Route>
 
       <Route path="/">
-        {() => <Redirect to="/dashboard" />}
+        {() => {
+          const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+          const share = searchParams?.get("token") || searchParams?.get("share") || searchParams?.get("shareToken");
+          const proposal = searchParams?.get("proposal");
+          if (share) {
+            return <PublicCalendarPage params={{ shareToken: share }} />;
+          }
+          if (proposal) {
+            return <ProposalSharePage params={{ token: proposal }} />;
+          }
+          return <Redirect to="/dashboard" />;
+        }}
       </Route>
       <Route component={NotFound} />
     </Switch>

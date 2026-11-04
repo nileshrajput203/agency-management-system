@@ -375,7 +375,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
         });
         const shareData = await shareRes.json();
         if (shareData?.shareToken) {
-          shareUrl = `${window.location.origin}/content-calendar/share/${shareData.shareToken}`;
+          shareUrl = `${window.location.origin}/?token=${shareData.shareToken}`;
         }
       }
 
