@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
   "services": {
     "agency-os": {
       "root": "artifacts/agency-os",
@@ -29,6 +30,13 @@
       "source": "/public/(.*)",
       "destination": {
         "service": "api-server"
+      }
+    },
+    {
+      "source": "/((?!api/|public/|assets/|templates/|.*\\..*$).*)",
+      "destination": {
+        "service": "agency-os",
+        "path": "/index.html"
       }
     },
     {
