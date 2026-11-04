@@ -45,16 +45,10 @@
       }
     },
     {
-      "source": "/((?!api/|public/|assets/|templates/|.*\\..*).*)",
+      "source": "/(.*)",
       "destination": {
         "service": "agency-os",
         "path": "/index.html"
-      }
-    },
-    {
-      "source": "/(.*)",
-      "destination": {
-        "service": "agency-os"
       }
     }
   ]
