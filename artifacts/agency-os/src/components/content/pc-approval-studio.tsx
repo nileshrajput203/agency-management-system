@@ -5,7 +5,7 @@ import {
   ArrowRight, Upload, Download, FileText, Camera, Scissors, Eye, Layers,
   Film, Grid, Columns, User, Users, Pin, MapPin, Calendar, Hash,
   ExternalLink, MessageSquare, ChevronDown, ChevronRight, ChevronLeft, Zap, RefreshCw,
-  Plus, Trash2, Sliders, CheckSquare, Square, CornerDownLeft
+  Plus, Trash2, Sliders, CheckSquare, Square, CornerDownLeft, Search
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -92,7 +92,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
       });
 
   // Center pane view mode
-  const [centerMode, setCenterMode] = useState<"PLAYER" | "COMPARE" | "BRIEF" | "GRID">("PLAYER");
+  const [centerMode, setCenterMode] = useState<"PLAYER" | "COMPARE" | "BRIEF" | "SHOTS" | "GRID">("PLAYER");
 
   // Video player controls & frame pin proofing
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -102,6 +102,8 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [isMuted, setIsMuted] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
+  const [showSafeZoneOverlay, setShowSafeZoneOverlay] = useState(false);
+  const [externalAssetUrl, setExternalAssetUrl] = useState("");
 
   // Pin annotation on video frame
   const [pendingPin, setPendingPin] = useState<{ x: number; y: number; timeSec: number } | null>(null);
@@ -119,6 +121,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   const [teleprompterFontSize, setTeleprompterFontSize] = useState(32);
   const [teleprompterPlaying, setTeleprompterPlaying] = useState(false);
   const teleprompterScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Direct media upload on preview card
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
   // Fast-track upload state
   const [fastTrackClient, setFastTrackClient] = useState("");
@@ -197,17 +203,13 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
     }
   }, [activePost, selectedPostId]);
 
-  // Switch center mode when selecting post based on media presence
+  // Reset temporary state when changing active post
   useEffect(() => {
     if (activePost) {
-      if (["IDEA", "SCRIPTING", "SHOOTING"].includes(activePost.status || "") && !activePost.assetsLink && (!activePost.mediaFiles || activePost.mediaFiles.length === 0)) {
-        setCenterMode("BRIEF");
-      } else {
-        setCenterMode("PLAYER");
-      }
       setActiveSlide(0);
       setPendingPin(null);
       setRevisionNote("");
+      setExternalAssetUrl("");
     }
   }, [activePost?.id]);
 
@@ -456,6 +458,52 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
     }
   };
 
+  // 1-Click Pass All QC items
+  const handlePassAllQc = async () => {
+    if (!activePost) return;
+    const allPass = {
+      hookChecked: true,
+      brandGuidelinesMatched: true,
+      subtitlesVerified: true,
+      safeZoneChecked: true,
+      audioBalanced: true,
+      ctaIncluded: true,
+    };
+    try {
+      await fetch(`/api/content/${activePost.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
+        body: JSON.stringify({ qcChecklist: allPass }),
+      });
+      toast.success("All QC checklist items passed!");
+      onRefresh();
+    } catch {
+      toast.error("Failed to pass QC items");
+    }
+  };
+
+  // Direct save of external asset link (Drive / Dropbox / Frame.io)
+  const handleSaveExternalLink = async () => {
+    if (!activePost || !externalAssetUrl.trim()) return;
+    try {
+      const url = externalAssetUrl.trim();
+      await fetch(`/api/content/${activePost.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
+        body: JSON.stringify({
+          assetsLink: url,
+          mediaUrls: [url],
+          status: activePost.status === "IDEA" ? "PRODUCTION" : activePost.status,
+        }),
+      });
+      toast.success("Asset link attached!");
+      setExternalAssetUrl("");
+      onRefresh();
+    } catch {
+      toast.error("Failed to attach asset link");
+    }
+  };
+
   // Batch Approval
   const handleBatchApprove = async () => {
     if (selectedIds.length === 0) return;
@@ -537,6 +585,46 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
     }
   };
 
+  const handleDirectUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activePost) return;
+    setIsUploadingMedia(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
+      const res = await fetch("/api/uploads", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      const mediaUrl = data.url || data.filePath;
+
+      await fetch(`/api/content/${activePost.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          assetsLink: mediaUrl,
+          mediaUrls: [mediaUrl],
+          coverImageUrl: mediaUrl,
+          status: activePost.status === "IDEA" ? "PRODUCTION" : activePost.status,
+        }),
+      });
+      toast.success("Creative asset uploaded & attached!");
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to upload asset");
+    } finally {
+      setIsUploadingMedia(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   // Media determination
   const primaryMediaUrl = activePost?.assetsLink || (activePost?.mediaFiles && activePost.mediaFiles[0]) || "";
   const isVideo = primaryMediaUrl.endsWith(".mp4") || primaryMediaUrl.endsWith(".webm") || primaryMediaUrl.endsWith(".mov") || activePost?.format === "REEL" || activePost?.contentType === "REEL" || activePost?.contentType === "VIDEO";
@@ -554,45 +642,45 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   const activeStep = getStageStep(activePost?.status || "IDEA");
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8.5rem)] min-h-[640px] bg-background border rounded-xl overflow-hidden shadow-sm">
+    <div className="flex flex-col h-[calc(100vh-8.5rem)] min-h-[600px] bg-background border rounded-xl overflow-hidden shadow-xs">
       {/* ── Top Header Toolbar ── */}
-      <div className="h-12 border-b bg-card/60 px-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Film className="h-4 w-4 text-primary" />
-            <span className="font-bold text-sm font-heading">PC Approval & Production Studio</span>
+      <div className="h-12 border-b bg-card/60 px-3 sm:px-4 flex items-center justify-between shrink-0 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Film className="h-4 w-4 text-primary shrink-0" />
+            <span className="font-bold text-xs sm:text-sm font-heading truncate">PC Approval Studio</span>
           </div>
-          <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">
-            {filteredPosts.length} Items in Queue ({selectedMonth === "ALL" ? "All Months" : format(new Date(Number(selectedMonth.split("-")[0]), Number(selectedMonth.split("-")[1]) - 1, 1), "MMM yyyy")})
+          <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20 shrink-0 whitespace-nowrap">
+            {filteredPosts.length} {filteredPosts.length === 1 ? "Item" : "Items"} ({selectedMonth === "ALL" ? "All Months" : format(new Date(Number(selectedMonth.split("-")[0]), Number(selectedMonth.split("-")[1]) - 1, 1), "MMM yyyy")})
           </Badge>
-          <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-muted-foreground ml-2">
-            <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono">J / ↓</kbd> Next
-            <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono ml-1">K / ↑</kbd> Prev
-            <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono ml-1">Space</kbd> Play
-            <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono ml-1">A</kbd> Approve
+          <div className="hidden 2xl:flex items-center gap-1.5 text-[11px] text-muted-foreground whitespace-nowrap shrink-0 ml-1">
+            <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono whitespace-nowrap">J / ↓</kbd> Next
+            <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono ml-1 whitespace-nowrap">K / ↑</kbd> Prev
+            <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono ml-1 whitespace-nowrap">Space</kbd> Play
+            <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono ml-1 whitespace-nowrap">A</kbd> Approve
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* 1-2 Day Approval Check & Notification Button */}
           <Button
             size="sm"
             variant="outline"
             onClick={handleCheckUpcomingApprovals}
-            className="h-8 gap-1.5 text-xs border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 font-medium"
+            className="h-7 px-2 text-[11px] border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 font-medium"
             title="Scan upcoming posts within 1-2 days and notify managers for required approval"
           >
-            <Clock className="h-3.5 w-3.5 text-amber-500" />
-            Check 1-2 Day Approvals
+            <Clock className="h-3 w-3 text-amber-500 mr-1" />
+            <span className="hidden sm:inline">Check 1-2d</span> Approvals
           </Button>
 
           {/* Fast-Track Batch Upload Button */}
           <Button
             size="sm"
             onClick={() => setShowFastTrackModal(true)}
-            className="h-8 gap-1.5 text-xs bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-xs"
+            className="h-7 px-2.5 text-[11px] bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-xs"
           >
-            <Zap className="h-3.5 w-3.5 fill-current" /> Fast-Track Upload
+            <Zap className="h-3 w-3 fill-current mr-1" /> Fast-Track Upload
           </Button>
 
           {/* AI Generator Button */}
@@ -603,10 +691,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               setAiTopic(activePost?.title || "");
               setShowAiScriptModal(true);
             }}
-            className="h-8 gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/5"
+            className="h-7 px-2 text-[11px] border-primary/30 text-primary hover:bg-primary/5"
             disabled={!activePost}
           >
-            <Sparkles className="h-3.5 w-3.5 text-primary" /> AI Script & Shots
+            <Sparkles className="h-3 w-3 text-primary mr-1" /> AI Script & Shots
           </Button>
 
           {/* Shoot Call Sheet PDF */}
@@ -615,13 +703,13 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               size="sm"
               variant="outline"
               onClick={() => window.open(`/api/content/shoot-sheet-pdf?date=${activePost.shootDate}&clientId=${activePost.clientId || ""}`, "_blank")}
-              className="h-8 gap-1.5 text-xs"
+              className="h-7 px-2 text-[11px]"
             >
-              <Download className="h-3.5 w-3.5" /> Shoot Call Sheet
+              <Download className="h-3 w-3 mr-1" /> Call Sheet
             </Button>
           )}
 
-          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onRefresh} title="Refresh Studio">
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onRefresh} title="Refresh Studio">
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -629,16 +717,16 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
 
       {/* ── Main 3-Pane Full-Viewport Layout ── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* ═════════ LEFT PANE (320px): Smart Queue & Filters ═════════ */}
-        <aside className="w-80 shrink-0 border-r bg-card/40 flex flex-col justify-between overflow-hidden">
+        {/* ═════════ LEFT PANE (280-300px): Smart Queue & Filters ═════════ */}
+        <aside className="w-72 sm:w-80 shrink-0 border-r bg-card/30 flex flex-col justify-between overflow-hidden">
           {/* Filter Stage Tabs */}
-          <div className="p-3 border-b space-y-2 shrink-0 bg-background/50">
+          <div className="p-2.5 border-b space-y-2 shrink-0 bg-background/50">
             {/* Month Navigator Header (Month-Wise View) */}
-            <div className="flex items-center justify-between bg-muted/70 p-1 rounded-md border text-xs">
+            <div className="flex items-center justify-between bg-muted/70 p-1 rounded-lg border text-xs">
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-6 w-6 shrink-0"
+                className="h-6 w-6 shrink-0 hover:bg-muted"
                 onClick={() => {
                   const baseMonth = selectedMonth === "ALL" ? format(new Date(), "yyyy-MM") : selectedMonth;
                   const [y, m] = baseMonth.split("-").map(Number);
@@ -651,7 +739,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               </Button>
 
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="h-6 text-[11px] font-bold border-0 bg-transparent shadow-none px-1 focus:ring-0">
+                <SelectTrigger className="h-6 text-xs font-bold border-0 bg-transparent shadow-none px-2 focus:ring-0 text-center justify-center">
                   <SelectValue placeholder="Month" />
                 </SelectTrigger>
                 <SelectContent>
@@ -672,7 +760,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-6 w-6 shrink-0"
+                className="h-6 w-6 shrink-0 hover:bg-muted"
                 onClick={() => {
                   const baseMonth = selectedMonth === "ALL" ? format(new Date(), "yyyy-MM") : selectedMonth;
                   const [y, m] = baseMonth.split("-").map(Number);
@@ -685,96 +773,45 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               </Button>
             </div>
 
-            <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground mb-1">
-              <span>WORKFLOW STAGE</span>
-              {selectedIds.length > 0 && (
-                <span className="text-[11px] text-primary font-bold">{selectedIds.length} selected</span>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-1 text-[11px]">
-              <button
-                onClick={() => setStageFilter("ALL")}
-                className={cn(
-                  "px-2 py-1.5 rounded-md text-left font-medium transition-all flex items-center justify-between col-span-2",
-                  stageFilter === "ALL" ? "bg-primary/15 text-primary font-bold shadow-2xs" : "hover:bg-muted text-muted-foreground"
-                )}
-              >
-                <span>📋 All Content</span>
-                <span className="text-[10px] bg-primary/20 px-1.5 rounded-full font-bold">
-                  {countAll}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setStageFilter("NEEDS_APPROVAL")}
-                className={cn(
-                  "px-2 py-1.5 rounded-md text-left font-medium transition-all flex items-center justify-between",
-                  stageFilter === "NEEDS_APPROVAL" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 font-bold" : "hover:bg-muted text-muted-foreground"
-                )}
-              >
-                <span>🔔 Needs Review</span>
-                <span className="text-[10px] bg-amber-500/20 px-1.5 rounded-full font-bold">
-                  {countNeedsReview}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setStageFilter("REVISIONS")}
-                className={cn(
-                  "px-2 py-1.5 rounded-md text-left font-medium transition-all flex items-center justify-between",
-                  stageFilter === "REVISIONS" ? "bg-rose-500/15 text-rose-700 dark:text-rose-300 font-bold" : "hover:bg-muted text-muted-foreground"
-                )}
-              >
-                <span>⚠️ Revisions</span>
-                <span className="text-[10px] bg-rose-500/20 px-1.5 rounded-full font-bold">
-                  {countRevisions}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setStageFilter("IDEATION_SHOOT")}
-                className={cn(
-                  "px-2 py-1.5 rounded-md text-left font-medium transition-all flex items-center justify-between",
-                  stageFilter === "IDEATION_SHOOT" ? "bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold" : "hover:bg-muted text-muted-foreground"
-                )}
-              >
-                <span>🎥 Shoot Briefs</span>
-                <span className="text-[10px] bg-blue-500/20 px-1.5 rounded-full font-bold">
-                  {countShootBriefs}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setStageFilter("EDITING")}
-                className={cn(
-                  "px-2 py-1.5 rounded-md text-left font-medium transition-all flex items-center justify-between",
-                  stageFilter === "EDITING" ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 font-bold" : "hover:bg-muted text-muted-foreground"
-                )}
-              >
-                <span>✂️ In Editing</span>
-                <span className="text-[10px] bg-purple-500/20 px-1.5 rounded-full font-bold">
-                  {countEditing}
-                </span>
-              </button>
-
-              <button
-                onClick={() => setStageFilter("APPROVED_SCHEDULED")}
-                className={cn(
-                  "px-2 py-1.5 rounded-md text-left font-medium transition-all flex items-center justify-between col-span-2",
-                  stageFilter === "APPROVED_SCHEDULED" ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold" : "hover:bg-muted text-muted-foreground"
-                )}
-              >
-                <span>✅ Approved & Scheduled</span>
-                <span className="text-[10px] bg-emerald-500/20 px-1.5 rounded-full font-bold">
-                  {countApprovedScheduled}
-                </span>
-              </button>
+            {/* Stage filter vertical list */}
+            <div className="space-y-0.5">
+              {[
+                { key: "ALL", label: "All Content", count: countAll, icon: "📋", activeClass: "bg-primary/10 text-primary font-bold border-l-2 border-primary" },
+                { key: "NEEDS_APPROVAL", label: "Needs Review", count: countNeedsReview, icon: "🔔", activeClass: "bg-amber-500/10 text-amber-700 dark:text-amber-300 font-bold border-l-2 border-amber-500" },
+                { key: "REVISIONS", label: "Revisions", count: countRevisions, icon: "⚠️", activeClass: "bg-rose-500/10 text-rose-700 dark:text-rose-300 font-bold border-l-2 border-rose-500" },
+                { key: "IDEATION_SHOOT", label: "Shoot Briefs", count: countShootBriefs, icon: "🎥", activeClass: "bg-blue-500/10 text-blue-700 dark:text-blue-300 font-bold border-l-2 border-blue-500" },
+                { key: "EDITING", label: "In Editing", count: countEditing, icon: "✂️", activeClass: "bg-purple-500/10 text-purple-700 dark:text-purple-300 font-bold border-l-2 border-purple-500" },
+                { key: "APPROVED_SCHEDULED", label: "Approved & Scheduled", count: countApprovedScheduled, icon: "✅", activeClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold border-l-2 border-emerald-500" },
+              ].map((st) => {
+                const isActive = stageFilter === st.key;
+                return (
+                  <button
+                    key={st.key}
+                    type="button"
+                    onClick={() => setStageFilter(st.key)}
+                    className={cn(
+                      "w-full px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center justify-between text-left",
+                      isActive
+                        ? st.activeClass
+                        : "hover:bg-muted/70 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <span className="text-[11px]">{st.icon}</span>
+                      <span className="truncate">{st.label}</span>
+                    </span>
+                    <span className={cn("text-[10px] px-1.5 py-0.2 rounded-full font-bold", isActive ? "bg-background/80" : "bg-muted text-muted-foreground")}>
+                      {st.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Quick Filter Selectors */}
-            <div className="grid grid-cols-2 gap-1.5 pt-1">
+            <div className="grid grid-cols-2 gap-1.5 pt-0.5">
               <Select value={clientFilter} onValueChange={setClientFilter}>
-                <SelectTrigger className="h-7 text-[11px] bg-background"><SelectValue placeholder="Client" /></SelectTrigger>
+                <SelectTrigger className="h-7 text-[11px] bg-background"><SelectValue placeholder="All Clients" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Clients</SelectItem>
                   {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}
@@ -782,7 +819,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               </Select>
 
               <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                <SelectTrigger className="h-7 text-[11px] bg-background"><SelectValue placeholder="Platform" /></SelectTrigger>
+                <SelectTrigger className="h-7 text-[11px] bg-background"><SelectValue placeholder="All Platforms" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">All Platforms</SelectItem>
                   <SelectItem value="INSTAGRAM">Instagram</SelectItem>
@@ -794,12 +831,13 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
             </div>
 
             {/* Search within queue */}
-            <div className="pt-1">
+            <div className="relative pt-0.5">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 placeholder="Search queue..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-7 text-xs bg-background"
+                className="h-7 text-xs pl-8 bg-background"
               />
             </div>
           </div>
@@ -897,15 +935,16 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
 
         {/* ═════════ CENTER PANE (Flexible): Visual Player, Proofing & Stepper ═════════ */}
         <main className="flex-1 flex flex-col overflow-hidden bg-muted/20">
-          {/* Top Interactive Pipeline Stepper */}
-          <div className="p-3 border-b bg-card/40 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-1 sm:gap-2 flex-1 max-w-2xl">
+          {/* Top Interactive Pipeline Stepper & Mode Switcher */}
+          <div className="p-2 sm:p-2.5 border-b bg-card/50 flex flex-wrap items-center justify-between gap-2 shrink-0">
+            {/* Stepper */}
+            <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
               {[
-                { label: "1. Ideation & Refs", statusKey: "IDEA", icon: <FileText className="h-3.5 w-3.5" /> },
-                { label: "2. Shoot", statusKey: "SHOOTING", icon: <Camera className="h-3.5 w-3.5" /> },
-                { label: "3. Editing", statusKey: "PRODUCTION", icon: <Scissors className="h-3.5 w-3.5" /> },
-                { label: "4. Approval", statusKey: "IN_REVIEW", icon: <Eye className="h-3.5 w-3.5" /> },
-                { label: "5. Scheduled", statusKey: "SCHEDULED", icon: <Calendar className="h-3.5 w-3.5" /> },
+                { label: "1. Idea", statusKey: "IDEA", icon: <FileText className="h-3 w-3" /> },
+                { label: "2. Shoot", statusKey: "SHOOTING", icon: <Camera className="h-3 w-3" /> },
+                { label: "3. Edit", statusKey: "PRODUCTION", icon: <Scissors className="h-3 w-3" /> },
+                { label: "4. Review", statusKey: "IN_REVIEW", icon: <Eye className="h-3 w-3" /> },
+                { label: "5. Scheduled", statusKey: "SCHEDULED", icon: <Calendar className="h-3 w-3" /> },
               ].map((step, idx) => {
                 const isPassed = idx < activeStep;
                 const isCurrent = idx === activeStep;
@@ -924,73 +963,84 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                         onRefresh();
                       }}
                       className={cn(
-                        "flex items-center gap-1 px-2 py-1 rounded text-xs transition-all font-medium",
+                        "flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-all font-medium",
                         isCurrent
-                          ? "bg-primary text-primary-foreground font-bold shadow-2xs"
+                          ? "bg-primary text-primary-foreground font-bold shadow-xs"
                           : isPassed
-                          ? "text-emerald-600 dark:text-emerald-400 font-semibold"
+                          ? "text-emerald-600 dark:text-emerald-400 font-semibold hover:bg-emerald-500/10"
                           : "text-muted-foreground opacity-60 hover:opacity-100"
                       )}
                     >
-                      {isPassed ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : step.icon}
-                      <span className="hidden md:inline">{step.label}</span>
+                      {isPassed ? <Check className="h-3 w-3 text-emerald-500" /> : step.icon}
+                      <span>{step.label}</span>
                     </button>
-                    {idx < 4 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />}
+                    {idx < 4 && <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0" />}
                   </React.Fragment>
                 );
               })}
             </div>
 
             {/* View Sub-Mode Switcher */}
-            <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+            <div className="flex items-center gap-0.5 bg-muted p-0.5 rounded-lg shrink-0">
               <Button
                 size="sm"
                 variant={centerMode === "PLAYER" ? "default" : "ghost"}
                 onClick={() => setCenterMode("PLAYER")}
-                className="h-7 text-xs px-2.5"
+                className="h-6 text-[11px] px-2 font-medium"
               >
-                <Film className="h-3.5 w-3.5 mr-1" /> Player
-              </Button>
-              <Button
-                size="sm"
-                variant={centerMode === "COMPARE" ? "default" : "ghost"}
-                onClick={() => setCenterMode("COMPARE")}
-                className="h-7 text-xs px-2.5"
-              >
-                <Columns className="h-3.5 w-3.5 mr-1" /> Compare
+                <Film className="h-3 w-3 mr-1" /> Canvas
               </Button>
               <Button
                 size="sm"
                 variant={centerMode === "BRIEF" ? "default" : "ghost"}
                 onClick={() => setCenterMode("BRIEF")}
-                className="h-7 text-xs px-2.5"
+                className="h-6 text-[11px] px-2 font-medium"
               >
-                <FileText className="h-3.5 w-3.5 mr-1" /> Brief & Shots
+                <FileText className="h-3 w-3 mr-1" /> Script & Hook
+              </Button>
+              <Button
+                size="sm"
+                variant={centerMode === "SHOTS" ? "default" : "ghost"}
+                onClick={() => setCenterMode("SHOTS")}
+                className="h-6 text-[11px] px-2 font-medium"
+              >
+                <Camera className="h-3 w-3 mr-1" /> Shot List
+              </Button>
+              <Button
+                size="sm"
+                variant={centerMode === "COMPARE" ? "default" : "ghost"}
+                onClick={() => setCenterMode("COMPARE")}
+                className="h-6 text-[11px] px-2 font-medium"
+              >
+                <Columns className="h-3 w-3 mr-1" /> Compare
               </Button>
               <Button
                 size="sm"
                 variant={centerMode === "GRID" ? "default" : "ghost"}
                 onClick={() => setCenterMode("GRID")}
-                className="h-7 text-xs px-2.5"
+                className="h-6 text-[11px] px-2 font-medium"
               >
-                <Grid className="h-3.5 w-3.5 mr-1" /> 3×3 Grid
+                <Grid className="h-3 w-3 mr-1" /> 3×3 Grid
               </Button>
             </div>
           </div>
 
           {/* Center Pane Content Area */}
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-4 flex flex-col items-center justify-center">
             {!activePost ? (
-              <div className="text-center text-muted-foreground">Select a post to inspect</div>
+              <div className="text-center text-muted-foreground text-xs py-16">
+                <Film className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                Select a post from the queue to inspect and approve.
+              </div>
             ) : centerMode === "PLAYER" ? (
-              /* MODE 1: Live Video / Carousel Frame Proofing Player */
+              /* MODE 1: Live Video Player / Carousel / Social Mockup Canvas */
               <div className="w-full max-w-2xl flex flex-col items-center">
                 {isVideo && primaryMediaUrl ? (
                   <div className="w-full flex flex-col items-center">
-                    {/* Video Player Box with Pin Overlay */}
+                    {/* Video Player Box with Frame Pinning & Optional Safe Zone Overlay */}
                     <div
                       onClick={handleFrameClick}
-                      className="relative bg-black rounded-xl overflow-hidden shadow-xl aspect-[9/16] max-h-[460px] w-auto cursor-crosshair group"
+                      className="relative bg-black rounded-2xl overflow-hidden shadow-2xl aspect-[9/16] max-h-[480px] w-auto cursor-crosshair group border border-border/40 select-none"
                     >
                       <video
                         ref={videoRef}
@@ -1005,11 +1055,44 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                         className="h-full w-full object-contain"
                       />
 
+                      {/* Optional Instagram Reels Safe Zone Overlay */}
+                      {showSafeZoneOverlay && (
+                        <div className="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-3 select-none">
+                          <div className="flex items-center justify-between text-[10px] text-white/60 bg-black/40 px-2 py-0.5 rounded backdrop-blur-xs">
+                            <span>Instagram Reels Safe Zone Active</span>
+                            <span>9:16</span>
+                          </div>
+
+                          <div className="flex items-end justify-between">
+                            {/* Bottom-left user and caption mock overlay */}
+                            <div className="max-w-[70%] space-y-1 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 rounded-lg text-white">
+                              <div className="flex items-center gap-1.5 text-xs font-bold">
+                                <span className="h-5 w-5 rounded-full bg-white/20 flex items-center justify-center text-[9px]">👤</span>
+                                <span>@{activePost.clientName ? activePost.clientName.toLowerCase().replace(/\s+/g, "") : "client"}</span>
+                              </div>
+                              <p className="text-[10px] text-white/80 line-clamp-1">{activePost.caption || "Caption text appears in this lower area..."}</p>
+                              <div className="text-[9px] text-white/60 flex items-center gap-1">
+                                <span>🎵 Original Audio</span>
+                              </div>
+                            </div>
+
+                            {/* Right-side button stack overlay */}
+                            <div className="flex flex-col items-center gap-2.5 text-white/80 pb-2 pr-1">
+                              <div className="flex flex-col items-center text-[9px]"><span className="text-base">❤️</span><span>12.4k</span></div>
+                              <div className="flex flex-col items-center text-[9px]"><span className="text-base">💬</span><span>284</span></div>
+                              <div className="flex flex-col items-center text-[9px]"><span className="text-base">✈️</span><span>1.2k</span></div>
+                              <div className="flex flex-col items-center text-[9px]"><span className="text-base">🔖</span><span>Save</span></div>
+                              <div className="h-5 w-5 rounded-full border-2 border-white/60 flex items-center justify-center text-[8px] animate-spin">💿</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Display Pending Pin if clicked */}
                       {pendingPin && (
                         <div
                           style={{ left: `${pendingPin.x}%`, top: `${pendingPin.y}%` }}
-                          className="absolute -translate-x-1/2 -translate-y-1/2 bg-rose-500 text-white text-[10px] font-bold h-6 w-6 rounded-full flex items-center justify-center border-2 border-white shadow-lg animate-bounce pointer-events-none"
+                          className="absolute -translate-x-1/2 -translate-y-1/2 bg-rose-500 text-white text-[10px] font-bold h-6 w-6 rounded-full flex items-center justify-center border-2 border-white shadow-lg animate-bounce pointer-events-none z-20"
                         >
                           📌
                         </div>
@@ -1026,7 +1109,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                                 if (c.timestampSec !== null) seekVideo(c.timestampSec);
                               }}
                               style={{ left: `${c.frameCoordX}%`, top: `${c.frameCoordY}%` }}
-                              className="absolute -translate-x-1/2 -translate-y-1/2 bg-amber-500 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center border border-white shadow-md cursor-pointer hover:scale-125 transition-transform"
+                              className="absolute -translate-x-1/2 -translate-y-1/2 bg-amber-500 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center border border-white shadow-md cursor-pointer hover:scale-125 transition-transform z-20"
                               title={`${c.comment} (@${formatTime(c.timestampSec || 0)})`}
                             >
                               {i + 1}
@@ -1037,7 +1120,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                       })}
 
                       {/* Bottom Playback Overlay */}
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 flex items-center justify-between text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 flex items-center justify-between text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity z-20">
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
@@ -1090,9 +1173,39 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                         </div>
                       </div>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-2 text-center">
-                      💡 <strong>Frame Proofing:</strong> Click anywhere on the video frame to pause & drop a numbered revision pin.
-                    </p>
+
+                    {/* Quick Player Bar */}
+                    <div className="flex items-center justify-between w-full max-w-sm mt-2 px-1 text-xs">
+                      <Button
+                        size="sm"
+                        variant={showSafeZoneOverlay ? "default" : "outline"}
+                        onClick={() => setShowSafeZoneOverlay(!showSafeZoneOverlay)}
+                        className="h-7 text-[11px] gap-1"
+                      >
+                        <Eye className="h-3 w-3" /> Safe Zone {showSafeZoneOverlay ? "ON" : "OFF"}
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingMedia}
+                        className="h-7 text-[11px] gap-1"
+                      >
+                        <Upload className="h-3 w-3" /> Replace Cut
+                      </Button>
+
+                      {primaryMediaUrl && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => window.open(primaryMediaUrl, "_blank")}
+                          className="h-7 text-[11px] gap-1 text-muted-foreground hover:text-foreground"
+                        >
+                          <Download className="h-3 w-3" /> Download
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 ) : carouselSlides.length > 0 ? (
                   /* Multi-Slide Carousel Viewer */
@@ -1136,33 +1249,318 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                     </div>
 
                     <div className="p-3 space-y-1 text-xs">
-                      <p className="font-semibold text-foreground">{activePost.title || "Social Post"}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-foreground">{activePost.title || "Social Post"}</p>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="h-6 text-[10px] px-1.5 text-primary"
+                        >
+                          <Upload className="h-3 w-3 mr-1" /> Replace
+                        </Button>
+                      </div>
                       <p className="text-muted-foreground whitespace-pre-wrap line-clamp-3">
                         {activePost.caption || "No caption added yet."}
                       </p>
                     </div>
                   </div>
                 ) : (
-                  /* No media uploaded yet */
-                  <div className="text-center py-16 border border-dashed rounded-xl p-8 bg-card/40">
-                    <Film className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                    <h3 className="font-bold text-sm">No Media Uploaded Yet</h3>
-                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                      This post is in {activePost.status}. View the brief & script tab to check on-set shot lists and equipment.
-                    </p>
-                    <div className="flex gap-2 justify-center mt-4">
-                      <Button size="sm" onClick={() => setCenterMode("BRIEF")} className="text-xs">
-                        View Brief & Script
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => onOpenEdit(activePost)} className="text-xs">
-                        Upload Video/Image
-                      </Button>
+                  /* Interactive Social Post Mockup Canvas with Active Dropzone (When No Media Yet) */
+                  <div className="w-full max-w-sm bg-card border rounded-2xl shadow-xl overflow-hidden flex flex-col">
+                    {/* Mockup Header */}
+                    <div className="p-3 border-b flex items-center justify-between text-xs bg-muted/20">
+                      <div className="flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center text-[11px] font-bold text-primary">
+                          {activePost.clientName ? activePost.clientName.slice(0, 2).toUpperCase() : "BB"}
+                        </div>
+                        <div>
+                          <span className="font-bold block leading-tight">{activePost.clientName || "BlinkBeyond Client"}</span>
+                          <span className="text-[10px] text-muted-foreground">Original audio • Organic Post</span>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] font-semibold uppercase">
+                        {activePost.format || activePost.contentType || "Reel"}
+                      </Badge>
+                    </div>
+
+                    {/* Active Dropzone in Mockup Media Area */}
+                    <div
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) {
+                          const dummyEvent = { target: { files: [file] } } as any;
+                          handleDirectUpload(dummyEvent);
+                        }
+                      }}
+                      className="relative aspect-[9/13] bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white border-y border-border/40 group transition-colors"
+                    >
+                      <div className="h-14 w-14 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                        <Upload className="h-6 w-6 text-primary" />
+                      </div>
+                      <h4 className="font-bold text-sm text-slate-100">Upload Creative Asset</h4>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-[220px]">
+                        Drag & drop video (.mp4, .mov) or graphic (.png, .jpg) directly here
+                      </p>
+
+                      <div className="mt-4 flex flex-col gap-2 w-full max-w-[240px]">
+                        <Button
+                          size="sm"
+                          disabled={isUploadingMedia}
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-xs h-8"
+                        >
+                          {isUploadingMedia ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
+                          {isUploadingMedia ? "Uploading..." : "Browse Local File"}
+                        </Button>
+
+                        {/* External Link Input */}
+                        <div className="flex items-center gap-1 mt-1">
+                          <Input
+                            placeholder="Or paste Drive / Dropbox URL..."
+                            value={externalAssetUrl}
+                            onChange={(e) => setExternalAssetUrl(e.target.value)}
+                            className="h-7 text-[11px] bg-slate-900 border-slate-700 text-white placeholder:text-slate-500"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={handleSaveExternalLink}
+                            disabled={!externalAssetUrl.trim()}
+                            className="h-7 px-2 text-[11px] bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Mockup Caption & Meta Preview */}
+                    <div className="p-3 bg-card space-y-2 text-xs">
+                      <div className="flex items-center justify-between text-muted-foreground text-xs pb-1 border-b border-border/40">
+                        <div className="flex items-center gap-3">
+                          <span>❤️ 0</span>
+                          <span>💬 0</span>
+                          <span>✈️ 0</span>
+                        </div>
+                        <span>🔖</span>
+                      </div>
+
+                      <div>
+                        <p className="font-bold text-foreground text-xs">{activePost.title || "Untitled Concept"}</p>
+                        {activePost.conceptHook && (
+                          <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                            🎯 Hook: {activePost.conceptHook}
+                          </p>
+                        )}
+                        <p className="text-muted-foreground text-[11px] mt-1 whitespace-pre-wrap line-clamp-2">
+                          {activePost.caption || "No caption added yet. Click edit or generate with AI."}
+                        </p>
+                      </div>
+
+                      {/* Quick Action Chips beneath Mockup */}
+                      <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setAiTopic(activePost.title || "");
+                            setShowAiScriptModal(true);
+                          }}
+                          className="h-6 text-[10px] px-2 gap-1 border-primary/30 text-primary hover:bg-primary/5"
+                        >
+                          <Sparkles className="h-3 w-3" /> AI Hook
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCenterMode("BRIEF")}
+                          className="h-6 text-[10px] px-2 gap-1"
+                        >
+                          <FileText className="h-3 w-3" /> Script
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCenterMode("SHOTS")}
+                          className="h-6 text-[10px] px-2 gap-1"
+                        >
+                          <Camera className="h-3 w-3" /> Shots
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onOpenEdit(activePost)}
+                          className="h-6 text-[10px] px-2 text-muted-foreground ml-auto"
+                        >
+                          Edit Details ↗
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
+            ) : centerMode === "BRIEF" ? (
+              /* MODE 2: Visual & Verbal Hook + Scene Script Breakdown */
+              <div className="w-full max-w-3xl space-y-4">
+                {/* Visual & Verbal Hook */}
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                      🎯 3-Second Visual + Verbal Hook
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowTeleprompterModal(true)}
+                      className="h-6 text-[11px] gap-1 text-primary hover:bg-primary/10"
+                    >
+                      <Film className="h-3 w-3" /> Teleprompter Mode
+                    </Button>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {activePost.conceptHook || "No hook defined yet. Click 'AI Script & Shots' in top bar to generate!"}
+                  </p>
+                </div>
+
+                {/* Scene by Scene Script Table */}
+                <div className="border rounded-xl bg-card overflow-hidden">
+                  <div className="p-3 border-b bg-muted/30 flex items-center justify-between">
+                    <span className="text-xs font-bold">🎬 Scene-by-Scene Script Breakdown</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] text-muted-foreground">
+                        {Array.isArray(activePost.scriptScenes) ? activePost.scriptScenes.length : 0} Scenes
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setAiTopic(activePost.title || "");
+                          setShowAiScriptModal(true);
+                        }}
+                        className="h-6 text-[11px] text-primary"
+                      >
+                        <Sparkles className="h-3 w-3 mr-1" /> Generate with AI
+                      </Button>
+                    </div>
+                  </div>
+                  {Array.isArray(activePost.scriptScenes) && activePost.scriptScenes.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b bg-muted/10 text-muted-foreground text-[10px] uppercase font-bold">
+                            <th className="p-2.5 w-10 text-center">#</th>
+                            <th className="p-2.5 w-24">Time</th>
+                            <th className="p-2.5">Visual Direction</th>
+                            <th className="p-2.5">Spoken Dialogue</th>
+                            <th className="p-2.5">On-Screen Text</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {activePost.scriptScenes.map((sc: any, idx: number) => (
+                            <tr key={sc.id || idx} className="hover:bg-muted/30 transition-colors">
+                              <td className="p-2.5 text-center font-bold text-muted-foreground">{sc.sceneNo || idx + 1}</td>
+                              <td className="p-2.5 font-mono text-[11px] text-muted-foreground">{sc.timecode || "0:00"}</td>
+                              <td className="p-2.5 font-medium text-foreground">{sc.visualDirection}</td>
+                              <td className="p-2.5 text-muted-foreground italic">"{sc.spokenAudio}"</td>
+                              <td className="p-2.5 font-bold text-primary">{sc.onScreenText || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-xs text-muted-foreground space-y-2">
+                      <FileText className="h-8 w-8 mx-auto opacity-40 text-muted-foreground" />
+                      <p>No structured script scenes yet.</p>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setAiTopic(activePost.title || "");
+                          setShowAiScriptModal(true);
+                        }}
+                        className="text-xs font-semibold"
+                      >
+                        <Sparkles className="h-3.5 w-3.5 mr-1" /> Generate AI Script & Scenes
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : centerMode === "SHOTS" ? (
+              /* MODE 3: On-Set Interactive Shot List Checklist */
+              <div className="w-full max-w-3xl space-y-4">
+                <div className="border rounded-xl bg-card overflow-hidden">
+                  <div className="p-3 border-b bg-muted/30 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Camera className="h-4 w-4 text-primary" />
+                      <span className="text-xs font-bold">🎥 On-Set Interactive Shot List</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold text-primary">
+                        {Array.isArray(activePost.shotList) ? activePost.shotList.filter((sh: any) => sh.isCaptured).length : 0} / {Array.isArray(activePost.shotList) ? activePost.shotList.length : 0} Captured
+                      </span>
+                      {activePost.shootDate && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(`/api/content/shoot-sheet-pdf?date=${activePost.shootDate}&clientId=${activePost.clientId || ""}`, "_blank")}
+                          className="h-6 text-[10px]"
+                        >
+                          <Download className="h-3 w-3 mr-1" /> Call Sheet PDF
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {Array.isArray(activePost.shotList) && activePost.shotList.length > 0 ? (
+                      activePost.shotList.map((sh: any) => (
+                        <div
+                          key={sh.id}
+                          className={cn(
+                            "p-2.5 rounded-lg border flex items-center justify-between gap-3 text-xs transition-colors",
+                            sh.isCaptured ? "bg-emerald-500/5 border-emerald-500/20" : "bg-card hover:bg-muted/50"
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => toggleShotCaptured(sh.id)}
+                              className="text-primary hover:scale-110 transition-transform shrink-0"
+                            >
+                              {sh.isCaptured ? <CheckSquare className="h-4 w-4 text-emerald-600" /> : <Square className="h-4 w-4 text-muted-foreground" />}
+                            </button>
+                            <span className="font-bold shrink-0">Shot {sh.shotNumber}:</span>
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0 font-semibold">{sh.framing}</Badge>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 font-semibold text-primary">{sh.cameraMovement}</Badge>
+                            <span className={cn("truncate", sh.isCaptured && "line-through text-muted-foreground")}>{sh.description}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-muted-foreground shrink-0">{sh.bestTakeNote || "Take —"}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-8 text-center text-xs text-muted-foreground space-y-2">
+                        <Camera className="h-8 w-8 mx-auto opacity-40 text-muted-foreground" />
+                        <p>No shots in checklist yet.</p>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setAiTopic(activePost.title || "");
+                            setShowAiScriptModal(true);
+                          }}
+                          className="text-xs font-semibold"
+                        >
+                          <Sparkles className="h-3.5 w-3.5 mr-1" /> Generate Shots with AI
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             ) : centerMode === "COMPARE" ? (
-              /* MODE 2: Side-by-Side Compare (Reference vs. Final OR v1 vs. v2) */
+              /* MODE 4: Side-by-Side Compare (Reference vs. Final OR v1 vs. v2) */
               <div className="w-full h-full flex flex-col md:flex-row gap-4 items-center justify-center">
                 <div className="flex-1 w-full max-w-md h-full flex flex-col border rounded-xl overflow-hidden bg-card/60">
                   <div className="p-2 border-b text-xs font-bold bg-muted/40 flex items-center justify-between">
@@ -1199,111 +1597,8 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                   </div>
                 </div>
               </div>
-            ) : centerMode === "BRIEF" ? (
-              /* MODE 3: Brief, AI Script Table & Shot List Companion */
-              <div className="w-full max-w-3xl space-y-4">
-                {/* Visual & Verbal Hook */}
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                      🎯 3-Second Visual + Verbal Hook
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowTeleprompterModal(true)}
-                      className="h-6 text-[11px] gap-1 text-primary hover:bg-primary/10"
-                    >
-                      <Film className="h-3 w-3" /> Teleprompter Mode
-                    </Button>
-                  </div>
-                  <p className="text-sm font-semibold text-foreground">
-                    {activePost.conceptHook || "No hook defined yet. Click 'AI Script & Shots' in top bar to generate!"}
-                  </p>
-                </div>
-
-                {/* Scene by Scene Script Table */}
-                <div className="border rounded-xl bg-card overflow-hidden">
-                  <div className="p-3 border-b bg-muted/30 flex items-center justify-between">
-                    <span className="text-xs font-bold">🎬 Scene-by-Scene Script Breakdown</span>
-                    <span className="text-[11px] text-muted-foreground">
-                      {Array.isArray(activePost.scriptScenes) ? activePost.scriptScenes.length : 0} Scenes
-                    </span>
-                  </div>
-                  {Array.isArray(activePost.scriptScenes) && activePost.scriptScenes.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="border-b bg-muted/10 text-muted-foreground text-[10px] uppercase font-bold">
-                            <th className="p-2.5 w-10 text-center">#</th>
-                            <th className="p-2.5 w-24">Time</th>
-                            <th className="p-2.5">Visual Direction</th>
-                            <th className="p-2.5">Spoken Dialogue</th>
-                            <th className="p-2.5">On-Screen Text</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {activePost.scriptScenes.map((sc: any, idx: number) => (
-                            <tr key={sc.id || idx} className="hover:bg-muted/30 transition-colors">
-                              <td className="p-2.5 text-center font-bold text-muted-foreground">{sc.sceneNo || idx + 1}</td>
-                              <td className="p-2.5 font-mono text-[11px] text-muted-foreground">{sc.timecode || "0:00"}</td>
-                              <td className="p-2.5 font-medium text-foreground">{sc.visualDirection}</td>
-                              <td className="p-2.5 text-muted-foreground italic">"{sc.spokenAudio}"</td>
-                              <td className="p-2.5 font-bold text-primary">{sc.onScreenText || "—"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="p-6 text-center text-xs text-muted-foreground">
-                      No structured script scenes yet. You can use the AI Script button to generate them in seconds!
-                    </div>
-                  )}
-                </div>
-
-                {/* Interactive On-Set Shot List Checklist */}
-                <div className="border rounded-xl bg-card overflow-hidden">
-                  <div className="p-3 border-b bg-muted/30 flex items-center justify-between">
-                    <span className="text-xs font-bold">🎥 On-Set Interactive Shot List</span>
-                    <span className="text-[11px] font-bold text-primary">
-                      {Array.isArray(activePost.shotList) ? activePost.shotList.filter((sh: any) => sh.isCaptured).length : 0} / {Array.isArray(activePost.shotList) ? activePost.shotList.length : 0} Shots Captured
-                    </span>
-                  </div>
-                  <div className="p-3 space-y-2">
-                    {Array.isArray(activePost.shotList) && activePost.shotList.length > 0 ? (
-                      activePost.shotList.map((sh: any) => (
-                        <div
-                          key={sh.id}
-                          className={cn(
-                            "p-2.5 rounded-lg border flex items-center justify-between gap-3 text-xs transition-colors",
-                            sh.isCaptured ? "bg-emerald-500/5 border-emerald-500/20" : "bg-card hover:bg-muted/50"
-                          )}
-                        >
-                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => toggleShotCaptured(sh.id)}
-                              className="text-primary hover:scale-110 transition-transform shrink-0"
-                            >
-                              {sh.isCaptured ? <CheckSquare className="h-4 w-4 text-emerald-600" /> : <Square className="h-4 w-4 text-muted-foreground" />}
-                            </button>
-                            <span className="font-bold shrink-0">Shot {sh.shotNumber}:</span>
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0 font-semibold">{sh.framing}</Badge>
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 font-semibold text-primary">{sh.cameraMovement}</Badge>
-                            <span className={cn("truncate", sh.isCaptured && "line-through text-muted-foreground")}>{sh.description}</span>
-                          </div>
-                          <span className="text-[10px] font-mono text-muted-foreground shrink-0">{sh.bestTakeNote || "Take —"}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-xs text-muted-foreground text-center py-4">No shots in checklist.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
             ) : (
-              /* MODE 4: 3×3 Instagram Profile Grid Preview */
+              /* MODE 5: 3×3 Instagram Profile Grid Preview */
               <div className="w-full max-w-md flex flex-col items-center">
                 <div className="w-full bg-card border rounded-2xl p-4 shadow-xl space-y-4">
                   <div className="flex items-center justify-between border-b pb-3">
@@ -1313,7 +1608,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                       </div>
                       <div>
                         <h4 className="text-sm font-bold">{activePost.clientName || "BlinkBeyond Client"}</h4>
-                        <p className="text-[11px] text-muted-foreground">3×3 Grid Aesthetic Preview</p>
+                        <p className="text-[11px] text-muted-foreground">3×3 Feed Aesthetic Preview</p>
                       </div>
                     </div>
                     <Badge variant="outline" className="text-xs">Instagram Feed</Badge>
@@ -1352,16 +1647,16 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
           </div>
         </main>
 
-        {/* ═════════ RIGHT PANE (380px): Approval, Routing & Team Coordinator ═════════ */}
-        <aside className="w-96 shrink-0 border-l bg-card/40 flex flex-col justify-between overflow-y-auto p-4 space-y-4">
+        {/* ═════════ RIGHT PANE (340-360px): Approval, Routing & Team Coordinator ═════════ */}
+        <aside className="w-80 sm:w-88 shrink-0 border-l bg-card/40 flex flex-col justify-between overflow-y-auto p-3 sm:p-3.5 space-y-3">
           {!activePost ? (
             <div className="text-center py-20 text-muted-foreground text-xs">No post selected</div>
           ) : (
             <>
               {/* Sticky 2-Step Approval Decision Card (Manager First, Then Client) */}
-              <div className="space-y-2.5 p-3 rounded-xl border bg-muted/30">
+              <div className="space-y-2 p-3 rounded-xl border bg-muted/30">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     2-STEP APPROVAL WORKFLOW
                   </span>
                   <Badge variant="outline" className="text-[10px] font-semibold">
@@ -1462,7 +1757,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                         disabled={isSubmitting}
                         className="h-8 text-[11px] font-semibold border-primary/30 text-primary hover:bg-primary/5"
                       >
-                        <Share2 className="h-3 w-3 mr-1" /> Share with Client
+                        <Share2 className="h-3 w-3 mr-1" /> Copy Client Link
                       </Button>
                       <Button
                         size="sm"
@@ -1479,7 +1774,17 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
 
               {/* Pre-Flight Quality Check (QC) Bar */}
               <div className="border rounded-xl p-3 bg-background/50 space-y-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pre-Flight QC Bar</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pre-Flight QC Bar</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handlePassAllQc}
+                    className="h-5 text-[10px] px-1.5 text-primary hover:bg-primary/10 font-bold"
+                  >
+                    Pass All
+                  </Button>
+                </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
                     { key: "hookChecked", label: "Hook (3s)" },
@@ -1510,7 +1815,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                 </div>
               </div>
 
-              {/* Smart Revision Routing Box */}
+              {/* Smart Revision Routing Box with 1-Click Feedback Chips */}
               <div className="border rounded-xl p-3 bg-background/50 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
@@ -1523,14 +1828,35 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                   )}
                 </div>
 
+                {/* 1-Click Preset Feedback Chips */}
+                <div className="flex flex-wrap gap-1">
+                  {[
+                    "Tighten 3s Hook",
+                    "Fix Subtitle Typo",
+                    "Reel Safe Zone",
+                    "Audio Level",
+                    "Color Grade",
+                    "Add Clear CTA",
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setRevisionNote(prev => prev ? `${prev}, ${chip}` : chip)}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-muted hover:bg-primary/10 hover:text-primary transition-colors border border-border/50 text-muted-foreground"
+                    >
+                      + {chip}
+                    </button>
+                  ))}
+                </div>
+
                 <Textarea
                   placeholder="Type feedback notes (Click video to auto-insert exact timestamp @00:14)..."
                   value={revisionNote}
                   onChange={(e) => setRevisionNote(e.target.value)}
-                  className="text-xs h-20 resize-none bg-card"
+                  className="text-xs h-18 resize-none bg-card"
                 />
 
-                <div className="space-y-1.5 pt-1">
+                <div className="space-y-1.5 pt-0.5">
                   <span className="text-[10px] font-medium text-muted-foreground">Route Revision Directly To:</span>
                   <div className="grid grid-cols-3 gap-1">
                     <Button
@@ -1538,7 +1864,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                       variant="outline"
                       onClick={() => handleRouteRevision("EDITOR")}
                       disabled={isSubmitting}
-                      className="h-7 text-[10px] px-1 border-rose-300 hover:bg-rose-50 text-rose-700 dark:text-rose-300"
+                      className="h-7 text-[10px] px-1 border-rose-300 hover:bg-rose-50 text-rose-700 dark:text-rose-300 font-medium"
                     >
                       <Scissors className="h-3 w-3 mr-1" /> Editor
                     </Button>
@@ -1547,7 +1873,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                       variant="outline"
                       onClick={() => handleRouteRevision("VIDEOGRAPHER")}
                       disabled={isSubmitting}
-                      className="h-7 text-[10px] px-1 border-orange-300 hover:bg-orange-50 text-orange-700 dark:text-orange-300"
+                      className="h-7 text-[10px] px-1 border-orange-300 hover:bg-orange-50 text-orange-700 dark:text-orange-300 font-medium"
                     >
                       <Camera className="h-3 w-3 mr-1" /> Reshoot
                     </Button>
@@ -1556,7 +1882,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                       variant="outline"
                       onClick={() => handleRouteRevision("STRATEGIST")}
                       disabled={isSubmitting}
-                      className="h-7 text-[10px] px-1 border-blue-300 hover:bg-blue-50 text-blue-700 dark:text-blue-300"
+                      className="h-7 text-[10px] px-1 border-blue-300 hover:bg-blue-50 text-blue-700 dark:text-blue-300 font-medium"
                     >
                       <FileText className="h-3 w-3 mr-1" /> Script Fix
                     </Button>

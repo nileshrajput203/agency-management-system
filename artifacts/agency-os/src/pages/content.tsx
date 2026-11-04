@@ -352,55 +352,97 @@ export default function ContentPage() {
   ];
 
   return (
-    <div className="p-6 animated-fade-in space-y-6">
+    <div className={cn("animated-fade-in", view === "studio" ? "p-2 sm:p-3 space-y-2 h-[calc(100vh-68px)] flex flex-col" : "p-6 space-y-6")}>
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold font-heading">Content Calendar</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {activeClientId ? `${activeClient?.companyName} — ` : ""}{posts?.length ?? 0} {view === "calendar" ? "posts this month" : "posts in pipeline"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <SearchBar placeholder="Search posts…" value={searchQuery} onChange={setSearchQuery} />
-          {/* View toggle */}
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-            <button
-              onClick={() => setView("studio")}
-              className={cn(
-                "px-3 py-1 rounded-md text-sm font-semibold transition-colors flex items-center gap-1.5",
-                view === "studio" ? "bg-primary text-primary-foreground shadow" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Film className="h-3.5 w-3.5" /> PC Approval Studio
-            </button>
-            <button
-              onClick={() => setView("list")}
-              className={cn("px-3 py-1 rounded-md text-sm font-medium transition-colors", view === "list" ? "bg-card shadow text-foreground" : "text-muted-foreground")}
-            >List</button>
-            <button
-              onClick={() => setView("calendar")}
-              className={cn("px-3 py-1 rounded-md text-sm font-medium transition-colors", view === "calendar" ? "bg-card shadow text-foreground" : "text-muted-foreground")}
-            >Calendar</button>
+      {view === "studio" ? (
+        <div className="flex items-center justify-between flex-wrap gap-2 shrink-0 px-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold font-heading flex items-center gap-2">
+              <Film className="h-5 w-5 text-primary" />
+              <span>PC Approval & Production Studio</span>
+            </h1>
+            <Badge variant="outline" className="text-xs bg-muted/50">
+              {activeClientId ? activeClient?.companyName : "All Clients"} • {posts?.length ?? 0} Posts
+            </Badge>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
-            onClick={openShareDialog}
-          >
-            <Share2 className="h-3.5 w-3.5" />
-            Share Calendar
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={printCurrentMonth}>
-            <Printer className="h-3.5 w-3.5" />
-            Print
-          </Button>
-          <Button onClick={() => openCreate()} className="gap-2 btn-micro-anim">
-            <Plus className="h-4 w-4" /> Add Post
-          </Button>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* View toggle */}
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+              <button
+                onClick={() => setView("studio")}
+                className="px-2.5 py-1 rounded-md text-xs font-semibold bg-primary text-primary-foreground shadow-xs flex items-center gap-1.5"
+              >
+                <Film className="h-3.5 w-3.5" /> Studio
+              </button>
+              <button
+                onClick={() => setView("list")}
+                className="px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >List</button>
+              <button
+                onClick={() => setView("calendar")}
+                className="px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >Calendar</button>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/10"
+              onClick={openShareDialog}
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              Share Calendar
+            </Button>
+            <Button onClick={() => openCreate()} size="sm" className="h-8 gap-1.5 text-xs btn-micro-anim">
+              <Plus className="h-3.5 w-3.5" /> Add Post
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between flex-wrap gap-2 shrink-0">
+          <div>
+            <h1 className="text-2xl font-bold font-heading">Content Calendar</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {activeClientId ? `${activeClient?.companyName} — ` : ""}{posts?.length ?? 0} {view === "calendar" ? "posts this month" : "posts in pipeline"}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <SearchBar placeholder="Search posts…" value={searchQuery} onChange={setSearchQuery} />
+            {/* View toggle */}
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              <button
+                onClick={() => setView("studio")}
+                className="px-2.5 py-1 rounded-md text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+              >
+                <Film className="h-3.5 w-3.5" /> Studio
+              </button>
+              <button
+                onClick={() => setView("list")}
+                className={cn("px-2.5 py-1 rounded-md text-xs font-medium transition-colors", view === "list" ? "bg-card shadow-xs text-foreground" : "text-muted-foreground")}
+              >List</button>
+              <button
+                onClick={() => setView("calendar")}
+                className={cn("px-2.5 py-1 rounded-md text-xs font-medium transition-colors", view === "calendar" ? "bg-card shadow-xs text-foreground" : "text-muted-foreground")}
+              >Calendar</button>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs border-primary/30 text-primary hover:bg-primary/10"
+              onClick={openShareDialog}
+            >
+              <Share2 className="h-3.5 w-3.5" />
+              Share Calendar
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={printCurrentMonth}>
+              <Printer className="h-3.5 w-3.5" />
+              Print
+            </Button>
+            <Button onClick={() => openCreate()} size="sm" className="h-8 gap-1.5 text-xs btn-micro-anim">
+              <Plus className="h-3.5 w-3.5" /> Add Post
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       {isLoading ? (
@@ -408,13 +450,15 @@ export default function ContentPage() {
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
         </div>
       ) : view === "studio" ? (
-        <PCApprovalStudio
-          posts={(posts ?? []) as PostRecord[]}
-          clients={clients}
-          users={(users ?? []) as any[]}
-          onRefresh={() => qc.invalidateQueries({ queryKey: getListContentPostsQueryKey() })}
-          onOpenEdit={(post) => openEdit(post)}
-        />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <PCApprovalStudio
+            posts={(posts ?? []) as PostRecord[]}
+            clients={clients}
+            users={(users ?? []) as any[]}
+            onRefresh={() => qc.invalidateQueries({ queryKey: getListContentPostsQueryKey() })}
+            onOpenEdit={(post) => openEdit(post)}
+          />
+        </div>
       ) : (
         <>
           {/* Stat chips */}
