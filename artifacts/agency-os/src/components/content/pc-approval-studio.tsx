@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/App";
+import { isManagerOrAdminRole } from "@/lib/permissions";
 import { STATUS_CONFIG, PLATFORM_ICON, PostRecord, isNeedsRevision } from "./content-constants";
 
 interface UserOption {
@@ -41,6 +43,9 @@ interface Props {
 }
 
 export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpenEdit }: Props) {
+  const { user } = useAuth();
+  const isManagerOrAdmin = isManagerOrAdminRole(user);
+
   // Selected post in studio
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
@@ -245,14 +250,18 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
         }
       } else if (e.key === "a" || e.key === "A") {
         if (activePost) {
-          handleApproveInternally();
+          if (!isManagerOrAdmin) {
+            toast.error("Content approval can only be done by a manager or administrator.");
+          } else {
+            handleApproveInternally();
+          }
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filteredPosts, activePost, centerMode]);
+  }, [filteredPosts, activePost, centerMode, isManagerOrAdmin]);
 
   // Teleprompter autoscroll loop
   useEffect(() => {
@@ -307,6 +316,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   // Step 1: Manager Internal Approval (done first before client)
   const handleApproveInternally = async () => {
     if (!activePost) return;
+    if (!isManagerOrAdmin) {
+      toast.error("Content approval can only be done by a manager or administrator.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const res = await fetch(`/api/content/${activePost.id}/internal-approve`, {
@@ -326,6 +339,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   // Step 2: Client Approval (confirmed after Manager approval)
   const handleClientApprove = async () => {
     if (!activePost) return;
+    if (!isManagerOrAdmin) {
+      toast.error("Content approval can only be done by a manager or administrator.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const res = await fetch(`/api/content/${activePost.id}/client-approve`, {
@@ -367,6 +384,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   // 1-Click Approve & Share with Client
   const handleApproveAndShare = async () => {
     if (!activePost) return;
+    if (!isManagerOrAdmin) {
+      toast.error("Content approval can only be done by a manager or administrator.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       // 1. Approve internally first if not already
@@ -507,6 +528,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   // Batch Approval
   const handleBatchApprove = async () => {
     if (selectedIds.length === 0) return;
+    if (!isManagerOrAdmin) {
+      toast.error("Content approval can only be done by a manager or administrator.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const res = await fetch("/api/content/batch-approve", {
@@ -657,7 +682,11 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
             <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono whitespace-nowrap">J / ↓</kbd> Next
             <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono ml-1 whitespace-nowrap">K / ↑</kbd> Prev
             <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono ml-1 whitespace-nowrap">Space</kbd> Play
-            <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono ml-1 whitespace-nowrap">A</kbd> Approve
+            {isManagerOrAdmin && (
+              <>
+                <kbd className="bg-muted px-1.5 py-0.5 rounded border text-[10px] font-mono ml-1 whitespace-nowrap">A</kbd> Approve
+              </>
+            )}
           </div>
         </div>
 
@@ -923,9 +952,15 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
           {/* Multi-Select Sticky Batch Bar */}
           {selectedIds.length > 0 && (
             <div className="p-3 border-t bg-primary/10 flex items-center justify-between gap-2 shrink-0">
-              <Button size="sm" onClick={handleBatchApprove} disabled={isSubmitting} className="h-8 flex-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white">
-                <Check className="h-3.5 w-3.5 mr-1" /> Approve Selected ({selectedIds.length})
-              </Button>
+              {isManagerOrAdmin ? (
+                <Button size="sm" onClick={handleBatchApprove} disabled={isSubmitting} className="h-8 flex-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white">
+                  <Check className="h-3.5 w-3.5 mr-1" /> Approve Selected ({selectedIds.length})
+                </Button>
+              ) : (
+                <div className="flex-1 text-[11px] text-muted-foreground flex items-center gap-1.5 font-medium px-2 py-1 bg-muted/70 rounded border border-border">
+                  <span>🔒 Manager approval required</span>
+                </div>
+              )}
               <Button size="sm" variant="outline" onClick={() => setSelectedIds([])} className="h-8 text-xs">
                 Clear
               </Button>
@@ -955,6 +990,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                       type="button"
                       onClick={async () => {
                         if (!activePost) return;
+                        if (["SCHEDULED", "ADMIN_APPROVED"].includes(step.statusKey) && !isManagerOrAdmin) {
+                          toast.error("Content approval and scheduling can only be done by a manager or administrator.");
+                          return;
+                        }
                         await fetch(`/api/content/${activePost.id}`, {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
@@ -1709,6 +1748,11 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                       <span>Internally approved by manager. Ready for client.</span>
                     </p>
+                  ) : !isManagerOrAdmin ? (
+                    <div className="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                      <span>Manager review required. Only managers and admins can approve content.</span>
+                    </div>
                   ) : (
                     <Button
                       size="sm"
@@ -1748,6 +1792,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                       <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                       <span>Client confirmed. Post scheduled.</span>
                     </p>
+                  ) : !isManagerOrAdmin ? (
+                    <div className="p-2 rounded bg-muted text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
+                      <span>🔒 Client approval and link sharing are managed by managers and admins.</span>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                       <Button

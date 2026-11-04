@@ -11,6 +11,8 @@ import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/App";
+import { isManagerOrAdminRole } from "@/lib/permissions";
 import {
   FileText, Trash2, Send, CheckCircle2, XCircle, AlertTriangle, RotateCcw,
   Paperclip, Clock, Calendar, Image, Link2, Settings2, Plus, X, MessageSquare,
@@ -52,6 +54,8 @@ export function ContentPostDrawer({
   newComment,
   setNewComment,
 }: ContentPostDrawerProps) {
+  const { user } = useAuth();
+  const isManagerOrAdmin = isManagerOrAdminRole(user);
   const commentInputRef = useRef<HTMLInputElement>(null);
 
   function setField<K extends keyof typeof draft>(key: K, value: typeof draft[K]) {
@@ -101,7 +105,18 @@ export function ContentPostDrawer({
                 <Trash2 className="h-4 w-4" />
               </Button>
             )}
-            <Button size="sm" onClick={savePost} disabled={isPending} className="gap-1.5 font-semibold btn-micro-anim">
+            <Button
+              size="sm"
+              onClick={() => {
+                if (draft.status === "ADMIN_APPROVED" && !isManagerOrAdmin) {
+                  toast.error("Content approval can only be done by a manager or administrator.");
+                  return;
+                }
+                savePost();
+              }}
+              disabled={isPending}
+              className="gap-1.5 font-semibold btn-micro-anim"
+            >
               <Send className="h-3.5 w-3.5" />
               {isPending ? "Saving…" : panel.mode === "create" ? "Create Post" : "Save Changes"}
             </Button>
@@ -340,12 +355,26 @@ export function ContentPostDrawer({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Status</Label>
-                <Select value={draft.status} onValueChange={(v) => setField("status", v)}>
+                <Select
+                  value={draft.status}
+                  onValueChange={(v) => {
+                    if (["ADMIN_APPROVED", "SCHEDULED"].includes(v) && !isManagerOrAdmin) {
+                      toast.error("Content approval can only be done by a manager or administrator.");
+                      return;
+                    }
+                    setField("status", v);
+                  }}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                    ))}
+                    {Object.entries(STATUS_CONFIG).map(([k, v]) => {
+                      if (k === "ADMIN_APPROVED" && !isManagerOrAdmin) {
+                        return null;
+                      }
+                      return (
+                        <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

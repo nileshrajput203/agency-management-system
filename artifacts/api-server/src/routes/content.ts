@@ -18,6 +18,33 @@ import { NotificationService } from "../services/notificationService";
 
 const router = Router();
 
+export function isManagerOrAdmin(
+  systemRole?: string | null,
+  isDelegatedAdmin?: boolean,
+  userRole?: string | null,
+): boolean {
+  if (isDelegatedAdmin) return true;
+  const normalizedSystem = String(systemRole || "").trim().toUpperCase();
+  const normalizedRole = String(userRole || "").trim().toUpperCase();
+
+  const managerOrAdminRoles = [
+    "SUPER_ADMIN",
+    "ADMIN",
+    "MANAGER",
+    "ACCOUNT_MANAGER",
+    "PROJECT_MANAGER",
+    "HR",
+    "DIRECTOR",
+    "LEAD",
+  ];
+
+  return (
+    managerOrAdminRoles.includes(normalizedSystem) ||
+    normalizedRole === "ADMIN" ||
+    normalizedRole === "MANAGER"
+  );
+}
+
 function sanitizeContentPost(body: any, isUpdate = false) {
   return sanitizeAndValidate(body, {
     uuids: ["clientId"],
@@ -251,6 +278,14 @@ router.post("/batch-upload", requirePermission("content.create"), asyncHandler(a
 
 // ─── POST /api/content/batch-approve ─────────────────────────
 router.post("/batch-approve", requirePermission("content.edit"), asyncHandler(async (req, res) => {
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+
+  if (!isManagerOrAdmin(requesterSystemRole, isDelegatedAdmin, requesterRole)) {
+    throw createError("Forbidden: Content approval can only be done by a manager or administrator", 403);
+  }
+
   const { ids } = req.body || {};
   if (!Array.isArray(ids) || ids.length === 0) {
     throw createError("IDs array is required", 400);
@@ -673,6 +708,21 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
   const { id: _id, createdAt: _ts, ...body } = req.body;
   const sanitized = sanitizeContentPost(body, true);
 
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+  const isManager = isManagerOrAdmin(requesterSystemRole, isDelegatedAdmin, requesterRole);
+
+  if (!isManager) {
+    if (
+      sanitized.internalApprovalStatus === "APPROVED" ||
+      sanitized.approvalStatus === "APPROVED" ||
+      sanitized.status === "ADMIN_APPROVED"
+    ) {
+      throw createError("Forbidden: Content approval can only be done by a manager or administrator", 403);
+    }
+  }
+
   const [existing] = await db
     .select()
     .from(contentPostsTable)
@@ -824,6 +874,14 @@ router.delete("/:id", requirePermission("content.delete"), asyncHandler(async (r
 
 // ─── Approval Routes (2-Step: Manager First, Then Client) ──────────────────────
 router.post("/:id/internal-approve", requirePermission("content.edit"), asyncHandler(async (req, res) => {
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+
+  if (!isManagerOrAdmin(requesterSystemRole, isDelegatedAdmin, requesterRole)) {
+    throw createError("Forbidden: Content approval can only be done by a manager or administrator", 403);
+  }
+
   const userId = (req as any).userId ?? null;
   const contentId = req.params.id as string;
 
@@ -835,7 +893,7 @@ router.post("/:id/internal-approve", requirePermission("content.edit"), asyncHan
       internalApprovedAt: new Date(),
       status: "IN_REVIEW", // Ready for Client Approval
       approvalStatus: "PENDING", // Client approval pending
-      needsRevision: "false",
+      needsRevision: false,
     } as any)
     .where(eq(contentPostsTable.id, contentId))
     .returning();
@@ -856,6 +914,14 @@ router.post("/:id/internal-approve", requirePermission("content.edit"), asyncHan
 }));
 
 router.post("/:id/client-approve", requirePermission("content.edit"), asyncHandler(async (req, res) => {
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+
+  if (!isManagerOrAdmin(requesterSystemRole, isDelegatedAdmin, requesterRole)) {
+    throw createError("Forbidden: Content approval can only be done by a manager or administrator", 403);
+  }
+
   const userId = (req as any).userId ?? null;
   const contentId = req.params.id as string;
 
@@ -921,6 +987,14 @@ router.post("/check-upcoming-approvals", requirePermission("content.view"), asyn
 }));
 
 router.post("/:id/approve", requirePermission("content.edit"), asyncHandler(async (req, res) => {
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+
+  if (!isManagerOrAdmin(requesterSystemRole, isDelegatedAdmin, requesterRole)) {
+    throw createError("Forbidden: Content approval can only be done by a manager or administrator", 403);
+  }
+
   const userId = (req as any).userId ?? null;
   const [row] = await db
     .update(contentPostsTable)
@@ -940,6 +1014,14 @@ router.post("/:id/approve", requirePermission("content.edit"), asyncHandler(asyn
 }));
 
 router.post("/:id/reject", requirePermission("content.edit"), asyncHandler(async (req, res) => {
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+
+  if (!isManagerOrAdmin(requesterSystemRole, isDelegatedAdmin, requesterRole)) {
+    throw createError("Forbidden: Content rejection can only be done by a manager or administrator", 403);
+  }
+
   const { note } = req.body as { note?: string };
   const [row] = await db
     .update(contentPostsTable)
