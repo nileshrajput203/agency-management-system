@@ -15,6 +15,20 @@ import {
 
 export const PRIVILEGED_ROLES = ["SUPER_ADMIN"] as const;
 
+export function isManagerRole(systemRole?: string | null): boolean {
+  if (!systemRole) return false;
+  const normalized = String(systemRole).trim().toUpperCase();
+  return [
+    "SUPER_ADMIN",
+    "ADMIN",
+    "MANAGER",
+    "PROJECT_MANAGER",
+    "ACCOUNT_MANAGER",
+    "DIRECTOR",
+    "LEAD",
+  ].includes(normalized);
+}
+
 export function isPrivilegedRole(systemRole?: string | null): boolean {
   if (!systemRole) return false;
   return PRIVILEGED_ROLES.includes(systemRole as any);
@@ -24,6 +38,7 @@ export function isPrivilegedRole(systemRole?: string | null): boolean {
 // are still employees for the task workspace. Only these roles can see and
 // manage the company-wide task board.
 export function canManageTaskWorkspace(systemRole?: string | null, allowedModules?: unknown): boolean {
+  if (isManagerRole(systemRole)) return true;
   return canManageTaskWorkspaceFromModules(systemRole, allowedModules);
 }
 
@@ -36,6 +51,7 @@ export function canManageEnabledSection(
 }
 
 export function canManageProjectWorkspace(systemRole?: string | null, allowedModules?: unknown): boolean {
+  if (isManagerRole(systemRole)) return true;
   return canManageEnabledSection(systemRole, "projects", allowedModules);
 }
 
@@ -246,16 +262,50 @@ export function requirePermission(permission: Permission) {
 
     const isSuperAdmin = user.systemRole === "SUPER_ADMIN";
     const isDelegated = Boolean(user.isDelegatedAdmin);
+    const isManager = isManagerRole(user.systemRole) || isDelegated;
     const allowedModulesList = getEffectiveModules(user.allowedModules);
     const configuredModulesList = parseConfiguredModules(user.allowedModules);
-    const role: UserRole = isSuperAdmin || canManageTaskWorkspace(user.systemRole, configuredModulesList)
+    const role: UserRole = isSuperAdmin || isManager || canManageTaskWorkspace(user.systemRole, configuredModulesList)
       ? "ADMIN"
       : "EMPLOYEE";
-    const effectivePermissions: string[] = isSuperAdmin
+    const basePermissions: string[] = isSuperAdmin
       ? [...ROLE_PERMISSIONS.ADMIN]
       : getModulePermissions(user.allowedModules);
 
-    if (!effectivePermissions.includes(permission)) {
+    const effectivePermissions = new Set<string>(basePermissions);
+    if (isManager) {
+      const managerDefaultPermissions = [
+        "projects.create",
+        "projects.edit",
+        "projects.view",
+        "projects.delete",
+        "tasks.create",
+        "tasks.edit",
+        "tasks.view",
+        "tasks.delete",
+        "content.create",
+        "content.edit",
+        "content.view",
+        "clients.create",
+        "clients.edit",
+        "clients.view",
+        "meetings.create",
+        "meetings.edit",
+        "meetings.view",
+        "time.view",
+        "time.log",
+        "attendance.view",
+        "reports.view",
+        "attachments.view",
+        "attachments.upload",
+        "users.view",
+      ];
+      for (const p of managerDefaultPermissions) {
+        effectivePermissions.add(p);
+      }
+    }
+
+    if (!effectivePermissions.has(permission)) {
       return res.status(403).json({ error: `Forbidden: Missing required permission ${permission}` });
     }
 

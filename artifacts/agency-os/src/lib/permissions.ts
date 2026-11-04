@@ -47,9 +47,12 @@ export function getExplicitUserModules(allowedModules?: unknown): string[] {
   return [];
 }
 
-export function getUserModules(allowedModules?: unknown): string[] {
+export function getUserModules(allowedModules?: unknown, role?: string): string[] {
   const configured = getExplicitUserModules(allowedModules);
   if (configured.length > 0) return configured;
+  if (role && (ROLE_MODULES as any)[role]) {
+    return (ROLE_MODULES as any)[role];
+  }
   return DEFAULT_EMPLOYEE_MODULES;
 }
 
@@ -84,14 +87,23 @@ export function isManagerOrAdminRole(user: any): boolean {
 
 export function canManageModule(user: any, module: string): boolean {
   const role = user?.systemRole ?? user?.role;
-  return isSuperAdminRole(role) || hasExplicitModuleAccess(user?.allowedModules, module);
+  if (isSuperAdminRole(role)) return true;
+  if (isManagerOrAdminRole(user)) {
+    if (["projects", "tasks", "content", "clients", "meetings", "reports", "team"].includes(module)) {
+      return true;
+    }
+  }
+  return hasExplicitModuleAccess(user?.allowedModules, module);
 }
 
 export function canManageTaskWorkspaceForUser(user: any): boolean {
-  const role = user?.systemRole ?? user?.role;
-  return isSuperAdminRole(role) ||
-    (hasExplicitModuleAccess(user?.allowedModules, "projects") &&
-      hasExplicitModuleAccess(user?.allowedModules, "tasks"));
+  if (isSuperAdminRole(user?.systemRole ?? user?.role) || isManagerOrAdminRole(user)) {
+    return true;
+  }
+  return (
+    hasExplicitModuleAccess(user?.allowedModules, "projects") &&
+    hasExplicitModuleAccess(user?.allowedModules, "tasks")
+  );
 }
 
 const ROLE_MODULES: Record<SystemRole, ModuleKey[]> = {

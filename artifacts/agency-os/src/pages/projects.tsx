@@ -28,7 +28,7 @@ import { SearchBar } from "@/components/common/SearchBar";
 import { cn, formatDateOnly } from "@/lib/utils";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/App";
-import { canManageModule } from "@/lib/permissions";
+import { canManageModule, isManagerOrAdminRole } from "@/lib/permissions";
 import { ProjectSubprojects } from "@/components/projects/subprojects-manager";
 import { ProjectDetailModal } from "@/components/projects/project-detail-modal";
 
@@ -82,7 +82,7 @@ interface ProjectFormData {
 
 export default function ProjectsPage() {
   const { user } = useAuth();
-  const isAdmin = canManageModule(user, "projects");
+  const isAdmin = isManagerOrAdminRole(user) || canManageModule(user, "projects");
   const qc = useQueryClient();
 
   const [search, setSearch] = useState("");
@@ -206,11 +206,13 @@ export default function ProjectsPage() {
   };
 
   const { data: projects, isLoading } = useListProjects();
+  const canViewClients = isManagerOrAdminRole(user) || canManageModule(user, "clients");
+  const canViewUsers = isManagerOrAdminRole(user) || canManageModule(user, "team");
   const { data: clients } = useListClients(undefined, {
-    query: { enabled: canManageModule(user, "clients") },
+    query: { enabled: canViewClients },
   });
   const { data: users } = useListUsers({
-    query: { enabled: canManageModule(user, "team") },
+    query: { enabled: canViewUsers },
   });
 
   const createMutation = useCreateProject({
