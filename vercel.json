@@ -3,7 +3,14 @@
   "services": {
     "agency-os": {
       "root": "artifacts/agency-os",
-      "framework": "vite"
+      "framework": "vite",
+      "outputDirectory": "dist",
+      "rewrites": [
+        {
+          "source": "/(.*)",
+          "destination": "/index.html"
+        }
+      ]
     },
     "api-server": {
       "root": "artifacts/api-server",
@@ -42,6 +49,12 @@
       }
     },
     {
+      "source": "/favicon.ico",
+      "destination": {
+        "service": "agency-os"
+      }
+    },
+    {
       "source": "/js/(.*)",
       "destination": {
         "service": "agency-os"
@@ -56,8 +69,7 @@
     {
       "source": "/(.*)",
       "destination": {
-        "service": "agency-os",
-        "path": "/index.html"
+        "service": "agency-os"
       }
     }
   ]
