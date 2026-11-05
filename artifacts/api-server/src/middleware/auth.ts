@@ -18,7 +18,7 @@ export const PRIVILEGED_ROLES = ["SUPER_ADMIN"] as const;
 export function isManagerRole(systemRole?: string | null): boolean {
   if (!systemRole) return false;
   const normalized = String(systemRole).trim().toUpperCase();
-  return [
+  const managerRoles = [
     "SUPER_ADMIN",
     "ADMIN",
     "MANAGER",
@@ -26,7 +26,20 @@ export function isManagerRole(systemRole?: string | null): boolean {
     "ACCOUNT_MANAGER",
     "DIRECTOR",
     "LEAD",
-  ].includes(normalized);
+    "PRODUCTION_COORDINATOR",
+    "PROJECT_COORDINATOR",
+    "COORDINATOR",
+    "PC",
+    "CREATIVE_DIRECTOR",
+    "CONTENT_LEAD",
+    "HEAD_OF_CONTENT",
+    "OPERATIONS",
+    "FOUNDER",
+    "CEO",
+    "COO",
+    "HR",
+  ];
+  return managerRoles.some((r) => normalized.includes(r)) || managerRoles.includes(normalized);
 }
 
 export function isPrivilegedRole(systemRole?: string | null): boolean {
