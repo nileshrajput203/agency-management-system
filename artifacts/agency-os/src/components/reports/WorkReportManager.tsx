@@ -633,6 +633,7 @@ function WorkReportEditorView({
   const [isRequestChangesOpen, setIsRequestChangesOpen] = useState<boolean>(false);
   const [managerFeedbackInput, setManagerFeedbackInput] = useState<string>("");
   const [projectCommentsInput, setProjectCommentsInput] = useState<Record<string, string>>({});
+  const [isAutoFilling, setIsAutoFilling] = useState<boolean>(false);
 
   useEffect(() => {
     if (report) {
@@ -875,10 +876,9 @@ function WorkReportEditorView({
   const status = report.status;
   const isEditable = isManagerOrAdmin || (isOwner && (status === "Draft" || status === "Needs Changes"));
 
-  const totalHours = formData.projects.reduce((acc: number, p: any) => acc + (Number(p.hoursSpent) || 0), 0);
-  const completedCount = formData.projects.filter((p: any) => p.status === "Completed" || Number(p.completionPercentage) === 100).length;
+  const totalHours = (formData?.projects || []).reduce((acc: number, p: any) => acc + (Number(p.hoursSpent) || 0), 0);
+  const completedCount = (formData?.projects || []).filter((p: any) => p.status === "Completed" || Number(p.completionPercentage) === 100).length;
 
-  const [isAutoFilling, setIsAutoFilling] = useState(false);
   const handleAutoFill = async () => {
     setIsAutoFilling(true);
     try {
@@ -1265,7 +1265,7 @@ function WorkReportEditorView({
           )}
         </CardHeader>
         <CardContent className="p-6">
-          {formData.projects.length === 0 ? (
+          {(formData?.projects || []).length === 0 ? (
             <div className="text-center py-10 border border-dashed rounded-xl text-muted-foreground text-sm space-y-2 bg-muted/20">
               <Building className="h-8 w-8 text-muted-foreground/50 mx-auto" />
               <p className="font-medium">No project entries added yet.</p>
@@ -1273,7 +1273,7 @@ function WorkReportEditorView({
             </div>
           ) : (
             <div className="space-y-6 w-full">
-              {formData.projects.map((proj: any, idx: number) => (
+              {(formData?.projects || []).map((proj: any, idx: number) => (
                 <Card key={proj.id || idx} className="p-5 border border-border bg-card/60 shadow-xs w-full space-y-4 rounded-xl">
                   <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-3">
                     <span className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -1309,7 +1309,7 @@ function WorkReportEditorView({
                         value={
                           proj.projectId && proj.projectId !== "none"
                             ? String(proj.projectId)
-                            : systemProjects.find((sys: any) => sys.name?.toLowerCase() === proj.projectName?.toLowerCase())?.id
+                            : Array.isArray(systemProjects) && systemProjects.find((sys: any) => sys.name?.toLowerCase() === proj.projectName?.toLowerCase())?.id
                             ? String(systemProjects.find((sys: any) => sys.name?.toLowerCase() === proj.projectName?.toLowerCase())!.id)
                             : "none"
                         }
@@ -1317,11 +1317,11 @@ function WorkReportEditorView({
                           if (val === "none") {
                             updateProject(proj.id, "projectId", "none");
                           } else {
-                            const selectedSysProject = systemProjects.find((sys: any) => String(sys.id) === val);
+                            const selectedSysProject = Array.isArray(systemProjects) ? systemProjects.find((sys: any) => String(sys.id) === val) : undefined;
                             if (selectedSysProject) {
                               setFormData((prev: any) => ({
                                 ...prev,
-                                projects: prev.projects.map((p: any) => {
+                                projects: (prev?.projects || []).map((p: any) => {
                                   if (p.id === proj.id) {
                                     return {
                                       ...p,
@@ -1342,7 +1342,7 @@ function WorkReportEditorView({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">No Project</SelectItem>
-                          {systemProjects.map((p: any) => (
+                          {Array.isArray(systemProjects) && systemProjects.filter((p: any) => p && p.id).map((p: any) => (
                             <SelectItem key={p.id} value={String(p.id)}>
                               {p.name}
                             </SelectItem>
@@ -1460,7 +1460,7 @@ function WorkReportEditorView({
             <div className="p-4 rounded-xl bg-muted/30 border border-border/60 flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground font-medium">Total Projects Logged</p>
-                <p className="text-2xl font-black text-foreground mt-1">{formData.projects.length}</p>
+                <p className="text-2xl font-black text-foreground mt-1">{(formData?.projects || []).length}</p>
               </div>
               <Building className="h-8 w-8 text-foreground/30" />
             </div>
@@ -1761,7 +1761,7 @@ function WorkReportEditorView({
               />
             </div>
 
-            {formData.projects.length > 0 && (
+            {Array.isArray(formData?.projects) && formData.projects.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-xs font-semibold">Project Specific Comments (Optional)</Label>
                 {formData.projects.map((p: any) => (
