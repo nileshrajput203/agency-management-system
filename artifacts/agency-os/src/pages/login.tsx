@@ -152,19 +152,6 @@ export default function LoginPage() {
                 Create account
               </button>
             </div>
-
-            <div className="mt-4 pt-3 border-t border-border/40 flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setValue("email", "admin@agencyps.com");
-                  setValue("password", "Admin@123");
-                }}
-                className="text-[11px] text-muted-foreground hover:text-primary transition-colors inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-muted/70 hover:bg-muted font-medium border border-border/50"
-              >
-                <span>🔑 Auto-fill Admin (admin@agencyps.com)</span>
-              </button>
-            </div>
           </CardContent>
         </Card>
       </div>
