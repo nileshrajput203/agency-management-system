@@ -212,6 +212,9 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   const [aiTopic, setAiTopic] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
 
+  // 3x3 Grid Pagination
+  const [gridPage, setGridPage] = useState(0);
+
   // Filter queue items (month-wise + workflow stage + client + platform + search)
   const filteredPosts = monthPosts.filter((p) => {
     // Stage filtering
@@ -1855,50 +1858,253 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               </div>
             ) : (
               /* MODE 5: 3×3 Instagram Profile Grid Preview */
-              <div className="w-full max-w-md flex flex-col items-center">
-                <div className="w-full bg-card border rounded-2xl p-4 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between border-b pb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary text-sm">
-                        {activePost.clientName ? activePost.clientName.slice(0, 2).toUpperCase() : "BB"}
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-bold">{activePost.clientName || "BlinkBeyond Client"}</h4>
-                        <p className="text-[11px] text-muted-foreground">3×3 Feed Aesthetic Preview</p>
-                      </div>
-                    </div>
-                    <Badge variant="outline" className="text-xs">Instagram Feed</Badge>
-                  </div>
+              (() => {
+                const clientGridPosts = posts.filter(
+                  (p) => !activePost?.clientId || p.clientId === activePost.clientId
+                );
+                // Sort by scheduled date descending (newest on top, like Instagram feed)
+                const sortedClientGridPosts = [...clientGridPosts].sort((a, b) => {
+                  const timeA = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
+                  const timeB = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
+                  if (timeA !== timeB) return timeB - timeA;
+                  return (a.title || "").localeCompare(b.title || "");
+                });
+                const totalGridPages = Math.max(1, Math.ceil(sortedClientGridPosts.length / 9));
+                const displayedGridSlice = sortedClientGridPosts.slice(gridPage * 9, (gridPage + 1) * 9);
 
-                  {/* 3x3 Grid */}
-                  <div className="grid grid-cols-3 gap-1.5 aspect-square bg-muted/40 p-1 rounded-xl">
-                    {posts
-                      .filter(p => !activePost.clientId || p.clientId === activePost.clientId)
-                      .slice(0, 9)
-                      .map((p, i) => (
-                        <div
-                          key={p.id || i}
-                          onClick={() => setSelectedPostId(p.id)}
-                          className={cn(
-                            "relative aspect-square rounded-md overflow-hidden bg-slate-900 cursor-pointer group border transition-all",
-                            p.id === activePost.id ? "ring-2 ring-primary ring-offset-1 border-primary" : "border-border/60 hover:opacity-90"
-                          )}
-                        >
-                          {p.coverImageUrl || p.assetsLink ? (
-                            <img src={p.coverImageUrl || p.assetsLink || ""} alt="thumbnail" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-white/50 p-1 text-center">
-                              {p.title || `Post #${i+1}`}
+                return (
+                  <div className="w-full max-w-md flex flex-col items-center">
+                    <div className="w-full bg-card border rounded-2xl p-4 shadow-xl space-y-4">
+                      <div className="flex items-center justify-between border-b pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary text-sm">
+                            {activePost.clientName ? activePost.clientName.slice(0, 2).toUpperCase() : "BB"}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold">{activePost.clientName || "BlinkBeyond Client"}</h4>
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <span>3×3 Feed Aesthetic Preview</span>
+                              <span>•</span>
+                              <span className="font-semibold text-foreground">
+                                {sortedClientGridPosts.length} {sortedClientGridPosts.length === 1 ? "Post" : "Posts"}
+                              </span>
                             </div>
-                          )}
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold p-1 text-center transition-opacity">
-                            {p.title || "Post"}
                           </div>
                         </div>
-                      ))}
+                        <div className="flex items-center gap-1.5">
+                          {totalGridPages > 1 && (
+                            <div className="flex items-center gap-1 bg-muted p-0.5 rounded-lg border text-xs">
+                              <button
+                                type="button"
+                                onClick={() => setGridPage((prev) => Math.max(0, prev - 1))}
+                                disabled={gridPage === 0}
+                                className="h-6 w-6 flex items-center justify-center rounded disabled:opacity-30 hover:bg-card transition-colors"
+                                title="Previous 9 Posts"
+                              >
+                                <ChevronLeft className="h-3.5 w-3.5" />
+                              </button>
+                              <span className="text-[10px] font-semibold px-1 min-w-[2.5rem] text-center">
+                                {gridPage + 1}/{totalGridPages}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setGridPage((prev) => Math.min(totalGridPages - 1, prev + 1))}
+                                disabled={gridPage >= totalGridPages - 1}
+                                className="h-6 w-6 flex items-center justify-center rounded disabled:opacity-30 hover:bg-card transition-colors"
+                                title="Next 9 Posts"
+                              >
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
+                          <Badge variant="outline" className="text-xs">Instagram Feed</Badge>
+                        </div>
+                      </div>
+
+                      {/* 3x3 Grid */}
+                      <div className="grid grid-cols-3 gap-1.5 aspect-square bg-muted/40 p-1.5 rounded-xl border border-border/40">
+                        {displayedGridSlice.map((p, i) => {
+                          const mediaUrl =
+                            p.coverImageUrl ||
+                            p.assetsLink ||
+                            (Array.isArray(p.mediaUrls) ? p.mediaUrls[0] : null) ||
+                            (Array.isArray(p.mediaFiles) ? p.mediaFiles[0] : null) ||
+                            (Array.isArray(p.assetVersions) && p.assetVersions.length > 0
+                              ? p.assetVersions[p.assetVersions.length - 1]?.url
+                              : null) ||
+                            "";
+                          const parsed = parseMediaUrl(mediaUrl);
+                          const isReel = p.format === "REEL" || p.contentType === "REEL";
+                          const isCarousel = p.format === "CAROUSEL" || p.contentType === "CAROUSEL" || (Array.isArray(p.mediaFiles) && p.mediaFiles.length > 1);
+
+                          const formatGradients: Record<string, string> = {
+                            REEL: "from-purple-950 via-slate-900 to-indigo-950 border-purple-500/30 text-purple-200",
+                            CAROUSEL: "from-pink-950 via-slate-900 to-rose-950 border-pink-500/30 text-pink-200",
+                            GRAPHIC: "from-blue-950 via-slate-900 to-cyan-950 border-blue-500/30 text-blue-200",
+                            POST: "from-slate-900 via-zinc-900 to-neutral-950 border-slate-700 text-slate-200",
+                          };
+                          const gradientClass = formatGradients[p.format || p.contentType || "POST"] || formatGradients.POST;
+
+                          return (
+                            <div
+                              key={p.id || i}
+                              onClick={() => {
+                                setSelectedPostId(p.id);
+                              }}
+                              className={cn(
+                                "relative aspect-square rounded-lg overflow-hidden cursor-pointer group border transition-all duration-150 flex flex-col",
+                                p.id === activePost.id
+                                  ? "ring-2 ring-primary ring-offset-2 ring-offset-background border-primary z-10 shadow-lg scale-[1.02]"
+                                  : "border-border/60 hover:opacity-95 hover:border-primary/50"
+                              )}
+                            >
+                              {mediaUrl ? (
+                                parsed.type === "gdrive" ? (
+                                  <div className="relative w-full h-full bg-slate-950">
+                                    <img
+                                      src={parsed.previewUrl.replace("/preview", "/thumbnail?sz=w600")}
+                                      alt={p.title || "Post"}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        (e.target as HTMLElement).style.display = "none";
+                                      }}
+                                    />
+                                    {isReel && (
+                                      <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
+                                        <Film className="h-3 w-3" />
+                                      </div>
+                                    )}
+                                    {isCarousel && (
+                                      <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
+                                        <Layers className="h-3 w-3" />
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : parsed.type === "video" || isReel || mediaUrl.match(/\.(mp4|mov|webm|m4v)/i) ? (
+                                  <div className="relative w-full h-full bg-slate-950">
+                                    <video
+                                      src={parsed.streamUrl || mediaUrl}
+                                      className="w-full h-full object-cover pointer-events-none"
+                                      preload="metadata"
+                                      muted
+                                      playsInline
+                                    />
+                                    <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
+                                      <Film className="h-3 w-3" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="relative w-full h-full bg-slate-950">
+                                    <img
+                                      src={mediaUrl}
+                                      alt={p.title || "Post"}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        (e.target as HTMLElement).style.display = "none";
+                                      }}
+                                    />
+                                    {isCarousel && (
+                                      <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
+                                        <Layers className="h-3 w-3" />
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              ) : (
+                                /* Creative Aesthetic Placeholder Tile when no final media is uploaded yet */
+                                <div className={cn("w-full h-full bg-gradient-to-br flex flex-col justify-between p-2 select-none", gradientClass)}>
+                                  <div className="flex items-center justify-between text-[9px] font-bold">
+                                    <span className="flex items-center gap-1 opacity-80 uppercase text-[8px] tracking-wider">
+                                      {isReel ? <Film className="h-2.5 w-2.5" /> : isCarousel ? <Layers className="h-2.5 w-2.5" /> : <Camera className="h-2.5 w-2.5" />}
+                                      {p.format || p.contentType || "POST"}
+                                    </span>
+                                    {p.scheduledAt && (
+                                      <span className="text-[8px] bg-white/10 px-1 py-0.5 rounded opacity-90 font-mono">
+                                        {format(new Date(p.scheduledAt), "dd MMM")}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="text-center my-auto px-0.5">
+                                    <p className="font-bold text-[11px] leading-tight text-white line-clamp-2">
+                                      {p.title || `Post #${i + 1}`}
+                                    </p>
+                                    {p.conceptHook && (
+                                      <p className="text-[8px] text-white/70 line-clamp-1 mt-0.5 italic">
+                                        "{p.conceptHook}"
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center justify-between text-[8px] pt-1 border-t border-white/10">
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[8px] px-1 py-0 h-4 border-0 font-semibold",
+                                        p.status === "ADMIN_APPROVED" || p.status === "SCHEDULED"
+                                          ? "bg-emerald-500/20 text-emerald-300"
+                                          : p.status === "IN_REVIEW"
+                                          ? "bg-amber-500/20 text-amber-300"
+                                          : "bg-white/10 text-white/70"
+                                      )}
+                                    >
+                                      {p.status || "IDEA"}
+                                    </Badge>
+                                    <span className="text-[8px] text-white/50 group-hover:text-primary transition-colors flex items-center gap-0.5 font-medium">
+                                      <Upload className="h-2.5 w-2.5" /> Cut
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Hover Overlay with Quick Actions */}
+                              <div className="absolute inset-0 bg-black/75 backdrop-blur-xs opacity-0 group-hover:opacity-100 flex flex-col justify-between p-2 text-white transition-opacity">
+                                <div className="flex items-center justify-between text-[9px]">
+                                  <span className="font-bold uppercase tracking-wider text-primary-foreground bg-primary px-1 py-0.5 rounded text-[8px]">
+                                    {p.format || "Post"}
+                                  </span>
+                                  <span className="text-white/70 text-[8px]">
+                                    {p.scheduledAt ? format(new Date(p.scheduledAt), "MMM dd") : ""}
+                                  </span>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-[10px] font-bold leading-tight line-clamp-2">{p.title || "Post"}</p>
+                                </div>
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedPostId(p.id);
+                                      setCenterMode("PLAYER");
+                                    }}
+                                    className="h-6 text-[9px] px-2 py-0 gap-1 bg-white/20 hover:bg-white/30 text-white border-0"
+                                  >
+                                    <Play className="h-2.5 w-2.5" /> Open
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedPostId(p.id);
+                                      fileInputRef.current?.click();
+                                    }}
+                                    className="h-6 text-[9px] px-2 py-0 gap-1 bg-primary/20 hover:bg-primary/30 text-primary border-primary/30"
+                                  >
+                                    <Upload className="h-2.5 w-2.5" /> Cut
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()
             )}
           </div>
         </main>
