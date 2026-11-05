@@ -61,11 +61,13 @@ export default function NotificationsPage() {
   const currentUser = getUser();
   const canBroadcastAnnouncement = canManageModule(currentUser, "team");
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = async (isBackground = false) => {
     const token = getToken();
     if (!token) return;
 
-    setLoading(true);
+    if (!isBackground && notifications.length === 0) {
+      setLoading(true);
+    }
     try {
       const params = new URLSearchParams();
       if (activeTab !== "ALL") params.append("type", activeTab);
@@ -85,7 +87,9 @@ export default function NotificationsPage() {
       setNotifications(data.notifications || []);
       setUnreadCount(data.unreadCount || 0);
     } catch (err: any) {
-      toast.error(err.message || "Failed to fetch notifications");
+      if (!isBackground) {
+        toast.error(err.message || "Failed to fetch notifications");
+      }
     } finally {
       setLoading(false);
     }
@@ -93,9 +97,16 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 4000);
+    const interval = setInterval(() => fetchNotifications(true), 12000);
 
-    const handleUpdatedEvent = () => fetchNotifications();
+    const handleUpdatedEvent = (e: any) => {
+      if (e?.detail?.notifications && activeTab === "ALL" && priorityFilter === "ALL" && !unreadOnly && !searchQuery) {
+        setNotifications(e.detail.notifications);
+        setUnreadCount(e.detail.unreadCount || 0);
+      } else {
+        fetchNotifications(true);
+      }
+    };
     window.addEventListener("agency_notifications_updated", handleUpdatedEvent);
 
     return () => {

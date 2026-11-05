@@ -124,7 +124,7 @@ export function NotificationsPopover() {
 
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 3500); // Fast 3.5s polling for snappy updates
+    const interval = setInterval(fetchNotifications, 12000); // 12s polling for background updates
 
     const handleRefreshEvent = () => fetchNotifications();
     window.addEventListener("agency_notifications_refresh", handleRefreshEvent);

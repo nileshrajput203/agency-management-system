@@ -98,18 +98,14 @@ export default function MeetingsPage() {
 
   useEffect(() => {
     fetchMeetings();
-    const interval = setInterval(fetchMeetings, 3500);
+    const interval = setInterval(fetchMeetings, 15000);
 
     const handleRefresh = () => fetchMeetings();
     window.addEventListener("agency_meetings_updated", handleRefresh);
-    window.addEventListener("agency_notifications_updated", handleRefresh);
-    window.addEventListener("agency_notifications_refresh", handleRefresh);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("agency_meetings_updated", handleRefresh);
-      window.removeEventListener("agency_notifications_updated", handleRefresh);
-      window.removeEventListener("agency_notifications_refresh", handleRefresh);
     };
   }, []);
 
