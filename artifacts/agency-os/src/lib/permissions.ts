@@ -81,8 +81,19 @@ export function isManagerOrAdminRole(user: any): boolean {
     "HR",
     "DIRECTOR",
     "LEAD",
+    "PRODUCTION_COORDINATOR",
+    "PROJECT_COORDINATOR",
+    "COORDINATOR",
+    "PC",
+    "CREATIVE_DIRECTOR",
+    "CONTENT_LEAD",
+    "HEAD_OF_CONTENT",
+    "OPERATIONS",
+    "FOUNDER",
+    "CEO",
+    "COO",
   ];
-  return managerOrAdminRoles.includes(role);
+  return managerOrAdminRoles.some((r) => role.includes(r));
 }
 
 export function canManageModule(user: any, module: string): boolean {

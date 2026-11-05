@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "crypto";
 import { db } from "@workspace/db";
 import {
   contentPostsTable,
@@ -36,10 +37,21 @@ export function isManagerOrAdmin(
     "HR",
     "DIRECTOR",
     "LEAD",
+    "PRODUCTION_COORDINATOR",
+    "PROJECT_COORDINATOR",
+    "COORDINATOR",
+    "PC",
+    "CREATIVE_DIRECTOR",
+    "CONTENT_LEAD",
+    "HEAD_OF_CONTENT",
+    "OPERATIONS",
+    "FOUNDER",
+    "CEO",
+    "COO",
   ];
 
   return (
-    managerOrAdminRoles.includes(normalizedSystem) ||
+    managerOrAdminRoles.some((r) => normalizedSystem.includes(r)) ||
     normalizedRole === "ADMIN" ||
     normalizedRole === "MANAGER"
   );
@@ -477,7 +489,7 @@ router.post("/:id/handoff", requirePermission("content.edit"), asyncHandler(asyn
 }));
 
 // ─── POST /api/content/ai-script-generate ─────────────────────
-router.post("/ai-script-generate", requirePermission("content.create"), asyncHandler(async (req, res) => {
+router.post("/ai-script-generate", requirePermission("content.view"), asyncHandler(async (req, res) => {
   const { topic, clientName, platform, format, referenceNotes } = req.body || {};
 
   const cleanTopic = topic || "Growth strategies for modern brands";
