@@ -302,6 +302,8 @@ router.post("/batch-approve", requirePermission("content.edit"), asyncHandler(as
       internalApprovedAt: new Date(),
       approvedBy: userId,
       approvedAt: new Date(),
+      needsRevision: "false",
+      rejectionNote: null,
     })
     .where(inArray(contentPostsTable.id, ids))
     .returning();
@@ -893,7 +895,8 @@ router.post("/:id/internal-approve", requirePermission("content.edit"), asyncHan
       internalApprovedAt: new Date(),
       status: "IN_REVIEW", // Ready for Client Approval
       approvalStatus: "PENDING", // Client approval pending
-      needsRevision: false,
+      needsRevision: "false",
+      rejectionNote: null,
     } as any)
     .where(eq(contentPostsTable.id, contentId))
     .returning();
@@ -932,6 +935,8 @@ router.post("/:id/client-approve", requirePermission("content.edit"), asyncHandl
       approvedBy: userId,
       approvedAt: new Date(),
       status: "ADMIN_APPROVED", // Final approved state, ready to schedule / publish
+      needsRevision: "false",
+      rejectionNote: null,
     } as any)
     .where(eq(contentPostsTable.id, contentId))
     .returning();

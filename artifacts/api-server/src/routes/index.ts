@@ -50,6 +50,7 @@ router.use("/leads", leadContactsRouter);
 router.use("/projects", projectsRouter);
 router.use("/tasks", tasksRouter);
 router.use("/content-posts", contentRouter);
+router.use("/content", contentRouter);
 router.use("/invoices", invoicesRouter);
 router.use("/quotations", quotationsRouter);
 router.use("/proposals", proposalsRouter);

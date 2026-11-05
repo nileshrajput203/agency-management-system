@@ -40,3 +40,4 @@ describe("Attendance Timezone & RBAC Verification", () => {
     expect(isManagerOrAdmin("", false, "")).toBe(false);
   });
 });
+

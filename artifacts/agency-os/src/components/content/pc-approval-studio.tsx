@@ -326,7 +326,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
       });
-      if (!res.ok) throw new Error("Internal approval failed");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || "Internal approval failed");
+      }
       toast.success("✓ Internally approved by Manager! Ready for client review.");
       onRefresh();
     } catch (err: any) {
@@ -349,7 +352,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
       });
-      if (!res.ok) throw new Error("Client approval failed");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || "Client approval failed");
+      }
       toast.success("🎉 Client approval confirmed! Post is scheduled.");
       onRefresh();
     } catch (err: any) {
@@ -539,7 +545,10 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
         body: JSON.stringify({ ids: selectedIds }),
       });
-      if (!res.ok) throw new Error("Batch approval failed");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || "Batch approval failed");
+      }
       toast.success(`Approved ${selectedIds.length} post(s) successfully!`);
       setSelectedIds([]);
       onRefresh();
