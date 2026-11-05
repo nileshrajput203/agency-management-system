@@ -22,6 +22,14 @@ export async function processAutomaticAbsentMarking(targetDateStr?: string) {
   const today = getTodayDateStr();
   const targetDate = targetDateStr || today;
 
+  if (targetDateStr && !/^\d{4}-\d{2}-\d{2}$/.test(targetDateStr)) {
+    return {
+      skipped: true,
+      reason: `Invalid target date format: ${targetDateStr}. Expected YYYY-MM-DD.`,
+      date: targetDate,
+    };
+  }
+
   const settings = await db.query.agencySettings.findFirst({
     where: eq(agencySettings.id, "default"),
   });
