@@ -42,6 +42,74 @@ interface Props {
   onOpenEdit: (post: PostRecord) => void;
 }
 
+export function parseMediaUrl(url?: string | null): {
+  type: "video" | "image" | "gdrive" | "iframe" | "unknown";
+  streamUrl: string;
+  previewUrl: string;
+  rawUrl: string;
+} {
+  if (!url) return { type: "unknown", streamUrl: "", previewUrl: "", rawUrl: "" };
+  const clean = url.trim();
+
+  // Google Drive
+  const gdriveMatch = clean.match(/(?:drive\.google\.com\/(?:file\/d\/|open\?id=)|docs\.google\.com\/file\/d\/)([a-zA-Z0-9_-]+)/);
+  if (gdriveMatch) {
+    const fileId = gdriveMatch[1];
+    return {
+      type: "gdrive",
+      streamUrl: `https://drive.google.com/uc?export=download&id=${fileId}`,
+      previewUrl: `https://drive.google.com/file/d/${fileId}/preview`,
+      rawUrl: clean,
+    };
+  }
+
+  // Dropbox direct streaming
+  if (clean.includes("dropbox.com")) {
+    const directUrl = clean.replace(/(\?|&)dl=[01]/, "$1raw=1").replace(/\?raw=1&/, "?").replace(/\?$/, "");
+    const finalStream = directUrl.includes("raw=1") ? directUrl : `${directUrl}${directUrl.includes("?") ? "&" : "?"}raw=1`;
+    return {
+      type: "video",
+      streamUrl: finalStream,
+      previewUrl: finalStream,
+      rawUrl: clean,
+    };
+  }
+
+  // YouTube embed
+  const ytMatch = clean.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+  if (ytMatch) {
+    return {
+      type: "iframe",
+      streamUrl: `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1`,
+      previewUrl: `https://www.youtube.com/embed/${ytMatch[1]}`,
+      rawUrl: clean,
+    };
+  }
+
+  // Vimeo embed
+  const vimeoMatch = clean.match(/vimeo\.com\/(?:video\/)?([0-9]+)/);
+  if (vimeoMatch) {
+    return {
+      type: "iframe",
+      streamUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}`,
+      previewUrl: `https://player.vimeo.com/video/${vimeoMatch[1]}`,
+      rawUrl: clean,
+    };
+  }
+
+  const isVideoExt = /\.(mp4|mov|webm|m4v)(\?.*)?$/i.test(clean);
+  const isImageExt = /\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i.test(clean);
+
+  if (isVideoExt) {
+    return { type: "video", streamUrl: clean, previewUrl: clean, rawUrl: clean };
+  }
+  if (isImageExt) {
+    return { type: "image", streamUrl: clean, previewUrl: clean, rawUrl: clean };
+  }
+
+  return { type: "unknown", streamUrl: clean, previewUrl: clean, rawUrl: clean };
+}
+
 export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpenEdit }: Props) {
   const { user } = useAuth();
   const isManagerOrAdmin = isManagerOrAdminRole(user);
@@ -783,7 +851,8 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
 
   // Media determination
   const primaryMediaUrl = activePost?.assetsLink || (activePost?.mediaFiles && activePost.mediaFiles[0]) || "";
-  const isVideo = primaryMediaUrl.endsWith(".mp4") || primaryMediaUrl.endsWith(".webm") || primaryMediaUrl.endsWith(".mov") || activePost?.format === "REEL" || activePost?.contentType === "REEL" || activePost?.contentType === "VIDEO";
+  const parsedMedia = parseMediaUrl(primaryMediaUrl);
+  const isVideo = parsedMedia.type === "video" || parsedMedia.type === "gdrive" || parsedMedia.type === "iframe" || primaryMediaUrl.endsWith(".mp4") || primaryMediaUrl.endsWith(".webm") || primaryMediaUrl.endsWith(".mov") || activePost?.format === "REEL" || activePost?.contentType === "REEL" || activePost?.contentType === "VIDEO";
   const carouselSlides = activePost?.mediaFiles && activePost.mediaFiles.length > 0 ? activePost.mediaFiles : primaryMediaUrl ? [primaryMediaUrl] : [];
 
   // Pipeline stage index (0 to 4)
@@ -1220,18 +1289,27 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                       onClick={handleFrameClick}
                       className="relative bg-black rounded-2xl overflow-hidden shadow-2xl aspect-[9/16] max-h-[480px] w-auto cursor-crosshair group border border-border/40 select-none"
                     >
-                      <video
-                        ref={videoRef}
-                        src={primaryMediaUrl}
-                        onTimeUpdate={() => {
-                          if (videoRef.current) {
-                            setCurrentTime(videoRef.current.currentTime);
-                            setDuration(videoRef.current.duration || 0);
-                          }
-                        }}
-                        onEnded={() => setIsPlaying(false)}
-                        className="h-full w-full object-contain"
-                      />
+                      {parsedMedia.type === "gdrive" || parsedMedia.type === "iframe" ? (
+                        <iframe
+                          src={parsedMedia.previewUrl}
+                          className="h-full w-full object-contain border-0"
+                          allow="autoplay; encrypted-media; picture-in-picture"
+                          allowFullScreen
+                        />
+                      ) : (
+                        <video
+                          ref={videoRef}
+                          src={parsedMedia.streamUrl || primaryMediaUrl}
+                          onTimeUpdate={() => {
+                            if (videoRef.current) {
+                              setCurrentTime(videoRef.current.currentTime);
+                              setDuration(videoRef.current.duration || 0);
+                            }
+                          }}
+                          onEnded={() => setIsPlaying(false)}
+                          className="h-full w-full object-contain"
+                        />
+                      )}
 
                       {/* Optional Instagram Reels Safe Zone Overlay */}
                       {showSafeZoneOverlay && (

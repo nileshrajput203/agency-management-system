@@ -103,8 +103,8 @@ router.post("/", requirePermission("attachments.upload"), upload.single("file"),
   const filename = req.file.filename;
   const url = `/api/uploads/${filename}`;
 
-  // Persist file in database for serverless durability (under 15MB)
-  if (req.file.size <= 15 * 1024 * 1024) {
+  // Persist small files (avatars, thumbnails, receipts <= 2MB) in DB for serverless durability without exhausting DB capacity
+  if (req.file.size <= 2 * 1024 * 1024) {
     try {
       const buffer = fs.readFileSync(req.file.path);
       const base64Data = buffer.toString("base64");
