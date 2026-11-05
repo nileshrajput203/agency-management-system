@@ -38,6 +38,7 @@ export default defineConfig({
       "drizzle-orm": path.resolve(__dirname, "./lib/db/node_modules/drizzle-orm"),
       "react": path.resolve(__dirname, "./artifacts/agency-os/node_modules/react"),
       "react-dom": path.resolve(__dirname, "./artifacts/agency-os/node_modules/react-dom"),
+      "@testing-library/react": path.resolve(__dirname, "./tests/frontend/testing-library-shim.tsx"),
       "@workspace/db/schema": path.resolve(__dirname, "./lib/db/src/schema"),
       "@workspace/db": path.resolve(__dirname, "./lib/db/src"),
       "@workspace/api-zod": path.resolve(__dirname, "./lib/api-zod/src"),

@@ -8,6 +8,7 @@ import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
 import {
   requirePermission,
+  isManagerRole,
   canManageTaskWorkspace,
   canManageProjectWorkspace,
 } from "../middleware/auth";
@@ -112,8 +113,11 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
       desc(tasksTable.createdAt)
     );
   const hiddenIds = await getHiddenEntityIds(requesterId, "tasks");
-  const canViewProjects = requesterSystemRole === "SUPER_ADMIN" ||
-    (req as any).userConfiguredModules.includes("projects");
+  const canViewProjects =
+    isManagerRole(requesterSystemRole) ||
+    requesterSystemRole === "SUPER_ADMIN" ||
+    Boolean((req as any).userIsDelegatedAdmin) ||
+    ((req as any).userConfiguredModules || []).includes("projects");
   const scopedRows = canViewProjects
     ? rows
     : rows.map((row) => ({ ...row, projectId: null, projectName: null }));
@@ -256,8 +260,11 @@ router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res
     throw createError("Forbidden: You can only view tasks assigned to you", 403);
   }
 
-  const canViewProjects = requesterSystemRole === "SUPER_ADMIN" ||
-    (req as any).userConfiguredModules.includes("projects");
+  const canViewProjects =
+    isManagerRole(requesterSystemRole) ||
+    requesterSystemRole === "SUPER_ADMIN" ||
+    Boolean((req as any).userIsDelegatedAdmin) ||
+    ((req as any).userConfiguredModules || []).includes("projects");
   return res.json(canViewProjects ? row : { ...row, projectId: null, projectName: null });
 }));
 

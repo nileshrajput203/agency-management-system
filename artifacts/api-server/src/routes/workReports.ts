@@ -15,7 +15,7 @@ import {
 import { eq, desc, and, or, inArray, gte, lte, sql } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
-import { requirePermission } from "../middleware/auth";
+import { requirePermission, isManagerRole } from "../middleware/auth";
 import { parseConfiguredModules } from "../middleware/moduleAccess";
 
 const router = Router();
@@ -51,7 +51,10 @@ router.use(asyncHandler(async (req: any, _res, next) => {
 // Reports module. Empty module selections keep the standard personal view.
 function isManagerOrAdmin(user: any): boolean {
   if (!user) return false;
-  return user.systemRole === "SUPER_ADMIN" ||
+  return isManagerRole(user.systemRole) ||
+    isManagerRole(user.role) ||
+    Boolean(user.isDelegatedAdmin) ||
+    user.systemRole === "SUPER_ADMIN" ||
     parseConfiguredModules(user.allowedModules).includes("reports");
 }
 
@@ -183,6 +186,7 @@ async function notifyManagers({
       })
       .from(usersTable);
     const managers = recipients.filter((recipient) =>
+      isManagerRole(recipient.systemRole) ||
       recipient.systemRole === "SUPER_ADMIN" ||
       parseConfiguredModules(recipient.allowedModules).includes("reports")
     );

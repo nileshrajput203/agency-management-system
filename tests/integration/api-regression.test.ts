@@ -1,10 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 import app from "../../artifacts/api-server/src/app";
-import { signToken } from "../../artifacts/api-server/src/lib/jwt";
+import { getTestAdmin } from "../test-helper";
 
 describe("API Regression & Versioning Integration Tests (/api vs /api/v1)", () => {
-  const adminToken = signToken("9df7d339-addb-4f1f-9e72-ee9b29d21ada");
+  let adminToken: string;
+
+  beforeAll(async () => {
+    const admin = await getTestAdmin();
+    adminToken = admin.token;
+  });
 
   const endpointsToTest = [
     "/health",

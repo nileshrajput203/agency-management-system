@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/App";
+import { isManagerOrAdminRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import {
   FileText,
@@ -123,8 +124,7 @@ export function WorkReportManager() {
   });
 
   // Role helper
-  const role = String(user?.role || user?.systemRole || "").toUpperCase();
-  const isManagerOrAdmin = ["ADMIN", "SUPER_ADMIN", "MANAGER", "DIRECTOR", "LEAD"].includes(role);
+  const isManagerOrAdmin = isManagerOrAdminRole(user);
 
   // Stats calculation
   const totalReports = reports.length;

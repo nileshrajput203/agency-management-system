@@ -4,7 +4,7 @@ import { usersTable, attendance, holidaysTable, leaveRequests, agencySettings } 
 import { eq, and, sql, gte, lte } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
-import { requirePermission } from "../middleware/auth";
+import { requirePermission, isManagerRole } from "../middleware/auth";
 
 const router = Router();
 
@@ -42,6 +42,22 @@ router.get("/summary", requirePermission("users.view"), asyncHandler(async (req,
 
   const { totalDays, workingDays } = await getWorkingDaysInMonth(year, monthIndex);
 
+  const requesterId = (req as any).userId;
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+  const isManager =
+    isManagerRole(requesterSystemRole) ||
+    isManagerRole(requesterRole) ||
+    isDelegatedAdmin ||
+    requesterSystemRole === "SUPER_ADMIN" ||
+    ((req as any).userConfiguredModules || []).includes("finance");
+
+  const employeeFilters = [eq(usersTable.isActive, true)];
+  if (!isManager) {
+    employeeFilters.push(eq(usersTable.id, requesterId));
+  }
+
   const activeEmployees = await db
     .select({
       id: usersTable.id,
@@ -57,7 +73,7 @@ router.get("/summary", requirePermission("users.view"), asyncHandler(async (req,
       panNumber: usersTable.panNumber,
     })
     .from(usersTable)
-    .where(eq(usersTable.isActive, true));
+    .where(and(...employeeFilters));
 
   const startDateStr = `${targetMonth}-01`;
   const endDateStr = `${targetMonth}-${String(totalDays).padStart(2, "0")}`;
@@ -149,6 +165,21 @@ router.get("/summary", requirePermission("users.view"), asyncHandler(async (req,
 // GET /api/payroll/:userId/payslip-pdf?month=YYYY-MM — printable salary slip view
 router.get("/:userId/payslip-pdf", requirePermission("users.view"), asyncHandler(async (req, res) => {
   const userId = req.params.userId as string;
+  const requesterId = (req as any).userId;
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+  const isManager =
+    isManagerRole(requesterSystemRole) ||
+    isManagerRole(requesterRole) ||
+    isDelegatedAdmin ||
+    requesterSystemRole === "SUPER_ADMIN" ||
+    ((req as any).userConfiguredModules || []).includes("finance");
+
+  if (!isManager && userId !== requesterId) {
+    throw createError("Forbidden: You can only view your own payslip", 403);
+  }
+
   const targetMonth = (req.query.month as string) || new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date()).slice(0, 7);
   const [yearStr, monthStr] = targetMonth.split("-");
   const year = parseInt(yearStr, 10);

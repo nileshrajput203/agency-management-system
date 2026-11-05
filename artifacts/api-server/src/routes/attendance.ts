@@ -13,6 +13,11 @@ function getTodayDateStr(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 }
 
+export function parseAgencyDateTime(dateStr: string, timeStr: string): Date {
+  const [hh, mm] = (timeStr || "00:00").split(":").map((v) => (v || "00").padStart(2, "0"));
+  return new Date(`${dateStr}T${hh}:${mm}:00+05:30`);
+}
+
 export async function processAutomaticAbsentMarking(targetDateStr?: string) {
   const today = getTodayDateStr();
   const targetDate = targetDateStr || today;
@@ -27,22 +32,21 @@ export async function processAutomaticAbsentMarking(targetDateStr?: string) {
 
   if (targetDate === today) {
     const now = new Date();
-    const [cutoffHour, cutoffMin] = absentCutoffTime.split(":").map(Number);
-    const cutoffDate = new Date();
-    cutoffDate.setHours(cutoffHour, cutoffMin, 0, 0);
+    const cutoffDate = parseAgencyDateTime(targetDate, absentCutoffTime);
 
     if (now < cutoffDate) {
+      const istTimeStr = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", timeStyle: "short" }).format(now);
       return {
         skipped: true,
-        reason: `Attendance cutoff time (${absentCutoffTime}) for today has not passed yet. Current time is ${now.toTimeString().slice(0, 5)}.`,
+        reason: `Attendance cutoff time (${absentCutoffTime} IST) for today has not passed yet. Current time is ${istTimeStr} IST.`,
         date: targetDate,
       };
     }
   }
 
-  const [y, m, d] = targetDate.split("-").map(Number);
-  const dateObj = new Date(y, m - 1, d);
-  const dayOfWeek = dateObj.getDay();
+  // Determine day of week in India timezone
+  const middayIST = new Date(`${targetDate}T12:00:00+05:30`);
+  const dayOfWeek = middayIST.getUTCDay();
 
   if (!validWorkingDays.includes(dayOfWeek)) {
     return {
@@ -231,13 +235,9 @@ router.post("/attendance/check-in", requirePermission("attendance.view"), asyncH
   const halfDayCutoffTime = settings?.halfDayCutoffTime || "12:00";
 
   const now = new Date();
-  const [startHour, startMin] = workDayStart.split(":").map(Number);
-  const graceCutoff = new Date();
-  graceCutoff.setHours(startHour, startMin + gracePeriodMin, 0, 0);
-
-  const [halfHour, halfMin] = halfDayCutoffTime.split(":").map(Number);
-  const halfDayCutoff = new Date();
-  halfDayCutoff.setHours(halfHour, halfMin, 0, 0);
+  const baseStart = parseAgencyDateTime(today, workDayStart);
+  const graceCutoff = new Date(baseStart.getTime() + (gracePeriodMin * 60000));
+  const halfDayCutoff = parseAgencyDateTime(today, halfDayCutoffTime);
 
   let status = "PRESENT";
   let isLate = false;
@@ -289,7 +289,7 @@ router.post("/attendance/check-in", requirePermission("attendance.view"), asyncH
   .onConflictDoUpdate({
     target: [attendance.userId, attendance.date],
     set: {
-      checkInAt: now,
+      checkInAt: sql`COALESCE(${attendance.checkInAt}, ${now})`,
       status,
       isLate,
       workMode,
@@ -337,10 +337,8 @@ router.post("/attendance/check-out", requirePermission("attendance.view"), async
     where: eq(agencySettings.id, "default"),
   });
   const workDayEnd = settings?.workDayEnd || "18:00";
-  const [endHour, endMin] = workDayEnd.split(":").map(Number);
   const now = new Date();
-  const workEnd = new Date();
-  workEnd.setHours(endHour || 18, endMin || 0, 0, 0);
+  const workEnd = parseAgencyDateTime(today, workDayEnd);
   const overtimeMin = Math.max(0, Math.floor((now.getTime() - workEnd.getTime()) / 60000));
 
   let totalBreakMin = existing.breakDurationMin || 0;

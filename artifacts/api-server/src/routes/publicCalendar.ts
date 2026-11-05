@@ -161,6 +161,7 @@ router.post(["/calendar/:shareToken/approve/:postId", "/content/:shareToken/appr
     const [updatedPost] = await db
       .update(contentPostsTable)
       .set({
+        status: "ADMIN_APPROVED",
         approvalStatus: "APPROVED",
         approvedAt: new Date(),
         rejectionNote: null,

@@ -11,7 +11,7 @@ import {
 } from "@workspace/db/schema";
 import { and, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
-import { requirePermission } from "../middleware/auth";
+import { requirePermission, isManagerRole } from "../middleware/auth";
 import { createError } from "../middleware/errorHandler";
 
 const router = Router();
@@ -183,10 +183,18 @@ router.get("/monthly", requirePermission("reports.view"), asyncHandler(async (re
   const nextMonth = `${end.getUTCFullYear()}-${String(end.getUTCMonth() + 1).padStart(2, "0")}-01`;
   const monthLastDay = new Date(end.getTime() - 1).toISOString().slice(0, 10);
   const configuredModules: string[] = (req as any).userConfiguredModules ?? [];
+  const requesterSystemRole = (req as any).userSystemRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
   const canViewAllReports =
-    (req as any).userSystemRole === "SUPER_ADMIN" || configuredModules.includes("reports");
+    isManagerRole(requesterSystemRole) ||
+    requesterSystemRole === "SUPER_ADMIN" ||
+    isDelegatedAdmin ||
+    configuredModules.includes("reports");
   const canViewProjects =
-    (req as any).userSystemRole === "SUPER_ADMIN" || configuredModules.includes("projects");
+    isManagerRole(requesterSystemRole) ||
+    requesterSystemRole === "SUPER_ADMIN" ||
+    isDelegatedAdmin ||
+    configuredModules.includes("projects");
   const employeeFilters = [or(eq(usersTable.isActive, true), isNull(usersTable.isActive))!];
   if (!canViewAllReports) employeeFilters.push(eq(usersTable.id, (req as any).userId));
   const employeeRows = await db.select({
