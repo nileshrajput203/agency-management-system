@@ -313,7 +313,7 @@ export function ContentPostDrawer({
             }
 
             return (
-              <div className="rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 p-3.5 flex items-center justify-between gap-3 text-xs">
+              <div className="rounded-xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 p-3.5 flex items-center justify-between flex-wrap gap-3 text-xs">
                 <div className="flex items-center gap-2.5">
                   <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0" />
                   <div>
@@ -323,9 +323,39 @@ export function ContentPostDrawer({
                     </p>
                   </div>
                 </div>
-                <Badge variant="outline" className="border-blue-300 text-blue-700 dark:text-blue-300 bg-blue-100/50 shrink-0 text-[10px]">
-                  IN REVIEW
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="border-blue-300 text-blue-700 dark:text-blue-300 bg-blue-100/50 shrink-0 text-[10px]">
+                    IN REVIEW
+                  </Badge>
+                  {isManagerOrAdmin && (
+                    <Button
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs gap-1.5 shadow-xs shrink-0"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`/api/content/${activePost.id}/client-approve`, {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}`,
+                            },
+                          });
+                          if (!res.ok) {
+                            const errData = await res.json().catch(() => ({}));
+                            throw new Error(errData.error || errData.message || "Approval failed");
+                          }
+                          toast.success("Client approval confirmed by manager!");
+                          savePost({ status: "ADMIN_APPROVED", approvalStatus: "APPROVED", needsRevision: false });
+                          setPanel({ mode: "closed" });
+                        } catch (err: any) {
+                          toast.error(err.message || "Failed to confirm client approval");
+                        }
+                      }}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Approve as Client
+                    </Button>
+                  )}
+                </div>
               </div>
             );
           })()}

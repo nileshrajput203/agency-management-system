@@ -2189,7 +2189,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                 </div>
 
                 {/* Step 2: Client Approval */}
-                <div className={cn("p-2.5 rounded-lg border bg-card space-y-1.5", activePost.internalApprovalStatus !== "APPROVED" && "opacity-60")}>
+                <div className={cn("p-2.5 rounded-lg border bg-card space-y-1.5")}>
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold flex items-center gap-1.5">
                       <span className="h-4 w-4 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center text-[10px] font-bold">2</span>
@@ -2200,44 +2200,47 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                         ✓ Client Approved
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px]">
-                        {activePost.internalApprovalStatus === "APPROVED" ? "Awaiting Client" : "Locked"}
+                      <Badge variant="outline" className="text-[10px] text-blue-600 bg-blue-500/10 border-blue-500/30 font-medium">
+                        {activePost.internalApprovalStatus === "APPROVED" ? "Awaiting Client" : "Manager Approval Ready"}
                       </Badge>
                     )}
                   </div>
 
-                  {activePost.internalApprovalStatus !== "APPROVED" ? (
-                    <p className="text-[10px] text-muted-foreground italic">
-                      ⚠️ Complete Step 1 (Manager Approval) first before client approval.
-                    </p>
-                  ) : activePost.approvalStatus === "APPROVED" ? (
+                  {activePost.approvalStatus === "APPROVED" ? (
                     <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                       <span>Client confirmed. Post scheduled.</span>
                     </p>
                   ) : !isManagerOrAdmin ? (
                     <div className="p-2 rounded bg-muted text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
-                      <span>🔒 Client approval and link sharing are managed by managers and admins.</span>
+                      <span>🔒 Content approval can only be done by a manager or administrator.</span>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleApproveAndShare}
-                        disabled={isSubmitting}
-                        className="h-8 text-[11px] font-semibold border-primary/30 text-primary hover:bg-primary/5"
-                      >
-                        <Share2 className="h-3 w-3 mr-1" /> Copy Client Link
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleClientApprove}
-                        disabled={isSubmitting}
-                        className="h-8 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white"
-                      >
-                        <Check className="h-3 w-3 mr-1" /> Client Approved
-                      </Button>
+                    <div className="space-y-1.5 pt-0.5">
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleApproveAndShare}
+                          disabled={isSubmitting}
+                          className="h-8 text-[11px] font-semibold border-primary/30 text-primary hover:bg-primary/5"
+                        >
+                          <Share2 className="h-3 w-3 mr-1" /> Copy Client Link
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleClientApprove}
+                          disabled={isSubmitting}
+                          className="h-8 text-[11px] font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs"
+                        >
+                          <Check className="h-3 w-3 mr-1" /> Approve as Client
+                        </Button>
+                      </div>
+                      {activePost.internalApprovalStatus !== "APPROVED" && (
+                        <p className="text-[10px] text-muted-foreground italic">
+                          💡 Tip: Clicking 'Approve as Client' confirms both manager & client approval in one step.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>

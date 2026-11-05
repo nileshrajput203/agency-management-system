@@ -7,7 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/App";
-import { canManageModule } from "@/lib/permissions";
+import { canManageModule, isManagerOrAdminRole, isSuperAdminRole } from "@/lib/permissions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,10 +52,47 @@ async function copyShareLink(url: string) {
 export default function ContentPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+
+  const isManagerOrAdmin = Boolean(
+    isManagerOrAdminRole(user) ||
+    user?.isDelegatedAdmin ||
+    isSuperAdminRole(user?.systemRole ?? user?.role)
+  );
+
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [activeClientId, setActiveClientId] = useState<string>("");
   const [shareClientId, setShareClientId] = useState("");
-  const [view, setView] = useState<"studio" | "list" | "calendar">("studio");
+  const [view, setView] = useState<"studio" | "list" | "calendar">(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("agencyos_content_view");
+      if (saved === "list" || saved === "calendar") return saved;
+      if (saved === "studio" && isManagerOrAdmin) return "studio";
+    }
+    return isManagerOrAdmin ? "studio" : "calendar";
+  });
+
+  // Strict rule: Employees with content calendar access CANNOT access Studio; only Calendar and List
+  useEffect(() => {
+    if (!user) return;
+    if (!isManagerOrAdmin && view === "studio") {
+      setView("calendar");
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("agencyos_content_view", "calendar");
+      }
+    }
+  }, [isManagerOrAdmin, view, user]);
+
+  const handleSetView = (newView: "studio" | "list" | "calendar") => {
+    if (newView === "studio" && !isManagerOrAdmin) {
+      toast.error("Studio and content approvals are restricted to managers and administrators.");
+      return;
+    }
+    setView(newView);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("agencyos_content_view", newView);
+    }
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const [panel, setPanel] = useState<PanelState>({ mode: "closed" });
   const [draft, setDraft] = useState(emptyDraft());
@@ -352,9 +389,9 @@ export default function ContentPage() {
   ];
 
   return (
-    <div className={cn("animated-fade-in", view === "studio" ? "p-2 sm:p-3 space-y-2 h-[calc(100vh-68px)] flex flex-col" : "p-6 space-y-6")}>
+    <div className={cn("animated-fade-in", (view === "studio" && isManagerOrAdmin) ? "p-2 sm:p-3 space-y-2 h-[calc(100vh-68px)] flex flex-col" : "p-6 space-y-6")}>
       {/* Header */}
-      {view === "studio" ? (
+      {(view === "studio" && isManagerOrAdmin) ? (
         <div className="flex items-center justify-between flex-wrap gap-2 shrink-0 px-1">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold font-heading flex items-center gap-2">
@@ -369,17 +406,17 @@ export default function ContentPage() {
             {/* View toggle */}
             <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
               <button
-                onClick={() => setView("studio")}
+                onClick={() => handleSetView("studio")}
                 className="px-2.5 py-1 rounded-md text-xs font-semibold bg-primary text-primary-foreground shadow-xs flex items-center gap-1.5"
               >
                 <Film className="h-3.5 w-3.5" /> Studio
               </button>
               <button
-                onClick={() => setView("list")}
+                onClick={() => handleSetView("list")}
                 className="px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
               >List</button>
               <button
-                onClick={() => setView("calendar")}
+                onClick={() => handleSetView("calendar")}
                 className="px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
               >Calendar</button>
             </div>
@@ -409,20 +446,22 @@ export default function ContentPage() {
             <SearchBar placeholder="Search posts…" value={searchQuery} onChange={setSearchQuery} />
             {/* View toggle */}
             <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              {isManagerOrAdmin && (
+                <button
+                  onClick={() => handleSetView("studio")}
+                  className="px-2.5 py-1 rounded-md text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+                >
+                  <Film className="h-3.5 w-3.5" /> Studio
+                </button>
+              )}
               <button
-                onClick={() => setView("studio")}
-                className="px-2.5 py-1 rounded-md text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
-              >
-                <Film className="h-3.5 w-3.5" /> Studio
-              </button>
-              <button
-                onClick={() => setView("list")}
-                className={cn("px-2.5 py-1 rounded-md text-xs font-medium transition-colors", view === "list" ? "bg-card shadow-xs text-foreground" : "text-muted-foreground")}
-              >List</button>
-              <button
-                onClick={() => setView("calendar")}
-                className={cn("px-2.5 py-1 rounded-md text-xs font-medium transition-colors", view === "calendar" ? "bg-card shadow-xs text-foreground" : "text-muted-foreground")}
+                onClick={() => handleSetView("calendar")}
+                className={cn("px-2.5 py-1 rounded-md text-xs font-medium transition-colors", view === "calendar" ? "bg-card shadow-xs text-foreground font-semibold" : "text-muted-foreground hover:text-foreground")}
               >Calendar</button>
+              <button
+                onClick={() => handleSetView("list")}
+                className={cn("px-2.5 py-1 rounded-md text-xs font-medium transition-colors", view === "list" ? "bg-card shadow-xs text-foreground font-semibold" : "text-muted-foreground hover:text-foreground")}
+              >List</button>
             </div>
             <Button
               variant="outline"
@@ -449,7 +488,7 @@ export default function ContentPage() {
         <div className="grid grid-cols-1 gap-2">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16" />)}
         </div>
-      ) : view === "studio" ? (
+      ) : (view === "studio" && isManagerOrAdmin) ? (
         <div className="flex-1 min-h-0 overflow-hidden">
           <PCApprovalStudio
             posts={(posts ?? []) as PostRecord[]}

@@ -944,8 +944,11 @@ router.post("/:id/client-approve", requirePermission("content.edit"), asyncHandl
     .update(contentPostsTable)
     .set({
       approvalStatus: "APPROVED",
+      internalApprovalStatus: "APPROVED",
       approvedBy: userId,
       approvedAt: new Date(),
+      internalApprovedBy: userId,
+      internalApprovedAt: new Date(),
       status: "ADMIN_APPROVED", // Final approved state, ready to schedule / publish
       needsRevision: "false",
       rejectionNote: null,
