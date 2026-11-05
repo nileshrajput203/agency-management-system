@@ -93,26 +93,16 @@ export function canManageModuleSection(
   module: string,
   configuredModules: unknown,
 ): boolean {
-  const normalized = String(systemRole || "").trim().toUpperCase();
-  if (["SUPER_ADMIN", "ADMIN"].includes(normalized)) return true;
-  if (["MANAGER", "PROJECT_MANAGER", "ACCOUNT_MANAGER", "DIRECTOR", "LEAD"].includes(normalized)) {
-    if (["projects", "tasks", "content", "clients", "meetings", "reports"].includes(module)) {
-      return true;
-    }
-  }
-  return hasConfiguredModule(configuredModules, module);
+  return systemRole === "SUPER_ADMIN" || hasConfiguredModule(configuredModules, module);
 }
 
 export function canManageTaskWorkspace(
   systemRole: string | null | undefined,
   configuredModules: unknown,
 ): boolean {
-  const normalized = String(systemRole || "").trim().toUpperCase();
-  if (["SUPER_ADMIN", "ADMIN", "MANAGER", "PROJECT_MANAGER", "ACCOUNT_MANAGER", "DIRECTOR", "LEAD"].includes(normalized)) {
-    return true;
-  }
   return (
-    hasConfiguredModule(configuredModules, "projects") &&
-    hasConfiguredModule(configuredModules, "tasks")
+    systemRole === "SUPER_ADMIN" ||
+    (hasConfiguredModule(configuredModules, "projects") &&
+      hasConfiguredModule(configuredModules, "tasks"))
   );
 }

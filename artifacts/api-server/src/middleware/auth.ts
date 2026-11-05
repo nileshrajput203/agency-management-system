@@ -47,6 +47,9 @@ export function canManageEnabledSection(
   module: string,
   allowedModules: unknown,
 ): boolean {
+  if (isManagerRole(systemRole) && ["projects", "tasks", "content", "clients", "meetings", "reports"].includes(module)) {
+    return true;
+  }
   return canManageModuleSection(systemRole, module, allowedModules);
 }
 
