@@ -5,7 +5,8 @@ import {
   ArrowRight, Upload, Download, FileText, Camera, Scissors, Eye, Layers,
   Film, Grid, Columns, User, Users, Pin, MapPin, Calendar, Hash,
   ExternalLink, MessageSquare, ChevronDown, ChevronRight, ChevronLeft, Zap, RefreshCw,
-  Plus, Trash2, Sliders, CheckSquare, Square, CornerDownLeft, Search
+  Plus, Trash2, Sliders, CheckSquare, Square, CornerDownLeft, Search,
+  Smartphone, Monitor, ShieldCheck, Heart, Bookmark
 } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -212,8 +213,52 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
   const [aiTopic, setAiTopic] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
 
-  // 3x3 Grid Pagination
+  // 3x3 Grid Simulator Settings
   const [gridPage, setGridPage] = useState(0);
+  const [deviceFrame, setDeviceFrame] = useState<"PHONE" | "CANVAS">("PHONE");
+  const [showSafeZones, setShowSafeZones] = useState(false);
+  const [targetUploadPostId, setTargetUploadPostId] = useState<string | null>(null);
+  const tileFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleDirectTileUpload = async (postId: string, file: File) => {
+    setIsUploadingMedia(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
+      const res = await fetch("/api/uploads", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      const mediaUrl = data.url || data.filePath;
+
+      await fetch(`/api/content/${postId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          assetsLink: mediaUrl,
+          mediaUrls: [mediaUrl],
+          coverImageUrl: mediaUrl,
+          mediaFiles: [mediaUrl],
+          status: "IN_REVIEW",
+        }),
+      });
+      toast.success("Creative cut uploaded & attached!");
+      onRefresh();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to upload asset");
+    } finally {
+      setIsUploadingMedia(false);
+      setTargetUploadPostId(null);
+      if (tileFileInputRef.current) tileFileInputRef.current.value = "";
+    }
+  };
 
   // Filter queue items (month-wise + workflow stage + client + platform + search)
   const filteredPosts = monthPosts.filter((p) => {
@@ -900,6 +945,19 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
         onChange={handleDirectUpload}
         className="hidden"
         accept="image/*,video/*,application/pdf"
+      />
+      {/* Hidden file input for Direct 3x3 Tile Upload */}
+      <input
+        type="file"
+        ref={tileFileInputRef}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && targetUploadPostId) {
+            handleDirectTileUpload(targetUploadPostId, file);
+          }
+        }}
+        className="hidden"
+        accept="image/*,video/*"
       />
       {/* ── Top Header Toolbar ── */}
       <div className="h-12 border-b bg-card/60 px-3 sm:px-4 flex items-center justify-between shrink-0 gap-2">
@@ -1895,150 +1953,370 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                 const displayedGridSlice = sortedClientGridPosts.slice(gridPage * 9, (gridPage + 1) * 9);
 
                 return (
-                  <div className="w-full max-w-md flex flex-col items-center">
-                    <div className="w-full bg-card border rounded-2xl p-4 shadow-xl space-y-4">
-                      <div className="flex items-center justify-between border-b pb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary text-sm">
-                            {activePost.clientName ? activePost.clientName.slice(0, 2).toUpperCase() : "BB"}
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-bold">{activePost.clientName || "BlinkBeyond Client"}</h4>
-                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                              <span>3×3 Feed Aesthetic Preview</span>
-                              <span>•</span>
-                              <span className="font-semibold text-foreground">
-                                {sortedClientGridPosts.length} {sortedClientGridPosts.length === 1 ? "Post" : "Posts"}
-                              </span>
-                            </div>
-                          </div>
+                  <div className="w-full max-w-4xl flex flex-col items-center space-y-4">
+                    {/* Top Simulator Controls Toolbar */}
+                    <div className="w-full flex flex-wrap items-center justify-between gap-2.5 bg-card/80 backdrop-blur-xs border rounded-xl p-2.5 shadow-xs">
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex items-center bg-muted/80 p-0.5 rounded-lg border text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setDeviceFrame("PHONE")}
+                            className={cn(
+                              "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all",
+                              deviceFrame === "PHONE"
+                                ? "bg-background text-foreground shadow-xs"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <Smartphone className="h-3.5 w-3.5 text-primary" />
+                            <span>iPhone 16 Pro</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeviceFrame("CANVAS")}
+                            className={cn(
+                              "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all",
+                              deviceFrame === "CANVAS"
+                                ? "bg-background text-foreground shadow-xs"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            <Monitor className="h-3.5 w-3.5 text-primary" />
+                            <span>Studio Canvas</span>
+                          </button>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          {totalGridPages > 1 && (
-                            <div className="flex items-center gap-1 bg-muted p-0.5 rounded-lg border text-xs">
-                              <button
-                                type="button"
-                                onClick={() => setGridPage((prev) => Math.max(0, prev - 1))}
-                                disabled={gridPage === 0}
-                                className="h-6 w-6 flex items-center justify-center rounded disabled:opacity-30 hover:bg-card transition-colors"
-                                title="Previous 9 Posts"
-                              >
-                                <ChevronLeft className="h-3.5 w-3.5" />
-                              </button>
-                              <span className="text-[10px] font-semibold px-1 min-w-[2.5rem] text-center">
-                                {gridPage + 1}/{totalGridPages}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setGridPage((prev) => Math.min(totalGridPages - 1, prev + 1))}
-                                disabled={gridPage >= totalGridPages - 1}
-                                className="h-6 w-6 flex items-center justify-center rounded disabled:opacity-30 hover:bg-card transition-colors"
-                                title="Next 9 Posts"
-                              >
-                                <ChevronRight className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+
+                        <Button
+                          type="button"
+                          variant={showSafeZones ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowSafeZones(!showSafeZones)}
+                          className={cn(
+                            "h-7 text-[11px] gap-1 px-2.5 transition-all",
+                            showSafeZones
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                              : "text-muted-foreground hover:text-foreground"
                           )}
-                          <Badge variant="outline" className="text-xs">Instagram Feed</Badge>
-                        </div>
+                          title="Toggle 9:16 Safe Zone Overlay for captions & action buttons"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          <span>9:16 Safe Zones</span>
+                        </Button>
                       </div>
 
-                      {/* 3x3 Grid */}
-                      <div className="grid grid-cols-3 gap-1.5 aspect-square bg-muted/40 p-1.5 rounded-xl border border-border/40">
-                        {displayedGridSlice.map((p, i) => {
-                          const mediaUrl =
-                            p.coverImageUrl ||
-                            p.assetsLink ||
-                            (Array.isArray(p.mediaUrls) ? p.mediaUrls[0] : (typeof p.mediaUrls === "string" ? p.mediaUrls : null)) ||
-                            (Array.isArray(p.mediaFiles) ? p.mediaFiles[0] : (typeof p.mediaFiles === "string" ? p.mediaFiles : null)) ||
-                            (Array.isArray(p.assetVersions) && p.assetVersions.length > 0
-                              ? p.assetVersions[p.assetVersions.length - 1]?.url
-                              : null) ||
-                            p.referenceUrl ||
-                            "";
-                          const parsed = parseMediaUrl(mediaUrl);
-                          const isReel = p.format === "REEL" || p.contentType === "REEL";
-                          const isCarousel = p.format === "CAROUSEL" || p.contentType === "CAROUSEL" || (Array.isArray(p.mediaFiles) && p.mediaFiles.length > 1);
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span className="font-semibold text-foreground">
+                            {sortedClientGridPosts.length}
+                          </span>{" "}
+                          feed items
+                        </div>
 
-                          const formatGradients: Record<string, string> = {
-                            REEL: "from-purple-950 via-slate-900 to-indigo-950 border-purple-500/30 text-purple-200",
-                            CAROUSEL: "from-pink-950 via-slate-900 to-rose-950 border-pink-500/30 text-pink-200",
-                            GRAPHIC: "from-blue-950 via-slate-900 to-cyan-950 border-blue-500/30 text-blue-200",
-                            POST: "from-slate-900 via-zinc-900 to-neutral-950 border-slate-700 text-slate-200",
-                          };
-                          const gradientClass = formatGradients[p.format || p.contentType || "POST"] || formatGradients.POST;
-
-                          return (
-                            <div
-                              key={p.id || i}
-                              onClick={() => {
-                                setSelectedPostId(p.id);
-                              }}
-                              className={cn(
-                                "relative aspect-square rounded-lg overflow-hidden cursor-pointer group border transition-all duration-150 flex flex-col",
-                                p.id === activePost.id
-                                  ? "ring-2 ring-primary ring-offset-2 ring-offset-background border-primary z-10 shadow-lg scale-[1.02]"
-                                  : "border-border/60 hover:opacity-95 hover:border-primary/50"
-                              )}
+                        {totalGridPages > 1 && (
+                          <div className="flex items-center gap-1 bg-muted/80 p-0.5 rounded-lg border text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setGridPage((prev) => Math.max(0, prev - 1))}
+                              disabled={gridPage === 0}
+                              className="h-6 w-6 flex items-center justify-center rounded disabled:opacity-30 hover:bg-card transition-colors"
+                              title="Previous 9 Posts"
                             >
-                              {/* Background aesthetic info tile: visible when media is absent or loading */}
-                              <div className={cn("absolute inset-0 bg-gradient-to-br flex flex-col justify-between p-2 select-none z-0", gradientClass)}>
-                                <div className="flex items-center justify-between text-[9px] font-bold">
-                                  <span className="flex items-center gap-1 opacity-80 uppercase text-[8px] tracking-wider">
-                                    {isReel ? <Film className="h-2.5 w-2.5" /> : isCarousel ? <Layers className="h-2.5 w-2.5" /> : <Camera className="h-2.5 w-2.5" />}
-                                    {p.format || p.contentType || "POST"}
-                                  </span>
-                                  {p.scheduledAt && (
-                                    <span className="text-[8px] bg-white/10 px-1 py-0.5 rounded opacity-90 font-mono">
-                                      {format(new Date(p.scheduledAt), "dd MMM")}
-                                    </span>
-                                  )}
-                                </div>
+                              <ChevronLeft className="h-3.5 w-3.5" />
+                            </button>
+                            <span className="text-[10px] font-semibold px-1.5 min-w-[2.5rem] text-center">
+                              {gridPage + 1} / {totalGridPages}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setGridPage((prev) => Math.min(totalGridPages - 1, prev + 1))}
+                              disabled={gridPage >= totalGridPages - 1}
+                              className="h-6 w-6 flex items-center justify-center rounded disabled:opacity-30 hover:bg-card transition-colors"
+                              title="Next 9 Posts"
+                            >
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                                <div className="text-center my-auto px-0.5">
-                                  <p className="font-bold text-[11px] leading-tight text-white line-clamp-2">
-                                    {p.title || `Post #${i + 1}`}
-                                  </p>
-                                  {p.conceptHook && (
-                                    <p className="text-[8px] text-white/70 line-clamp-1 mt-0.5 italic">
-                                      "{p.conceptHook}"
-                                    </p>
-                                  )}
-                                </div>
+                    {/* MOCKUP MODE 1: Hyper-Realistic iPhone 16 Pro Chassis */}
+                    {deviceFrame === "PHONE" ? (
+                      <div className="relative w-full max-w-[390px] rounded-[52px] p-[10px] bg-gradient-to-b from-neutral-700 via-neutral-850 to-neutral-950 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.12)] ring-1 ring-black/80 select-none transition-all">
+                        {/* Speaker & Mic Edge Ridges */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-1 bg-neutral-900 rounded-b-md" />
 
-                                <div className="flex items-center justify-between text-[8px] pt-1 border-t border-white/10">
-                                  <Badge
-                                    variant="outline"
-                                    className={cn(
-                                      "text-[8px] px-1 py-0 h-4 border-0 font-semibold",
-                                      p.status === "ADMIN_APPROVED" || p.status === "SCHEDULED"
-                                        ? "bg-emerald-500/20 text-emerald-300"
-                                        : p.status === "IN_REVIEW"
-                                        ? "bg-amber-500/20 text-amber-300"
-                                        : "bg-white/10 text-white/70"
-                                    )}
-                                  >
-                                    {p.status || "IDEA"}
-                                  </Badge>
-                                  <span className="text-[8px] text-white/50 group-hover:text-primary transition-colors flex items-center gap-0.5 font-medium">
-                                    <Upload className="h-2.5 w-2.5" /> Cut
-                                  </span>
+                        {/* Inner Screen Surface */}
+                        <div className="relative rounded-[42px] overflow-hidden bg-neutral-950 text-neutral-100 flex flex-col border border-neutral-800 shadow-inner">
+                          {/* iOS Top Status Bar + Dynamic Island */}
+                          <div className="relative pt-3 pb-2 px-6 flex items-center justify-between z-30">
+                            {/* Clock */}
+                            <span className="text-[12px] font-bold tracking-tight text-white/90">9:41</span>
+
+                            {/* Dynamic Island */}
+                            <div className="absolute left-1/2 -translate-x-1/2 top-2.5 w-26 h-5 bg-black rounded-full flex items-center justify-between px-2.5 ring-1 ring-white/10 shadow-md">
+                              <span className="h-2 w-2 rounded-full bg-neutral-900 border border-neutral-700 block" />
+                              <span className="h-2 w-2 rounded-full bg-blue-950/80 border border-blue-500/30 block" />
+                            </div>
+
+                            {/* Signal / Battery */}
+                            <div className="flex items-center gap-1.5 text-white/90">
+                              <div className="flex items-end gap-0.5 h-2.5">
+                                <span className="w-0.5 h-1 bg-white/90 rounded-xs" />
+                                <span className="w-0.5 h-1.5 bg-white/90 rounded-xs" />
+                                <span className="w-0.5 h-2 bg-white/90 rounded-xs" />
+                                <span className="w-0.5 h-2.5 bg-white/90 rounded-xs" />
+                              </div>
+                              <span className="text-[10px] font-bold">5G</span>
+                              <div className="w-4 h-2 border border-white/80 rounded-xs p-[1px] flex items-center">
+                                <div className="h-full w-2.5 bg-white rounded-xs" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Instagram Client Profile Header */}
+                          <div className="px-4 pt-1 pb-2 border-b border-neutral-800/80">
+                            {/* Profile Bar */}
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-sm tracking-tight truncate max-w-[170px]">
+                                  {activePost.clientName
+                                    ? activePost.clientName.toLowerCase().replace(/[^a-z0-9]/g, "_")
+                                    : "client_official"}
+                                </span>
+                                <Badge className="h-3.5 px-1 text-[9px] bg-blue-500 hover:bg-blue-600 text-white border-0 font-bold">
+                                  ✓
+                                </Badge>
+                                <ChevronDown className="h-3 w-3 text-neutral-400" />
+                              </div>
+                              <div className="flex items-center gap-3 text-neutral-200">
+                                <Plus className="h-4 w-4" />
+                                <Heart className="h-4 w-4" />
+                                <Send className="h-3.5 w-3.5 -rotate-45" />
+                              </div>
+                            </div>
+
+                            {/* Avatar & Follower Stats */}
+                            <div className="flex items-center justify-between gap-3 mb-2.5">
+                              {/* Story Ring Avatar */}
+                              <div className="p-[2.5px] rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 shrink-0">
+                                <div className="h-16 w-16 rounded-full bg-neutral-900 border-2 border-neutral-950 flex items-center justify-center font-bold text-white text-base">
+                                  {activePost.clientName ? activePost.clientName.slice(0, 2).toUpperCase() : "BB"}
                                 </div>
                               </div>
 
-                              {/* Media overlay if file exists */}
-                              {mediaUrl && (
-                                <div className="absolute inset-0 w-full h-full z-1">
-                                  {parsed.type === "gdrive" ? (
-                                    <div className="relative w-full h-full">
-                                      <img
-                                        src={parsed.previewUrl.replace("/preview", "/thumbnail?sz=w600")}
-                                        alt={p.title || "Post"}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          (e.target as HTMLElement).style.display = "none";
+                              <div className="flex items-center justify-around flex-1 text-center">
+                                <div>
+                                  <div className="font-bold text-sm leading-tight text-white">
+                                    {sortedClientGridPosts.length}
+                                  </div>
+                                  <div className="text-[10px] text-neutral-400">Posts</div>
+                                </div>
+                                <div>
+                                  <div className="font-bold text-sm leading-tight text-white">18.4K</div>
+                                  <div className="text-[10px] text-neutral-400">Followers</div>
+                                </div>
+                                <div>
+                                  <div className="font-bold text-sm leading-tight text-white">412</div>
+                                  <div className="text-[10px] text-neutral-400">Following</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Bio & Links */}
+                            <div className="text-xs space-y-0.5">
+                              <p className="font-bold text-white text-xs">{activePost.clientName || "BlinkBeyond Client"}</p>
+                              <p className="text-[11px] text-neutral-400">Brand & Creative Campaign Roster • 2026</p>
+                              <p className="text-[11px] text-neutral-300 leading-snug">
+                                High-impact visuals, reels & growth marketing curated by agency 🚀
+                              </p>
+                              <p className="text-[11px] text-blue-400 font-medium">
+                                🔗 blinkbeyond.agency/{activePost.clientName ? activePost.clientName.toLowerCase().replace(/[^a-z0-9]/g, "") : "hub"}
+                              </p>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="grid grid-cols-3 gap-1.5 mt-2.5">
+                              <button
+                                type="button"
+                                className="h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-[11px] font-semibold text-white flex items-center justify-center gap-1"
+                              >
+                                Following <ChevronDown className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                className="h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-[11px] font-semibold text-white flex items-center justify-center"
+                              >
+                                Message
+                              </button>
+                              <button
+                                type="button"
+                                className="h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-[11px] font-semibold text-white flex items-center justify-center"
+                              >
+                                Contact
+                              </button>
+                            </div>
+
+                            {/* Story Highlights */}
+                            <div className="flex items-center gap-3 pt-3 overflow-x-auto no-scrollbar">
+                              {[
+                                { name: "Reels", icon: "🎬" },
+                                { name: "BTS", icon: "📸" },
+                                { name: "Launch", icon: "🚀" },
+                                { name: "Reviews", icon: "⭐" },
+                              ].map((h, hi) => (
+                                <div key={hi} className="flex flex-col items-center gap-1 shrink-0">
+                                  <div className="p-[1.5px] rounded-full border border-neutral-700">
+                                    <div className="h-12 w-12 rounded-full bg-neutral-900 border border-neutral-950 flex items-center justify-center text-sm">
+                                      {h.icon}
+                                    </div>
+                                  </div>
+                                  <span className="text-[10px] text-neutral-400 font-medium">{h.name}</span>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Profile Tabs */}
+                            <div className="grid grid-cols-3 pt-2 mt-2 border-t border-neutral-800/80 text-center">
+                              <div className="pb-1.5 border-b-2 border-white flex justify-center text-white">
+                                <Grid className="h-4 w-4" />
+                              </div>
+                              <div className="pb-1.5 flex justify-center text-neutral-500 hover:text-neutral-300">
+                                <Film className="h-4 w-4" />
+                              </div>
+                              <div className="pb-1.5 flex justify-center text-neutral-500 hover:text-neutral-300">
+                                <User className="h-4 w-4" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 3×3 Grid Tiles Container */}
+                          <div className="grid grid-cols-3 gap-[1.5px] bg-neutral-900/80 aspect-square">
+                            {displayedGridSlice.map((p, i) => {
+                              const mediaUrl =
+                                p.coverImageUrl ||
+                                p.assetsLink ||
+                                (Array.isArray(p.mediaUrls) ? p.mediaUrls[0] : (typeof p.mediaUrls === "string" ? p.mediaUrls : null)) ||
+                                (Array.isArray(p.mediaFiles) ? p.mediaFiles[0] : (typeof p.mediaFiles === "string" ? p.mediaFiles : null)) ||
+                                (Array.isArray(p.assetVersions) && p.assetVersions.length > 0
+                                  ? p.assetVersions[p.assetVersions.length - 1]?.url
+                                  : null) ||
+                                p.referenceUrl ||
+                                "";
+                              const parsed = parseMediaUrl(mediaUrl);
+                              const isReel = p.format === "REEL" || p.contentType === "REEL";
+                              const isCarousel = p.format === "CAROUSEL" || p.contentType === "CAROUSEL" || (Array.isArray(p.mediaFiles) && p.mediaFiles.length > 1);
+
+                              const formatGradients: Record<string, string> = {
+                                REEL: "from-purple-950 via-slate-950 to-indigo-950 border-purple-500/20 text-purple-200",
+                                CAROUSEL: "from-pink-950 via-slate-950 to-rose-950 border-pink-500/20 text-pink-200",
+                                GRAPHIC: "from-blue-950 via-slate-950 to-cyan-950 border-blue-500/20 text-blue-200",
+                                POST: "from-zinc-900 via-neutral-950 to-black border-zinc-800 text-zinc-200",
+                              };
+                              const gradientClass = formatGradients[p.format || p.contentType || "POST"] || formatGradients.POST;
+
+                              return (
+                                <div
+                                  key={p.id || i}
+                                  onClick={() => setSelectedPostId(p.id)}
+                                  className={cn(
+                                    "relative aspect-square overflow-hidden cursor-pointer group bg-neutral-950 transition-all duration-150",
+                                    p.id === activePost.id
+                                      ? "ring-2 ring-primary ring-inset z-10"
+                                      : "hover:opacity-90"
+                                  )}
+                                >
+                                  {/* Fallback Aesthetic Card when media is absent */}
+                                  <div className={cn("absolute inset-0 bg-gradient-to-br flex flex-col justify-between p-2 select-none", gradientClass)}>
+                                    <div className="flex items-center justify-between text-[8px] font-bold">
+                                      <span className="flex items-center gap-0.5 uppercase tracking-wider opacity-90">
+                                        {isReel ? <Film className="h-2.5 w-2.5" /> : isCarousel ? <Layers className="h-2.5 w-2.5" /> : <Camera className="h-2.5 w-2.5" />}
+                                        {p.format || p.contentType || "POST"}
+                                      </span>
+                                      {p.scheduledAt && (
+                                        <span className="text-[7.5px] bg-white/10 px-1 py-0.5 rounded opacity-80 font-mono">
+                                          {format(new Date(p.scheduledAt), "dd MMM")}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="text-center my-auto px-0.5">
+                                      <p className="font-bold text-[10px] leading-tight text-white line-clamp-2">
+                                        {p.title || `Post #${i + 1}`}
+                                      </p>
+                                      {p.conceptHook && (
+                                        <p className="text-[8px] text-white/70 line-clamp-1 mt-0.5 italic">
+                                          "{p.conceptHook}"
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[8px] pt-1 border-t border-white/10">
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          "text-[7px] px-1 py-0 h-3.5 border-0 font-semibold",
+                                          p.status === "ADMIN_APPROVED" || p.status === "SCHEDULED"
+                                            ? "bg-emerald-500/20 text-emerald-300"
+                                            : p.status === "IN_REVIEW"
+                                            ? "bg-amber-500/20 text-amber-300"
+                                            : "bg-white/10 text-white/70"
+                                        )}
+                                      >
+                                        {p.status || "IDEA"}
+                                      </Badge>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setTargetUploadPostId(p.id);
+                                          tileFileInputRef.current?.click();
                                         }}
-                                      />
+                                        className="text-[8px] text-primary hover:text-white font-medium flex items-center gap-0.5 hover:underline"
+                                      >
+                                        <Upload className="h-2 w-2" /> Cut
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Render Media Cover if file exists */}
+                                  {mediaUrl && (
+                                    <div className="absolute inset-0 w-full h-full z-1">
+                                      {parsed.type === "gdrive" ? (
+                                        <div className="relative w-full h-full">
+                                          <img
+                                            src={parsed.previewUrl.replace("/preview", "/thumbnail?sz=w600")}
+                                            alt={p.title || "Post"}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                              (e.target as HTMLElement).style.display = "none";
+                                            }}
+                                          />
+                                        </div>
+                                      ) : parsed.type === "video" || isReel || mediaUrl.match(/\.(mp4|mov|webm|m4v)/i) ? (
+                                        <div className="relative w-full h-full">
+                                          <video
+                                            src={parsed.streamUrl || mediaUrl}
+                                            className="w-full h-full object-cover pointer-events-none"
+                                            preload="metadata"
+                                            muted
+                                            playsInline
+                                          />
+                                        </div>
+                                      ) : (
+                                        <div className="relative w-full h-full">
+                                          <img
+                                            src={mediaUrl}
+                                            alt={p.title || "Post"}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                              (e.target as HTMLElement).style.display = "none";
+                                            }}
+                                          />
+                                        </div>
+                                      )}
+
+                                      {/* Format Icon in Top-Right */}
                                       {isReel && (
                                         <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
                                           <Film className="h-3 w-3" />
@@ -2049,85 +2327,210 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                                           <Layers className="h-3 w-3" />
                                         </div>
                                       )}
-                                    </div>
-                                  ) : parsed.type === "video" || isReel || mediaUrl.match(/\.(mp4|mov|webm|m4v)/i) ? (
-                                    <div className="relative w-full h-full">
-                                      <video
-                                        src={parsed.streamUrl || mediaUrl}
-                                        className="w-full h-full object-cover pointer-events-none"
-                                        preload="metadata"
-                                        muted
-                                        playsInline
-                                      />
-                                      <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
-                                        <Film className="h-3 w-3" />
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="relative w-full h-full">
-                                      <img
-                                        src={mediaUrl}
-                                        alt={p.title || "Post"}
-                                        className="w-full h-full object-cover"
-                                        onError={(e) => {
-                                          (e.target as HTMLElement).style.display = "none";
-                                        }}
-                                      />
-                                      {isCarousel && (
-                                        <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
-                                          <Layers className="h-3 w-3" />
+
+                                      {/* 9:16 Safe Zone Guides Overlay */}
+                                      {showSafeZones && (
+                                        <div className="absolute inset-0 pointer-events-none border border-emerald-400/40 z-2">
+                                          <div className="absolute top-1.5 left-1.5 right-1.5 h-3 border-b border-dashed border-emerald-400/50" />
+                                          <div className="absolute bottom-3 left-1.5 right-1.5 h-4 border-t border-dashed border-emerald-400/50 bg-emerald-500/10" />
+                                          <div className="absolute bottom-0 inset-x-0 text-[7px] text-center font-bold text-emerald-300 bg-black/70">
+                                            Safe Title Zone
+                                          </div>
                                         </div>
                                       )}
                                     </div>
                                   )}
-                                </div>
-                              )}
 
-                              {/* Hover Overlay with Quick Actions */}
-                              <div className="absolute inset-0 bg-black/75 backdrop-blur-xs opacity-0 group-hover:opacity-100 flex flex-col justify-between p-2 text-white transition-opacity">
-                                <div className="flex items-center justify-between text-[9px]">
-                                  <span className="font-bold uppercase tracking-wider text-primary-foreground bg-primary px-1 py-0.5 rounded text-[8px]">
-                                    {p.format || "Post"}
-                                  </span>
-                                  <span className="text-white/70 text-[8px]">
-                                    {p.scheduledAt ? format(new Date(p.scheduledAt), "MMM dd") : ""}
-                                  </span>
+                                  {/* Hover Overlay with Instagram Engagement Simulation */}
+                                  <div className="absolute inset-0 bg-black/80 backdrop-blur-xs opacity-0 group-hover:opacity-100 flex flex-col justify-between p-2 text-white transition-opacity z-10">
+                                    <div className="flex items-center justify-between text-[8px] font-bold">
+                                      <span className="uppercase text-primary">{p.format || "POST"}</span>
+                                      <span className="flex items-center gap-1 text-white/90">
+                                        <Heart className="h-2.5 w-2.5 text-rose-500 fill-rose-500" /> 1.8k
+                                      </span>
+                                    </div>
+
+                                    <p className="text-[10px] font-bold leading-tight line-clamp-2 text-center text-white">
+                                      {p.title || "Post"}
+                                    </p>
+
+                                    <div className="flex items-center justify-center gap-1">
+                                      <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedPostId(p.id);
+                                          setCenterMode("PLAYER");
+                                        }}
+                                        className="h-5 text-[8.5px] px-1.5 py-0 gap-0.5 bg-white/20 hover:bg-white/30 text-white border-0"
+                                      >
+                                        <Play className="h-2 w-2" /> View
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setTargetUploadPostId(p.id);
+                                          tileFileInputRef.current?.click();
+                                        }}
+                                        className="h-5 text-[8.5px] px-1.5 py-0 gap-0.5 bg-primary/20 hover:bg-primary/30 text-primary border-primary/30"
+                                      >
+                                        <Upload className="h-2 w-2" /> Cut
+                                      </Button>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-center">
-                                  <p className="text-[10px] font-bold leading-tight line-clamp-2">{p.title || "Post"}</p>
-                                </div>
-                                <div className="flex items-center justify-center gap-1">
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedPostId(p.id);
-                                      setCenterMode("PLAYER");
-                                    }}
-                                    className="h-6 text-[9px] px-2 py-0 gap-1 bg-white/20 hover:bg-white/30 text-white border-0"
-                                  >
-                                    <Play className="h-2.5 w-2.5" /> Open
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedPostId(p.id);
-                                      fileInputRef.current?.click();
-                                    }}
-                                    className="h-6 text-[9px] px-2 py-0 gap-1 bg-primary/20 hover:bg-primary/30 text-primary border-primary/30"
-                                  >
-                                    <Upload className="h-2.5 w-2.5" /> Cut
-                                  </Button>
-                                </div>
+                              );
+                            })}
+
+                            {/* Pad remaining slots up to 9 with elegant placeholders */}
+                            {Array.from({ length: Math.max(0, 9 - displayedGridSlice.length) }).map((_, padIdx) => (
+                              <div
+                                key={`empty-${padIdx}`}
+                                className="relative aspect-square bg-neutral-900/40 border border-neutral-800/40 flex flex-col items-center justify-center text-neutral-600 gap-1"
+                              >
+                                <Plus className="h-4 w-4 opacity-30" />
+                                <span className="text-[9px] font-mono opacity-30">Slot #{displayedGridSlice.length + padIdx + 1}</span>
                               </div>
-                            </div>
-                          );
-                        })}
+                            ))}
+                          </div>
+
+                          {/* Instagram Bottom App Navigation Bar */}
+                          <div className="py-2.5 px-6 border-t border-neutral-800/80 flex items-center justify-between text-neutral-400 bg-neutral-950">
+                            <Grid className="h-4 w-4 text-white" />
+                            <Search className="h-4 w-4" />
+                            <Plus className="h-4 w-4 p-0.5 border border-neutral-400 rounded-md" />
+                            <Film className="h-4 w-4" />
+                            <div className="h-4 w-4 rounded-full bg-neutral-700 border border-neutral-500" />
+                          </div>
+
+                          {/* iOS Home Indicator Bar */}
+                          <div className="pb-2 pt-1 flex justify-center">
+                            <div className="w-28 h-1 bg-white/40 rounded-full" />
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      /* MOCKUP MODE 2: Expansive Studio Canvas Grid */
+                      <div className="w-full bg-card border rounded-2xl p-4 shadow-xl space-y-4">
+                        <div className="flex items-center justify-between border-b pb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center font-bold text-primary text-sm">
+                              {activePost.clientName ? activePost.clientName.slice(0, 2).toUpperCase() : "BB"}
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-bold">{activePost.clientName || "BlinkBeyond Client"}</h4>
+                              <p className="text-[11px] text-muted-foreground">High-Density Studio Review Grid</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-xs">Studio Canvas Mode</Badge>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3">
+                          {displayedGridSlice.map((p, i) => {
+                            const mediaUrl =
+                              p.coverImageUrl ||
+                              p.assetsLink ||
+                              (Array.isArray(p.mediaUrls) ? p.mediaUrls[0] : (typeof p.mediaUrls === "string" ? p.mediaUrls : null)) ||
+                              (Array.isArray(p.mediaFiles) ? p.mediaFiles[0] : (typeof p.mediaFiles === "string" ? p.mediaFiles : null)) ||
+                              (Array.isArray(p.assetVersions) && p.assetVersions.length > 0
+                                ? p.assetVersions[p.assetVersions.length - 1]?.url
+                                : null) ||
+                              p.referenceUrl ||
+                              "";
+                            const parsed = parseMediaUrl(mediaUrl);
+                            const isReel = p.format === "REEL" || p.contentType === "REEL";
+
+                            return (
+                              <Card
+                                key={p.id || i}
+                                onClick={() => setSelectedPostId(p.id)}
+                                className={cn(
+                                  "overflow-hidden cursor-pointer transition-all border group",
+                                  p.id === activePost.id
+                                    ? "ring-2 ring-primary border-primary shadow-lg"
+                                    : "hover:border-primary/50"
+                                )}
+                              >
+                                <div className="relative aspect-video bg-muted overflow-hidden">
+                                  {mediaUrl ? (
+                                    parsed.type === "video" || isReel || mediaUrl.match(/\.(mp4|mov|webm|m4v)/i) ? (
+                                      <video
+                                        src={parsed.streamUrl || mediaUrl}
+                                        className="w-full h-full object-cover"
+                                        preload="metadata"
+                                        muted
+                                      />
+                                    ) : (
+                                      <img
+                                        src={parsed.previewUrl || mediaUrl}
+                                        alt={p.title || "Post"}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    )
+                                  ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center bg-muted/40">
+                                      <Camera className="h-6 w-6 text-muted-foreground/40 mb-1" />
+                                      <span className="text-[10px] text-muted-foreground font-medium">No media cut yet</span>
+                                    </div>
+                                  )}
+
+                                  <div className="absolute top-2 left-2 flex items-center gap-1">
+                                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 font-bold uppercase">
+                                      {p.format || "POST"}
+                                    </Badge>
+                                  </div>
+
+                                  <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setTargetUploadPostId(p.id);
+                                        tileFileInputRef.current?.click();
+                                      }}
+                                      className="h-6 text-[10px] px-2 gap-1 bg-black/75 hover:bg-black text-white"
+                                    >
+                                      <Upload className="h-3 w-3" /> Upload Cut
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                <CardContent className="p-2.5 space-y-1.5">
+                                  <p className="font-bold text-xs line-clamp-1">{p.title || `Post #${i + 1}`}</p>
+                                  {p.conceptHook && (
+                                    <p className="text-[10px] text-muted-foreground line-clamp-1 italic">
+                                      "{p.conceptHook}"
+                                    </p>
+                                  )}
+                                  <div className="flex items-center justify-between text-[10px] pt-1 border-t">
+                                    <span className="text-muted-foreground">
+                                      {p.scheduledAt ? format(new Date(p.scheduledAt), "MMM dd, yyyy") : "Unscheduled"}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-[9px] px-1.5 py-0 h-4 font-semibold",
+                                        p.status === "ADMIN_APPROVED" || p.status === "SCHEDULED"
+                                          ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                                          : p.status === "IN_REVIEW"
+                                          ? "border-amber-500/40 text-amber-600 dark:text-amber-400"
+                                          : "text-muted-foreground"
+                                      )}
+                                    >
+                                      {p.status || "IDEA"}
+                                    </Badge>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()

@@ -123,7 +123,7 @@ export default function MeetingsPage() {
         })
           .then((res) => (res.ok ? res.json() : null))
           .then((m) => { if (m) setViewMeeting(m); })
-          .catch(() => {});
+          .catch(() => { });
       }
     }
   }, [meetings]);
@@ -358,190 +358,190 @@ export default function MeetingsPage() {
               const isShoot = isShootMeeting(m);
               const { description: plainDesc, shootDetails } = parseMeetingDescription(m.description);
               return (
-              <Card
-                key={m.id}
-                className={cn(
-                  "shadow-2xs border transition-all flex flex-col justify-between overflow-hidden group bg-card",
-                  isShoot
-                    ? "border-violet-300 dark:border-violet-800 hover:border-violet-500 bg-violet-50/15 dark:bg-violet-950/10"
-                    : "border-border hover:border-primary/40"
-                )}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                      {getStatusBadge(m.status)}
-                      {isShoot && (
-                        <Badge className="text-[10px] bg-violet-600 hover:bg-violet-700 text-white border-violet-500 font-bold gap-1 shadow-2xs">
-                          <Clapperboard className="h-3 w-3" />
-                          {shootDetails?.category ? `Shoot · ${shootDetails.category}` : "Shoot"}
-                        </Badge>
-                      )}
-                      {m.clientName && (
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <span className="text-[10px] text-muted-foreground font-medium bg-muted/50 px-2 py-0.5 rounded-md truncate max-w-[130px] block border border-border">
-                              🏢 {m.clientName}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>{m.clientName}</TooltipContent>
-                        </Tooltip>
-                      )}
+                <Card
+                  key={m.id}
+                  className={cn(
+                    "shadow-2xs border transition-all flex flex-col justify-between overflow-hidden group bg-card",
+                    isShoot
+                      ? "border-violet-300 dark:border-violet-800 hover:border-violet-500 bg-violet-50/15 dark:bg-violet-950/10"
+                      : "border-border hover:border-primary/40"
+                  )}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                        {getStatusBadge(m.status)}
+                        {isShoot && (
+                          <Badge className="text-[10px] bg-violet-600 hover:bg-violet-700 text-white border-violet-500 font-bold gap-1 shadow-2xs">
+                            <Clapperboard className="h-3 w-3" />
+                            {shootDetails?.category ? `Shoot · ${shootDetails.category}` : "Shoot"}
+                          </Badge>
+                        )}
+                        {m.clientName && (
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <span className="text-[10px] text-muted-foreground font-medium bg-muted/50 px-2 py-0.5 rounded-md truncate max-w-[130px] block border border-border">
+                                🏢 {m.clientName}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>{m.clientName}</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="focus:outline-none">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground rounded-lg">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => setViewMeeting(m)}>
+                            <Eye className="h-4 w-4 mr-2 text-blue-500" /> View Details & Specs
+                          </DropdownMenuItem>
+
+                          {m.meetingLink && (
+                            <DropdownMenuItem onClick={() => copyMeetingLink(m.meetingLink!)}>
+                              <Copy className="h-4 w-4 mr-2 text-indigo-500" /> Copy Video Link
+                            </DropdownMenuItem>
+                          )}
+
+                          {canManageMeeting(m) && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => openEditDialog(m)}>
+                                <Edit3 className="h-4 w-4 mr-2 text-amber-500" /> {isShoot ? "Edit Shoot Specs" : "Edit Meeting"}
+                              </DropdownMenuItem>
+
+                              {m.status !== "COMPLETED" && (
+                                <DropdownMenuItem onClick={() => handleStatusChange(m.id, "COMPLETED")}>
+                                  <CheckCircle className="h-4 w-4 mr-2 text-emerald-500" /> Mark as Completed
+                                </DropdownMenuItem>
+                              )}
+
+                              {m.status !== "CANCELLED" && (
+                                <DropdownMenuItem onClick={() => handleStatusChange(m.id, "CANCELLED")}>
+                                  <XCircle className="h-4 w-4 mr-2 text-orange-500" /> Cancel {isShoot ? "Shoot" : "Meeting"}
+                                </DropdownMenuItem>
+                              )}
+
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => setDeleteMeetingId(m.id)}
+                                className="text-rose-600 dark:text-rose-400 focus:text-rose-600"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete {isShoot ? "Shoot" : "Meeting"}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="focus:outline-none">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground rounded-lg">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onClick={() => setViewMeeting(m)}>
-                          <Eye className="h-4 w-4 mr-2 text-blue-500" /> View Details & Specs
-                        </DropdownMenuItem>
+                    <CardTitle
+                      className="text-base font-semibold mt-2 leading-snug cursor-pointer hover:text-primary transition-colors line-clamp-2"
+                      onClick={() => setViewMeeting(m)}
+                    >
+                      {getMeetingDisplayTitle(m.title)}
+                    </CardTitle>
+                  </CardHeader>
+
+                  <CardContent className="space-y-3 text-xs flex-1 flex flex-col justify-between">
+                    <div>
+                      {plainDesc && (
+                        <p className="text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
+                          {plainDesc}
+                        </p>
+                      )}
+
+                      {shootDetails && (
+                        <div className="rounded-lg border border-violet-200/80 bg-violet-50/70 dark:border-violet-900/60 dark:bg-violet-950/30 p-2.5 space-y-1 text-[11px] mb-2">
+                          {shootDetails.objective && (
+                            <p className="line-clamp-1 text-foreground/90">
+                              <span className="font-semibold text-violet-700 dark:text-violet-300">Goal: </span>
+                              {shootDetails.objective}
+                            </p>
+                          )}
+                          {shootDetails.equipment && (
+                            <p className="line-clamp-1 text-muted-foreground">
+                              <span className="font-semibold text-violet-700 dark:text-violet-300">Gear: </span>
+                              {shootDetails.equipment}
+                            </p>
+                          )}
+                          {shootDetails.deliverables && (
+                            <p className="line-clamp-1 text-muted-foreground">
+                              <span className="font-semibold text-violet-700 dark:text-violet-300">Outputs: </span>
+                              {shootDetails.deliverables}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="space-y-1.5 text-foreground/90 font-medium">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span>
+                            {formatDateTime(m.startTime, "dd MMM yyyy, HH:mm")} ({m.durationMinutes} mins)
+                          </span>
+                        </div>
 
                         {m.meetingLink && (
-                          <DropdownMenuItem onClick={() => copyMeetingLink(m.meetingLink!)}>
-                            <Copy className="h-4 w-4 mr-2 text-indigo-500" /> Copy Video Link
-                          </DropdownMenuItem>
-                        )}
-
-                        {canManageMeeting(m) && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => openEditDialog(m)}>
-                              <Edit3 className="h-4 w-4 mr-2 text-amber-500" /> {isShoot ? "Edit Shoot Specs" : "Edit Meeting"}
-                            </DropdownMenuItem>
-
-                            {m.status !== "COMPLETED" && (
-                              <DropdownMenuItem onClick={() => handleStatusChange(m.id, "COMPLETED")}>
-                                <CheckCircle className="h-4 w-4 mr-2 text-emerald-500" /> Mark as Completed
-                              </DropdownMenuItem>
-                            )}
-
-                            {m.status !== "CANCELLED" && (
-                              <DropdownMenuItem onClick={() => handleStatusChange(m.id, "CANCELLED")}>
-                                <XCircle className="h-4 w-4 mr-2 text-orange-500" /> Cancel {isShoot ? "Shoot" : "Meeting"}
-                              </DropdownMenuItem>
-                            )}
-
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => setDeleteMeetingId(m.id)}
-                              className="text-rose-600 dark:text-rose-400 focus:text-rose-600"
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Video className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                            <a
+                              href={m.meetingLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:underline flex items-center gap-1 font-semibold truncate"
                             >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete {isShoot ? "Shoot" : "Meeting"}
-                            </DropdownMenuItem>
-                          </>
+                              Join Video Call <ExternalLink className="h-3 w-3 shrink-0" />
+                            </a>
+                          </div>
                         )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
 
-                  <CardTitle
-                    className="text-base font-semibold mt-2 leading-snug cursor-pointer hover:text-primary transition-colors line-clamp-2"
-                    onClick={() => setViewMeeting(m)}
-                  >
-                    {getMeetingDisplayTitle(m.title)}
-                  </CardTitle>
-                </CardHeader>
-
-                <CardContent className="space-y-3 text-xs flex-1 flex flex-col justify-between">
-                  <div>
-                    {plainDesc && (
-                      <p className="text-muted-foreground line-clamp-2 mb-2 leading-relaxed">
-                        {plainDesc}
-                      </p>
-                    )}
-
-                    {shootDetails && (
-                      <div className="rounded-lg border border-violet-200/80 bg-violet-50/70 dark:border-violet-900/60 dark:bg-violet-950/30 p-2.5 space-y-1 text-[11px] mb-2">
-                        {shootDetails.objective && (
-                          <p className="line-clamp-1 text-foreground/90">
-                            <span className="font-semibold text-violet-700 dark:text-violet-300">Goal: </span>
-                            {shootDetails.objective}
-                          </p>
+                        {m.location && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                            <span className="truncate">{m.location}</span>
+                          </div>
                         )}
-                        {shootDetails.equipment && (
-                          <p className="line-clamp-1 text-muted-foreground">
-                            <span className="font-semibold text-violet-700 dark:text-violet-300">Gear: </span>
-                            {shootDetails.equipment}
-                          </p>
-                        )}
-                        {shootDetails.deliverables && (
-                          <p className="line-clamp-1 text-muted-foreground">
-                            <span className="font-semibold text-violet-700 dark:text-violet-300">Outputs: </span>
-                            {shootDetails.deliverables}
-                          </p>
-                        )}
-                      </div>
-                    )}
 
-                    <div className="space-y-1.5 text-foreground/90 font-medium">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-3.5 w-3.5 text-primary shrink-0" />
-                        <span>
-                          {formatDateTime(m.startTime, "dd MMM yyyy, HH:mm")} ({m.durationMinutes} mins)
-                        </span>
-                      </div>
-
-                      {m.meetingLink && (
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Video className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                          <a
-                            href={m.meetingLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-blue-600 hover:underline flex items-center gap-1 font-semibold truncate"
-                          >
-                            Join Video Call <ExternalLink className="h-3 w-3 shrink-0" />
-                          </a>
-                        </div>
-                      )}
-
-                      {m.location && (
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                          <span className="truncate">{m.location}</span>
-                        </div>
-                      )}
-
-                      {m.projectName && (
-                        <div className="flex items-center gap-2 min-w-0">
-                          <FolderKanban className="h-3.5 w-3.5 text-violet-500 shrink-0" />
-                          <Tooltip>
-                            <TooltipTrigger className="text-left truncate">
-                              <span className="truncate block">{m.projectName}</span>
-                            </TooltipTrigger>
-                            <TooltipContent>{m.projectName}</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {m.attendees && m.attendees.length > 0 && (
-                    <div className="pt-2 border-t border-border mt-2">
-                      <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold mb-1.5">
-                        <span className="uppercase tracking-wider">{isShootMeeting(m) ? "Assigned crew" : "Attendees"} ({m.attendees.length})</span>
-                        <span>Organizer: {m.organizerName}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {m.attendees.slice(0, 3).map((att) => (
-                          <Badge key={att.id} variant="secondary" className="text-[10px] py-0 px-1.5 font-normal truncate max-w-[120px]">
-                            {att.name}
-                          </Badge>
-                        ))}
-                        {m.attendees.length > 3 && (
-                          <Badge variant="outline" className="text-[10px] py-0 px-1.5 text-muted-foreground font-medium">
-                            +{m.attendees.length - 3} more
-                          </Badge>
+                        {m.projectName && (
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FolderKanban className="h-3.5 w-3.5 text-violet-500 shrink-0" />
+                            <Tooltip>
+                              <TooltipTrigger className="text-left truncate">
+                                <span className="truncate block">{m.projectName}</span>
+                              </TooltipTrigger>
+                              <TooltipContent>{m.projectName}</TooltipContent>
+                            </Tooltip>
+                          </div>
                         )}
                       </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+
+                    {m.attendees && m.attendees.length > 0 && (
+                      <div className="pt-2 border-t border-border mt-2">
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground font-semibold mb-1.5">
+                          <span className="uppercase tracking-wider">{isShootMeeting(m) ? "Assigned crew" : "Attendees"} ({m.attendees.length})</span>
+                          <span>Organizer: {m.organizerName}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {m.attendees.slice(0, 3).map((att) => (
+                            <Badge key={att.id} variant="secondary" className="text-[10px] py-0 px-1.5 font-normal truncate max-w-[120px]">
+                              {att.name}
+                            </Badge>
+                          ))}
+                          {m.attendees.length > 3 && (
+                            <Badge variant="outline" className="text-[10px] py-0 px-1.5 text-muted-foreground font-medium">
+                              +{m.attendees.length - 3} more
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
