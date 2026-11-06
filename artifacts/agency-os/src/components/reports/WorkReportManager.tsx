@@ -633,17 +633,32 @@ function WorkReportEditorView({
     },
   });
 
-  const [formData, setFormData] = useState<any>({
-    title: "",
-    period: "Monthly",
-    startDate: "",
-    endDate: "",
-    employeeName: "",
-    employeeDesignation: "",
-    clientHandled: "",
-    projects: [],
-    selfAssessment: "",
-    summary: "",
+  const [formData, setFormData] = useState<any>(() => {
+    const rawProjects = Array.isArray(report?.projects) ? report.projects : [];
+    const normalizedProjects = rawProjects.map((p: any) => ({
+      id: p.id || crypto.randomUUID(),
+      projectId: p.projectId ? String(p.projectId) : "none",
+      projectName: p.projectName || "",
+      clientName: p.clientName || "",
+      taskDescription: p.taskDescription || "",
+      completionPercentage: typeof p.completionPercentage === "number" ? p.completionPercentage : (Number(p.completionPercentage) || 0),
+      hoursSpent: typeof p.hoursSpent === "number" ? p.hoursSpent : (Number(p.hoursSpent) || 0),
+      status: p.status || "In Progress",
+      managerComment: p.managerComment || "",
+    }));
+
+    return {
+      title: report?.title || "",
+      period: report?.period || "Monthly",
+      startDate: report?.startDate || "",
+      endDate: report?.endDate || "",
+      employeeName: report?.employeeName || "",
+      employeeDesignation: report?.employeeDesignation || "",
+      clientHandled: report?.clientHandled || "",
+      projects: normalizedProjects,
+      selfAssessment: report?.selfAssessment || "",
+      summary: report?.summary || "",
+    };
   });
 
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
@@ -1038,7 +1053,7 @@ function WorkReportEditorView({
             onClick={() => setIsHistoryOpen(true)}
             className="text-xs"
           >
-            <History className="h-3.5 w-3.5 mr-1.5" /> Versions ({report.versions?.length || 1})
+            <History className="h-3.5 w-3.5 mr-1.5" /> Versions ({report?.versions?.length || 1})
           </Button>
           <Button
             variant="outline"
@@ -1118,7 +1133,7 @@ function WorkReportEditorView({
           <p className="font-semibold flex items-center gap-2 text-amber-600 dark:text-amber-400">
             <AlertTriangle className="h-5 w-5 shrink-0" /> Manager Requested Changes
           </p>
-          <p className="text-xs md:text-sm pl-7 leading-relaxed">{report.managerFeedback}</p>
+          <p className="text-xs md:text-sm pl-7 leading-relaxed">{report?.managerFeedback || "Please review the feedback provided."}</p>
         </div>
       )}
 
@@ -1128,7 +1143,7 @@ function WorkReportEditorView({
             <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
             <span>This report has been formally approved by Management.</span>
           </div>
-          {!isManagerOrAdmin && !report.reopenRequested && (
+          {!isManagerOrAdmin && !report?.reopenRequested && (
             <Button
               size="sm"
               variant="outline"
@@ -1141,11 +1156,11 @@ function WorkReportEditorView({
         </div>
       )}
 
-      {report.reopenRequested && isManagerOrAdmin && (
+      {report?.reopenRequested && isManagerOrAdmin && (
         <div className="p-4 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs md:text-sm space-y-3 shadow-xs">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
-            <span><strong>Reopen Requested by Employee:</strong> &quot;{report.reopenReason}&quot;</span>
+            <span><strong>Reopen Requested by Employee:</strong> &quot;{report?.reopenReason}&quot;</span>
           </div>
           <div className="flex gap-2 pl-7">
             <Button
@@ -1659,22 +1674,26 @@ function WorkReportEditorView({
           </DialogHeader>
 
           <div className="space-y-3 max-h-[60vh] overflow-y-auto py-2">
-            {report.versions?.map((v: any) => (
-              <div key={v.id} className="p-3 border rounded-lg bg-card/50 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-foreground">
-                    Version #{v.versionNumber} ({v.statusAtVersion})
-                  </span>
-                  <span className="text-muted-foreground text-[11px]">
-                    {new Date(v.createdAt).toLocaleString()}
-                  </span>
+            {report?.versions && report.versions.length > 0 ? (
+              report.versions.map((v: any) => (
+                <div key={v.id} className="p-3 border rounded-lg bg-card/50 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-foreground">
+                      Version #{v.versionNumber} ({v.statusAtVersion})
+                    </span>
+                    <span className="text-muted-foreground text-[11px]">
+                      {new Date(v.createdAt).toLocaleString()}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{v.changeSummary}</p>
+                  <div className="text-[11px] text-muted-foreground/80">
+                    Submitted by: {v.submittedByName}
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">{v.changeSummary}</p>
-                <div className="text-[11px] text-muted-foreground/80">
-                  Submitted by: {v.submittedByName}
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-4">No previous versions found.</p>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -1692,7 +1711,8 @@ function WorkReportEditorView({
           </DialogHeader>
 
           <div className="space-y-3 max-h-[60vh] overflow-y-auto py-2">
-            {report.auditLogs?.map((log: any) => (
+            {report?.auditLogs && report.auditLogs.length > 0 ? (
+              report.auditLogs.map((log: any) => (
               <div key={log.id} className="p-3 border rounded-lg bg-card/40 space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-foreground">
@@ -1718,7 +1738,10 @@ function WorkReportEditorView({
                   </div>
                 )}
               </div>
-            ))}
+            ))
+            ) : (
+              <p className="text-xs text-muted-foreground text-center py-4">No audit logs recorded yet.</p>
+            )}
           </div>
         </DialogContent>
       </Dialog>
