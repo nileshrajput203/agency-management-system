@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { tasksTable, projectsTable, usersTable, contentPostsTable } from "@workspace/db/schema";
+import { tasksTable, projectsTable, subprojectsTable, usersTable, contentPostsTable } from "@workspace/db/schema";
 import { and, eq, or, sql, desc, asc, isNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { asyncHandler } from "../lib/asyncHandler";
@@ -39,7 +39,7 @@ function sanitizeTask(body: any, isUpdate = false) {
     }
   }
   const result = sanitizeAndValidate(body, {
-    uuids: ["projectId", "assigneeId", "parentId", "requestedBy", "approvedBy", "managerApprovedBy"],
+    uuids: ["projectId", "subprojectId", "assigneeId", "parentId", "requestedBy", "approvedBy", "managerApprovedBy"],
     dates: ["startDate", "dueDate", "approvedAt", "requestedAt", "managerApprovedAt"],
     enums: {
       status: ["TODO", "IN_PROGRESS", "IN_REVIEW", "DONE", "BLOCKED", "COMPLETED"],
@@ -77,6 +77,8 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
       priority: tasksTable.priority,
       projectId: tasksTable.projectId,
       projectName: projectsTable.name,
+      subprojectId: tasksTable.subprojectId,
+      subprojectName: subprojectsTable.name,
       assigneeId: tasksTable.assigneeId,
       assigneeName: usersTable.name,
       startDate: tasksTable.startDate,
@@ -103,6 +105,7 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
     })
     .from(tasksTable)
     .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
+    .leftJoin(subprojectsTable, eq(tasksTable.subprojectId, subprojectsTable.id))
     .leftJoin(usersTable, eq(tasksTable.assigneeId, usersTable.id))
     .leftJoin(requesterTable, eq(tasksTable.requestedBy, requesterTable.id))
     .leftJoin(approvedByTable, eq(tasksTable.approvedBy, approvedByTable.id))
@@ -120,7 +123,7 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
     ((req as any).userConfiguredModules || []).includes("projects");
   const scopedRows = canViewProjects
     ? rows
-    : rows.map((row) => ({ ...row, projectId: null, projectName: null }));
+    : rows.map((row) => ({ ...row, projectId: null, projectName: null, subprojectId: null, subprojectName: null }));
   const visibleRows = hiddenIds.length > 0 ? scopedRows.filter((r) => !hiddenIds.includes(r.id)) : scopedRows;
 
   return res.json(visibleRows);
@@ -223,6 +226,8 @@ router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res
       priority: tasksTable.priority,
       projectId: tasksTable.projectId,
       projectName: projectsTable.name,
+      subprojectId: tasksTable.subprojectId,
+      subprojectName: subprojectsTable.name,
       assigneeId: tasksTable.assigneeId,
       assigneeName: usersTable.name,
       startDate: tasksTable.startDate,
@@ -249,6 +254,7 @@ router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res
     })
     .from(tasksTable)
     .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
+    .leftJoin(subprojectsTable, eq(tasksTable.subprojectId, subprojectsTable.id))
     .leftJoin(usersTable, eq(tasksTable.assigneeId, usersTable.id))
     .leftJoin(requesterTable, eq(tasksTable.requestedBy, requesterTable.id))
     .leftJoin(approvedByTable, eq(tasksTable.approvedBy, approvedByTable.id))
@@ -265,7 +271,7 @@ router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res
     requesterSystemRole === "SUPER_ADMIN" ||
     Boolean((req as any).userIsDelegatedAdmin) ||
     ((req as any).userConfiguredModules || []).includes("projects");
-  return res.json(canViewProjects ? row : { ...row, projectId: null, projectName: null });
+  return res.json(canViewProjects ? row : { ...row, projectId: null, projectName: null, subprojectId: null, subprojectName: null });
 }));
 
 router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, res) => {

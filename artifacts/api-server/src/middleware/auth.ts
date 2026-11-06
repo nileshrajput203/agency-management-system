@@ -337,6 +337,92 @@ export function requirePermission(permission: Permission) {
   });
 }
 
+export function requireAnyPermission(...permissions: Permission[]) {
+  return asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const userId = (req as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const [user] = await db
+      .select({
+        systemRole: usersTable.systemRole,
+        isActive: usersTable.isActive,
+        allowedModules: usersTable.allowedModules,
+        isDelegatedAdmin: usersTable.isDelegatedAdmin,
+        portalMode: usersTable.portalMode,
+        viewAllClients: usersTable.viewAllClients,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId));
+
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!user.isActive) {
+      return res.status(401).json({ error: "Your account is inactive or pending approval." });
+    }
+
+    const isSuperAdmin = user.systemRole === "SUPER_ADMIN";
+    const isDelegated = Boolean(user.isDelegatedAdmin);
+    const isManager = isManagerRole(user.systemRole) || isDelegated;
+    const allowedModulesList = getEffectiveModules(user.allowedModules);
+    const configuredModulesList = parseConfiguredModules(user.allowedModules);
+    const role: UserRole = isSuperAdmin || isManager || canManageTaskWorkspace(user.systemRole, configuredModulesList)
+      ? "ADMIN"
+      : "EMPLOYEE";
+    const basePermissions: string[] = isSuperAdmin
+      ? [...ROLE_PERMISSIONS.ADMIN]
+      : getModulePermissions(user.allowedModules);
+
+    const effectivePermissions = new Set<string>(basePermissions);
+    if (isManager) {
+      const managerDefaultPermissions = [
+        "projects.create",
+        "projects.edit",
+        "projects.view",
+        "projects.delete",
+        "tasks.create",
+        "tasks.edit",
+        "tasks.view",
+        "tasks.delete",
+        "clients.create",
+        "clients.edit",
+        "clients.view",
+        "meetings.create",
+        "meetings.edit",
+        "meetings.view",
+        "time.view",
+        "time.log",
+        "attendance.view",
+        "reports.view",
+        "attachments.view",
+        "attachments.upload",
+        "users.view",
+      ];
+      for (const p of managerDefaultPermissions) {
+        effectivePermissions.add(p);
+      }
+    }
+
+    const hasAny = permissions.some((p) => effectivePermissions.has(p));
+    if (!hasAny) {
+      return res.status(403).json({ error: `Forbidden: Missing required permission (one of ${permissions.join(", ")})` });
+    }
+
+    (req as any).userRole = role;
+    (req as any).userSystemRole = user.systemRole;
+    (req as any).userIsDelegatedAdmin = isDelegated;
+    (req as any).userPortalMode = user.portalMode || "MODE_1";
+    (req as any).userViewAllClients = Boolean(user.viewAllClients) || isSuperAdmin || isManager;
+    (req as any).userAllowedModules = allowedModulesList;
+    (req as any).userConfiguredModules = configuredModulesList ?? [];
+
+    return next();
+  });
+}
+
 export function requireRole(allowedRole: UserRole) {
   return asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
     const userId = (req as any).userId;

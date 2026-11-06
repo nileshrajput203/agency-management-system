@@ -1653,7 +1653,13 @@ components:
           type: ["string", "null"]
         projectId:
           type: ["string", "null"]
+        subprojectId:
+          type: ["string", "null"]
         projectName:
+          type: ["string", "null"]
+        subprojectId:
+          type: ["string", "null"]
+        subprojectName:
           type: ["string", "null"]
         assigneeId:
           type: ["string", "null"]
@@ -1695,6 +1701,8 @@ components:
         priority:
           type: ["string", "null"]
         projectId:
+          type: ["string", "null"]
+        subprojectId:
           type: ["string", "null"]
         assigneeId:
           type: ["string", "null"]

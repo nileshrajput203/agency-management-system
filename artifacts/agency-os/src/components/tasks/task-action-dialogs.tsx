@@ -11,9 +11,19 @@ import { Button } from "@/components/ui/button";
 import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { MultiAssigneePicker } from "@/components/common/MultiAssigneePicker";
 import { COLUMNS } from "./task-constants";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { useEffect, useState } from "react";
 import type { TaskInput } from "@workspace/api-client-react";
+import { toast } from "sonner";
+import { Layers, Plus, RefreshCw, FolderKanban } from "lucide-react";
+
+interface SubprojectItem {
+  id: string;
+  projectId: string;
+  projectName?: string | null;
+  name: string;
+  status?: string | null;
+}
 
 interface TaskActionDialogsProps {
   dialogOpen: boolean;
@@ -70,21 +80,67 @@ export function TaskActionDialogs({
     defaultValues: {
       status: defaultStatus,
       priority: "MEDIUM",
+      projectId: "",
+      subprojectId: "",
     },
   });
 
+  const watchProjectId = useWatch({ control, name: "projectId" });
+
+  // Subprojects state
+  const [subprojects, setSubprojects] = useState<SubprojectItem[]>([]);
+  const [loadingSubprojects, setLoadingSubprojects] = useState(false);
+
+  // Quick Add Subproject modal
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddTargetProject, setQuickAddTargetProject] = useState<{ id: string; name: string } | null>(null);
+  const [quickAddName, setQuickAddName] = useState("");
+  const [isQuickAdding, setIsQuickAdding] = useState(false);
+  const [quickAddContext, setQuickAddContext] = useState<"create" | "modify" | "edit">("create");
+
+  // Modify dialog states
+  const [modifyProjectId, setModifyProjectId] = useState<string>("");
+  const [modifySubprojectId, setModifySubprojectId] = useState<string>("");
+
+  // Admin edit dialog states
+  const [editProjectId, setEditProjectId] = useState<string>("");
+  const [editSubprojectId, setEditSubprojectId] = useState<string>("");
+
   // coAssignees state per dialog
   const [createCoAssignees, setCreateCoAssignees] = useState<string[]>([]);
-  const [modifyCoAssignees, setModifyCoAssignees] = useState<string[]>(
-    Array.isArray(selectedTaskForAction?.coAssignees) ? selectedTaskForAction.coAssignees : []
-  );
-  const [editCoAssignees, setEditCoAssignees] = useState<string[]>(
-    Array.isArray(selectedTaskForAction?.coAssignees) ? selectedTaskForAction.coAssignees : []
-  );
+  const [modifyCoAssignees, setModifyCoAssignees] = useState<string[]>([]);
+  const [editCoAssignees, setEditCoAssignees] = useState<string[]>([]);
+
+  const fetchSubprojects = async () => {
+    const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
+    if (!token) return;
+    try {
+      setLoadingSubprojects(true);
+      const res = await fetch("/api/projects/subprojects", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setSubprojects(data);
+        }
+      }
+    } catch {
+      // Ignore background fetch error
+    } finally {
+      setLoadingSubprojects(false);
+    }
+  };
+
+  useEffect(() => {
+    if (dialogOpen || modifyDialogOpen || adminEditDialogOpen) {
+      fetchSubprojects();
+    }
+  }, [dialogOpen, modifyDialogOpen, adminEditDialogOpen]);
 
   useEffect(() => {
     if (dialogOpen) {
-      reset({ title: "", status: defaultStatus, priority: "MEDIUM" });
+      reset({ title: "", status: defaultStatus, priority: "MEDIUM", projectId: "", subprojectId: "" });
       setCreateCoAssignees([]);
     }
   }, [dialogOpen, defaultStatus, reset]);
@@ -94,8 +150,16 @@ export function TaskActionDialogs({
     const coAssignees = Array.isArray(selectedTaskForAction.coAssignees)
       ? selectedTaskForAction.coAssignees
       : [];
-    if (modifyDialogOpen) setModifyCoAssignees(coAssignees);
-    if (adminEditDialogOpen) setEditCoAssignees(coAssignees);
+    if (modifyDialogOpen) {
+      setModifyCoAssignees(coAssignees);
+      setModifyProjectId(selectedTaskForAction.projectId || "none");
+      setModifySubprojectId(selectedTaskForAction.subprojectId || "none");
+    }
+    if (adminEditDialogOpen) {
+      setEditCoAssignees(coAssignees);
+      setEditProjectId(selectedTaskForAction.projectId || "none");
+      setEditSubprojectId(selectedTaskForAction.subprojectId || "none");
+    }
   }, [selectedTaskForAction?.id, modifyDialogOpen, adminEditDialogOpen]);
 
   // Wrap create submit to inject coAssignees
@@ -103,8 +167,90 @@ export function TaskActionDialogs({
     onCreateSubmit({ ...data, coAssignees: createCoAssignees } as any);
   };
 
+  const handleQuickAddSubproject = async () => {
+    if (!quickAddTargetProject || !quickAddName.trim()) {
+      toast.error("Please enter a subproject name");
+      return;
+    }
+    setIsQuickAdding(true);
+    try {
+      const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
+      const res = await fetch(`/api/projects/${quickAddTargetProject.id}/subprojects`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: quickAddName.trim(),
+          status: "IN_PROGRESS",
+          priority: "MEDIUM",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to create subproject");
+      }
+
+      const created = await res.json();
+      setSubprojects((prev) => [...prev, created]);
+
+      if (quickAddContext === "create") {
+        setValue("subprojectId", created.id, { shouldDirty: true });
+      } else if (quickAddContext === "modify") {
+        setModifySubprojectId(created.id);
+      } else if (quickAddContext === "edit") {
+        setEditSubprojectId(created.id);
+      }
+
+      toast.success(`Subproject "${created.name}" created and assigned!`);
+      setQuickAddName("");
+      setQuickAddOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create subproject");
+    } finally {
+      setIsQuickAdding(false);
+    }
+  };
+
   return (
     <>
+      {/* QUICK ADD SUBPROJECT MODAL */}
+      <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-primary" />
+              Quick Add Subproject
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Add a new module/subproject under <strong>{quickAddTargetProject?.name || "the project"}</strong>.
+            </p>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Subproject Name *</Label>
+              <Input
+                placeholder="e.g. Video Editing, Color Grading, Sprint 1"
+                value={quickAddName}
+                onChange={(e) => setQuickAddName(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setQuickAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleQuickAddSubproject} disabled={isQuickAdding || !quickAddName.trim()}>
+              {isQuickAdding ? <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+              Create & Select
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ADMIN ADD/CREATE DIALOG */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setCreateCoAssignees([]); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -152,11 +298,20 @@ export function TaskActionDialogs({
                 )} />
               </div>
             </div>
+
+            {/* Project & Subproject Selectors */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Project</Label>
                 <Controller control={control} name="projectId" render={({ field }) => (
-                  <Select value={field.value || "none"} onValueChange={(val) => field.onChange(val === "none" ? "" : val)}>
+                  <Select
+                    value={field.value || "none"}
+                    onValueChange={(val) => {
+                      const pVal = val === "none" ? "" : val;
+                      field.onChange(pVal);
+                      setValue("subprojectId", "", { shouldDirty: true });
+                    }}
+                  >
                     <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No project</SelectItem>
@@ -165,19 +320,63 @@ export function TaskActionDialogs({
                   </Select>
                 )} />
               </div>
+
               <div className="space-y-1.5">
-                <Label>Primary Assignee</Label>
-                <Controller control={control} name="assigneeId" render={({ field }) => (
-                  <Select value={field.value || "unassigned"} onValueChange={(val) => field.onChange(val === "unassigned" ? "" : val)}>
-                    <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Unassigned</SelectItem>
-                      {(users ?? []).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )} />
+                <div className="flex items-center justify-between">
+                  <Label>Subproject (Module)</Label>
+                  {watchProjectId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const proj = (projects ?? []).find((p) => p.id === watchProjectId);
+                        setQuickAddTargetProject(proj ? { id: proj.id, name: proj.name } : null);
+                        setQuickAddContext("create");
+                        setQuickAddOpen(true);
+                      }}
+                      className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="h-3 w-3" /> Quick Add
+                    </button>
+                  )}
+                </div>
+                <Controller control={control} name="subprojectId" render={({ field }) => {
+                  const filtered = subprojects.filter((sp) => sp.projectId === watchProjectId);
+                  return (
+                    <Select
+                      value={field.value || "none"}
+                      onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
+                      disabled={!watchProjectId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={watchProjectId ? "Select subproject" : "Select project first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">General / No Subproject</SelectItem>
+                        {filtered.map((sp) => (
+                          <SelectItem key={sp.id} value={sp.id}>
+                            ↳ {sp.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  );
+                }} />
               </div>
             </div>
+
+            <div className="space-y-1.5">
+              <Label>Primary Assignee</Label>
+              <Controller control={control} name="assigneeId" render={({ field }) => (
+                <Select value={field.value || "unassigned"} onValueChange={(val) => field.onChange(val === "unassigned" ? "" : val)}>
+                  <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {(users ?? []).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )} />
+            </div>
+
             <div className="relative">
               <MultiAssigneePicker
                 users={users ?? []}
@@ -292,10 +491,19 @@ export function TaskActionDialogs({
                 </Select>
               </div>
             </div>
+
+            {/* Project & Subproject */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Project</Label>
-                <Select name="projectId" defaultValue={selectedTaskForAction?.projectId || "none"}>
+                <Select
+                  name="projectId"
+                  value={modifyProjectId}
+                  onValueChange={(val) => {
+                    setModifyProjectId(val);
+                    setModifySubprojectId("none");
+                  }}
+                >
                   <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No project</SelectItem>
@@ -303,17 +511,63 @@ export function TaskActionDialogs({
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-1.5">
-                <Label>Primary Assignee</Label>
-                <Select name="assigneeId" defaultValue={selectedTaskForAction?.assigneeId || "unassigned"}>
-                  <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
+                <div className="flex items-center justify-between">
+                  <Label>Subproject (Module)</Label>
+                  {modifyProjectId && modifyProjectId !== "none" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const proj = (projects ?? []).find((p) => p.id === modifyProjectId);
+                        setQuickAddTargetProject(proj ? { id: proj.id, name: proj.name } : null);
+                        setQuickAddContext("modify");
+                        setQuickAddOpen(true);
+                      }}
+                      className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="h-3 w-3" /> Quick Add
+                    </button>
+                  )}
+                </div>
+                <Select
+                  name="subprojectId"
+                  value={modifySubprojectId}
+                  onValueChange={setModifySubprojectId}
+                  disabled={!modifyProjectId || modifyProjectId === "none"}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={modifyProjectId && modifyProjectId !== "none" ? "Select subproject" : "Select project first"} />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {(users ?? []).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                    <SelectItem value="none">General / No Subproject</SelectItem>
+                    {subprojects
+                      .filter((sp) => sp.projectId === modifyProjectId)
+                      .map((sp) => (
+                        <SelectItem key={sp.id} value={sp.id}>
+                          ↳ {sp.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            {/* Hidden fields for explicit FormData delivery */}
+            <input type="hidden" name="projectId" value={modifyProjectId} />
+            <input type="hidden" name="subprojectId" value={modifySubprojectId} />
+
+            <div className="space-y-1.5">
+              <Label>Primary Assignee</Label>
+              <Select name="assigneeId" defaultValue={selectedTaskForAction?.assigneeId || "unassigned"}>
+                <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {(users ?? []).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* hidden input carries co-assignees as JSON for the native form handler */}
             <input type="hidden" name="coAssignees" value={JSON.stringify(modifyCoAssignees)} />
             <div className="relative">
@@ -401,10 +655,19 @@ export function TaskActionDialogs({
                 </Select>
               </div>
             </div>
+
+            {/* Project & Subproject */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Project</Label>
-                <Select name="projectId" defaultValue={selectedTaskForAction?.projectId || "none"}>
+                <Select
+                  name="projectId"
+                  value={editProjectId}
+                  onValueChange={(val) => {
+                    setEditProjectId(val);
+                    setEditSubprojectId("none");
+                  }}
+                >
                   <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No project</SelectItem>
@@ -412,17 +675,63 @@ export function TaskActionDialogs({
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-1.5">
-                <Label>Primary Assignee</Label>
-                <Select name="assigneeId" defaultValue={selectedTaskForAction?.assigneeId || "unassigned"}>
-                  <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
+                <div className="flex items-center justify-between">
+                  <Label>Subproject (Module)</Label>
+                  {editProjectId && editProjectId !== "none" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const proj = (projects ?? []).find((p) => p.id === editProjectId);
+                        setQuickAddTargetProject(proj ? { id: proj.id, name: proj.name } : null);
+                        setQuickAddContext("edit");
+                        setQuickAddOpen(true);
+                      }}
+                      className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="h-3 w-3" /> Quick Add
+                    </button>
+                  )}
+                </div>
+                <Select
+                  name="subprojectId"
+                  value={editSubprojectId}
+                  onValueChange={setEditSubprojectId}
+                  disabled={!editProjectId || editProjectId === "none"}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={editProjectId && editProjectId !== "none" ? "Select subproject" : "Select project first"} />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {(users ?? []).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                    <SelectItem value="none">General / No Subproject</SelectItem>
+                    {subprojects
+                      .filter((sp) => sp.projectId === editProjectId)
+                      .map((sp) => (
+                        <SelectItem key={sp.id} value={sp.id}>
+                          ↳ {sp.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            {/* Explicit hidden inputs for FormData retrieval */}
+            <input type="hidden" name="projectId" value={editProjectId} />
+            <input type="hidden" name="subprojectId" value={editSubprojectId} />
+
+            <div className="space-y-1.5">
+              <Label>Primary Assignee</Label>
+              <Select name="assigneeId" defaultValue={selectedTaskForAction?.assigneeId || "unassigned"}>
+                <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {(users ?? []).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* hidden input carries co-assignees as JSON for the native form handler */}
             <input type="hidden" name="coAssignees" value={JSON.stringify(editCoAssignees)} />
             <div className="relative">

@@ -101,6 +101,17 @@ export function ProjectSubprojects({ projectId, isAdmin }: { projectId: string; 
     enabled: dialogOpen && isAdmin,
   });
 
+  const { data: allTasks } = useQuery<any[]>({
+    queryKey: ["tasks-for-subprojects", projectId],
+    queryFn: async () => {
+      const res = await fetch("/api/tasks", { headers: getAuthHeaders(false) });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: expanded || viewDialogOpen,
+  });
+
   const { register, handleSubmit, control, reset } = useForm<SubprojectFormData>({
     defaultValues: { name: "", status: "NOT_STARTED", priority: "MEDIUM" },
   });
@@ -255,6 +266,8 @@ export function ProjectSubprojects({ projectId, isAdmin }: { projectId: string; 
           ) : (
             subprojects.map((sub) => {
               const sc = STATUS_CONFIG[sub.status ?? "NOT_STARTED"] ?? STATUS_CONFIG.NOT_STARTED;
+              const linkedTasks = (allTasks || []).filter((t: any) => t.subprojectId === sub.id);
+              const completedCount = linkedTasks.filter((t: any) => t.status === "DONE" || t.status === "COMPLETED").length;
               return (
                 <div
                   key={sub.id}
@@ -265,6 +278,10 @@ export function ProjectSubprojects({ projectId, isAdmin }: { projectId: string; 
                     <span className="font-medium text-foreground truncate">{sub.name}</span>
                     <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4 border shrink-0", sc.className)}>
                       {sc.label}
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border shrink-0 bg-primary/5 text-primary border-primary/20 flex items-center gap-1">
+                      <CheckSquare className="h-2.5 w-2.5" />
+                      {linkedTasks.length > 0 ? `${completedCount}/${linkedTasks.length} tasks` : "0 tasks"}
                     </Badge>
                     {sub.assignedEmployeeName && (
                       <span className="text-[11px] text-muted-foreground hidden sm:flex items-center gap-1 shrink-0">
@@ -405,6 +422,46 @@ export function ProjectSubprojects({ projectId, isAdmin }: { projectId: string; 
                   <p className="text-sm bg-muted/20 p-2.5 rounded-md border border-border/40 whitespace-pre-wrap">{viewingSubproject.notes}</p>
                 </div>
               )}
+
+              {/* Linked Tasks to this Subproject */}
+              <div className="space-y-2 pt-2 border-t border-border/40">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                    <CheckSquare className="h-3.5 w-3.5 text-primary" /> Linked Tasks (
+                    {(allTasks || []).filter((t: any) => t.subprojectId === viewingSubproject.id).length}
+                    )
+                  </p>
+                </div>
+                {(() => {
+                  const tasksForThisSub = (allTasks || []).filter((t: any) => t.subprojectId === viewingSubproject.id);
+                  if (tasksForThisSub.length === 0) {
+                    return (
+                      <p className="text-xs text-muted-foreground italic bg-muted/20 p-2.5 rounded-md border border-border/30">
+                        No tasks assigned to this subproject yet. When creating or editing a task, select this project and this subproject.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {tasksForThisSub.map((t: any) => (
+                        <div key={t.id} className="flex items-center justify-between p-2 rounded-md bg-muted/30 border border-border/40 text-xs">
+                          <div className="min-w-0 flex items-center gap-2">
+                            <span className="font-medium text-foreground truncate">{t.title}</span>
+                            <Badge variant="outline" className="text-[9px] px-1 py-0">{t.status}</Badge>
+                            <Badge variant="secondary" className="text-[9px] px-1 py-0">{t.priority}</Badge>
+                          </div>
+                          {t.assigneeName && (
+                            <span className="text-[11px] text-muted-foreground shrink-0 flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {t.assigneeName}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           )}
 

@@ -99,6 +99,8 @@ export function AdminTasksView() {
     const status = formData.get("status") as string;
     const rawProjectId = formData.get("projectId") as string;
     const projectId = (!rawProjectId || rawProjectId === "none") ? null : rawProjectId;
+    const rawSubprojectId = formData.get("subprojectId") as string;
+    const subprojectId = (!rawSubprojectId || rawSubprojectId === "none") ? null : rawSubprojectId;
     const rawAssigneeId = formData.get("assigneeId") as string;
     const assigneeId = (!rawAssigneeId || rawAssigneeId === "unassigned") ? null : rawAssigneeId;
     const dueDate = formData.get("dueDate") as string || null;
@@ -120,6 +122,7 @@ export function AdminTasksView() {
         priority,
         status,
         projectId,
+        subprojectId,
         assigneeId,
         coAssignees,
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
@@ -243,6 +246,8 @@ export function AdminTasksView() {
     const status = formData.get("status") as string;
     const rawProjectId = formData.get("projectId") as string;
     const projectId = (!rawProjectId || rawProjectId === "none") ? null : rawProjectId;
+    const rawSubprojectId = formData.get("subprojectId") as string;
+    const subprojectId = (!rawSubprojectId || rawSubprojectId === "none") ? null : rawSubprojectId;
     const rawAssigneeId = formData.get("assigneeId") as string;
     const assigneeId = (!rawAssigneeId || rawAssigneeId === "unassigned") ? null : rawAssigneeId;
     const dueDate = formData.get("dueDate") as string || null;
@@ -264,6 +269,7 @@ export function AdminTasksView() {
         priority,
         status,
         projectId,
+        subprojectId,
         assigneeId,
         coAssignees,
         dueDate: dueDate || null,
@@ -289,7 +295,8 @@ export function AdminTasksView() {
       return (
         t.title?.toLowerCase().includes(q) ||
         (t as any).assigneeName?.toLowerCase().includes(q) ||
-        (t as any).projectName?.toLowerCase().includes(q)
+        (t as any).projectName?.toLowerCase().includes(q) ||
+        (t as any).subprojectName?.toLowerCase().includes(q)
       );
     }
     return true;
@@ -305,7 +312,8 @@ export function AdminTasksView() {
       return (
         t.title?.toLowerCase().includes(q) ||
         (t as any).assigneeName?.toLowerCase().includes(q) ||
-        (t as any).projectName?.toLowerCase().includes(q)
+        (t as any).projectName?.toLowerCase().includes(q) ||
+        (t as any).subprojectName?.toLowerCase().includes(q)
       );
     }
     return true;
@@ -319,7 +327,8 @@ export function AdminTasksView() {
       return (
         t.title?.toLowerCase().includes(q) ||
         (t as any).assigneeName?.toLowerCase().includes(q) ||
-        (t as any).projectName?.toLowerCase().includes(q)
+        (t as any).projectName?.toLowerCase().includes(q) ||
+        (t as any).subprojectName?.toLowerCase().includes(q)
       );
     }
     return true;
@@ -589,7 +598,14 @@ export function AdminTasksView() {
                             </div>
 
                             {task.projectName && (
-                              <p className="text-[11px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded inline-block">{task.projectName}</p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="text-[11px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded inline-block">{task.projectName}</p>
+                                {(task as any).subprojectName && (
+                                  <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-0.5">
+                                    ↳ {(task as any).subprojectName}
+                                  </span>
+                                )}
+                              </div>
                             )}
 
                             <div className="flex items-center justify-between pt-1 border-t border-border/40">
@@ -703,7 +719,14 @@ export function AdminTasksView() {
                         {task.projectName && (
                           <div className="col-span-2 mt-1">
                             <span className="text-muted-foreground block font-medium">Project</span>
-                            <span className="font-semibold text-foreground">{task.projectName}</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-foreground">{task.projectName}</span>
+                              {(task as any).subprojectName && (
+                                <span className="text-[11px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded font-medium">
+                                  ↳ {(task as any).subprojectName}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )}
                         {task.dueDate && (
@@ -955,7 +978,14 @@ export function AdminTasksView() {
                                           )}
                                         </div>
                                         <p className="font-semibold text-foreground truncate">{t.title}</p>
-                                        {t.projectName && <p className="text-[10px] text-muted-foreground truncate">{t.projectName}</p>}
+                                        {t.projectName && (
+                                          <div className="flex items-center gap-1.5 truncate">
+                                            <p className="text-[10px] text-muted-foreground truncate">{t.projectName}</p>
+                                            {(t as any).subprojectName && (
+                                              <span className="text-[9px] text-primary truncate">↳ {(t as any).subprojectName}</span>
+                                            )}
+                                          </div>
+                                        )}
                                       </div>
 
                                       <Button
@@ -1114,7 +1144,14 @@ export function AdminTasksView() {
                       )}
                       <div className="space-y-1 text-[11px] text-muted-foreground">
                         {task.projectName && (
-                          <p><span className="font-semibold text-foreground">Project:</span> {task.projectName}</p>
+                          <p className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-foreground">Project:</span> {task.projectName}
+                            {(task as any).subprojectName && (
+                              <span className="text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded font-medium text-xs">
+                                ↳ {(task as any).subprojectName}
+                              </span>
+                            )}
+                          </p>
                         )}
                         {task.dueDate && (
                           <p><span className="font-semibold text-foreground">Due Date:</span> {format(new Date(task.dueDate), "dd MMM yyyy")}</p>

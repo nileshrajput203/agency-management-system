@@ -13,7 +13,7 @@ import { eq, aliasedTable, sql, desc, asc, and } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
-import { requirePermission, canManageProjectWorkspace } from "../middleware/auth";
+import { requirePermission, requireAnyPermission, canManageProjectWorkspace } from "../middleware/auth";
 import { NotificationService } from "../services/notificationService";
 
 const router = Router();
@@ -646,13 +646,18 @@ function sanitizeSubproject(body: any, isUpdate = false) {
   });
 }
 
-// Get subprojects for a project
-router.get("/:id/subprojects", requirePermission("projects.view"), asyncHandler(async (req, res) => {
-  const projectId = req.params.id as string;
+// Get all subprojects across all projects
+router.get("/subprojects", requireAnyPermission("projects.view", "tasks.view", "tasks.create", "tasks.edit"), asyncHandler(async (req, res) => {
+  const { projectId } = req.query as { projectId?: string };
+  const conditions = projectId && projectId !== "all" && projectId !== "none"
+    ? [eq(subprojectsTable.projectId, projectId)]
+    : [];
+
   const subprojects = await db
     .select({
       id: subprojectsTable.id,
       projectId: subprojectsTable.projectId,
+      projectName: projectsTable.name,
       name: subprojectsTable.name,
       status: subprojectsTable.status,
       priority: subprojectsTable.priority,
@@ -670,8 +675,43 @@ router.get("/:id/subprojects", requirePermission("projects.view"), asyncHandler(
       createdBy: subprojectsTable.createdBy,
     })
     .from(subprojectsTable)
+    .leftJoin(projectsTable, eq(subprojectsTable.projectId, projectsTable.id))
     .leftJoin(assignedUserTable, eq(subprojectsTable.assignedTo, assignedUserTable.id))
-    .where(eq(subprojectsTable.projectId, projectId));
+    .where(conditions.length > 0 ? conditions[0] : undefined);
+
+  return res.json(subprojects);
+}));
+
+// Get subprojects for a project
+router.get("/:id/subprojects", requireAnyPermission("projects.view", "tasks.view", "tasks.create", "tasks.edit"), asyncHandler(async (req, res) => {
+  const projectId = req.params.id as string;
+  const conditions = projectId === "all" ? [] : [eq(subprojectsTable.projectId, projectId)];
+
+  const subprojects = await db
+    .select({
+      id: subprojectsTable.id,
+      projectId: subprojectsTable.projectId,
+      projectName: projectsTable.name,
+      name: subprojectsTable.name,
+      status: subprojectsTable.status,
+      priority: subprojectsTable.priority,
+      description: subprojectsTable.description,
+      objective: subprojectsTable.objective,
+      requirements: subprojectsTable.requirements,
+      deliverables: subprojectsTable.deliverables,
+      notes: subprojectsTable.notes,
+      startDate: subprojectsTable.startDate,
+      dueDate: subprojectsTable.dueDate,
+      assignedTo: subprojectsTable.assignedTo,
+      assignedEmployeeName: assignedUserTable.name,
+      createdAt: subprojectsTable.createdAt,
+      updatedAt: subprojectsTable.updatedAt,
+      createdBy: subprojectsTable.createdBy,
+    })
+    .from(subprojectsTable)
+    .leftJoin(projectsTable, eq(subprojectsTable.projectId, projectsTable.id))
+    .leftJoin(assignedUserTable, eq(subprojectsTable.assignedTo, assignedUserTable.id))
+    .where(conditions.length > 0 ? conditions[0] : undefined);
 
   return res.json(subprojects);
 }));

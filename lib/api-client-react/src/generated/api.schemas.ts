@@ -282,7 +282,13 @@ export interface Task {
   /** @nullable */
   projectId?: string | null;
   /** @nullable */
+  subprojectId?: string | null;
+  /** @nullable */
   projectName?: string | null;
+  /** @nullable */
+  subprojectId?: string | null;
+  /** @nullable */
+  subprojectName?: string | null;
   /** @nullable */
   assigneeId?: string | null;
   /** @nullable */
@@ -321,6 +327,8 @@ export interface TaskInput {
   priority?: string | null;
   /** @nullable */
   projectId?: string | null;
+  /** @nullable */
+  subprojectId?: string | null;
   /** @nullable */
   assigneeId?: string | null;
   /** @nullable */

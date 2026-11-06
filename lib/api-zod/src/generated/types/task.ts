@@ -18,6 +18,10 @@ export interface Task {
   /** @nullable */
   projectName?: string | null;
   /** @nullable */
+  subprojectId?: string | null;
+  /** @nullable */
+  subprojectName?: string | null;
+  /** @nullable */
   assigneeId?: string | null;
   /** @nullable */
   assigneeName?: string | null;

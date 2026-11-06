@@ -12,6 +12,7 @@ export interface TaskInput {
   status?: string;
   priority?: string;
   projectId?: string;
+  subprojectId?: string;
   assigneeId?: string;
   dueDate?: string;
   approvalStatus?: string | null;

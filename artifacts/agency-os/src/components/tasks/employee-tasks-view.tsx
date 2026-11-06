@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useListTasks, useCreateTask, useUpdateTask, useDeleteTask,
   useListProjects, getListTasksQueryKey,
@@ -20,7 +20,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WriteWithAI } from "@/components/common/WriteWithAI";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import {
   Plus, Trash2, Calendar, CheckSquare, CheckCircle2, Edit3, FileText, EyeOff, Eye
 } from "lucide-react";
@@ -120,6 +120,23 @@ export function EmployeeTasksView() {
     defaultValues: { title: "", status: "TODO", priority: "MEDIUM" },
   });
 
+  const watchProjectId = useWatch({ control, name: "projectId" });
+  const [subprojects, setSubprojects] = useState<Array<{ id: string; projectId: string; name: string }>>([]);
+
+  useEffect(() => {
+    if (requestDialogOpen && canViewProjects) {
+      const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
+      fetch("/api/projects/subprojects", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          if (Array.isArray(data)) setSubprojects(data);
+        })
+        .catch(() => {});
+    }
+  }, [requestDialogOpen, canViewProjects]);
+
   const openRequestDialog = () => {
     reset({ title: "", status: "TODO", priority: "MEDIUM", description: "" });
     setRequestDialogOpen(true);
@@ -188,7 +205,8 @@ export function EmployeeTasksView() {
       const q = searchQuery.toLowerCase();
       return (
         t.title?.toLowerCase().includes(q) ||
-        (t as any).projectName?.toLowerCase().includes(q)
+        (t as any).projectName?.toLowerCase().includes(q) ||
+        (t as any).subprojectName?.toLowerCase().includes(q)
       );
     }
     return true;
@@ -205,7 +223,8 @@ export function EmployeeTasksView() {
       const q = searchQuery.toLowerCase();
       return (
         t.title?.toLowerCase().includes(q) ||
-        (t as any).projectName?.toLowerCase().includes(q)
+        (t as any).projectName?.toLowerCase().includes(q) ||
+        (t as any).subprojectName?.toLowerCase().includes(q)
       );
     }
     return true;
@@ -305,9 +324,16 @@ export function EmployeeTasksView() {
                               {pc.label}
                             </Badge>
                             {task.projectName && (
-                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-medium">
-                                {task.projectName}
-                              </Badge>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-medium">
+                                  {task.projectName}
+                                </Badge>
+                                {(task as any).subprojectName && (
+                                  <span className="text-[10px] text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded font-medium inline-flex items-center gap-0.5">
+                                    ↳ {(task as any).subprojectName}
+                                  </span>
+                                )}
+                              </div>
                             )}
                             {task.approvalStatus === "MODIFIED" && (
                               <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px] px-1.5 py-0 dark:bg-blue-950/40 dark:text-blue-400">
@@ -483,7 +509,14 @@ export function EmployeeTasksView() {
 
                       <div className="space-y-1 text-[11px] text-muted-foreground border-t border-border/40 pt-2">
                         {task.projectName && (
-                          <p><span className="font-semibold text-foreground">Project:</span> {task.projectName}</p>
+                          <p className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-semibold text-foreground">Project:</span> {task.projectName}
+                            {(task as any).subprojectName && (
+                              <span className="text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded font-medium text-xs">
+                                ↳ {(task as any).subprojectName}
+                              </span>
+                            )}
+                          </p>
                         )}
                         {task.dueDate && (
                           <p><span className="font-semibold text-foreground">Requested Due Date:</span> {format(new Date(task.dueDate), "dd MMM yyyy")}</p>
@@ -571,11 +604,21 @@ export function EmployeeTasksView() {
                   </Select>
                 )} />
               </div>
-              {canViewProjects && (
+            </div>
+
+            {canViewProjects && (
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Project</Label>
                   <Controller control={control} name="projectId" render={({ field }) => (
-                    <Select value={field.value || "none"} onValueChange={(val) => field.onChange(val === "none" ? "" : val)}>
+                    <Select
+                      value={field.value || "none"}
+                      onValueChange={(val) => {
+                        const pVal = val === "none" ? "" : val;
+                        field.onChange(pVal);
+                        setValue("subprojectId", "");
+                      }}
+                    >
                       <SelectTrigger><SelectValue placeholder="Select project" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">No project</SelectItem>
@@ -584,8 +627,34 @@ export function EmployeeTasksView() {
                     </Select>
                   )} />
                 </div>
-              )}
-            </div>
+
+                <div className="space-y-1.5">
+                  <Label>Subproject (Module)</Label>
+                  <Controller control={control} name="subprojectId" render={({ field }) => {
+                    const filtered = subprojects.filter((sp) => sp.projectId === watchProjectId);
+                    return (
+                      <Select
+                        value={field.value || "none"}
+                        onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
+                        disabled={!watchProjectId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={watchProjectId ? "Select subproject" : "Select project first"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">General / No Subproject</SelectItem>
+                          {filtered.map((sp) => (
+                            <SelectItem key={sp.id} value={sp.id}>
+                              ↳ {sp.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    );
+                  }} />
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Assignee</Label>

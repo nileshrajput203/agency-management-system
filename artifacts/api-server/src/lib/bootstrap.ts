@@ -93,6 +93,8 @@ export async function ensureSubprojectsTable(): Promise<void> {
     `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assignment_note TEXT`,
     `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS manager_approved_by TEXT`,
     `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS manager_approved_at TIMESTAMP WITH TIME ZONE`,
+    `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS subproject_id TEXT REFERENCES subprojects(id) ON DELETE SET NULL`,
+    `CREATE INDEX IF NOT EXISTS tasks_subproject_id_idx ON tasks(subproject_id)`,
     `ALTER TABLE projects ADD COLUMN IF NOT EXISTS co_assignees JSONB DEFAULT '[]'::jsonb`,
     `ALTER TABLE projects ADD COLUMN IF NOT EXISTS started_at TIMESTAMP WITH TIME ZONE`,
     `ALTER TABLE projects ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE`,

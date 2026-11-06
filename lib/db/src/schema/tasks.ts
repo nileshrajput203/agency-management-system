@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
-import { projectsTable } from "./projects";
+import { projectsTable, subprojectsTable } from "./projects";
 import { usersTable } from "./users";
 
 export const tasksTable = pgTable("tasks", {
@@ -10,6 +10,7 @@ export const tasksTable = pgTable("tasks", {
   status: text("status").default("TODO"),
   priority: text("priority").default("MEDIUM"),
   projectId: text("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
+  subprojectId: text("subproject_id").references(() => subprojectsTable.id, { onDelete: "set null" }),
   assigneeId: text("assignee_id").references(() => usersTable.id, { onDelete: "set null" }),
   startDate: timestamp("start_date"),
   dueDate: timestamp("due_date"),
@@ -42,6 +43,7 @@ export const tasksTable = pgTable("tasks", {
   deletedAt: timestamp("deleted_at"),
 }, (table) => [
   index("tasks_project_id_idx").on(table.projectId),
+  index("tasks_subproject_id_idx").on(table.subprojectId),
   index("tasks_assignee_id_idx").on(table.assigneeId),
   index("tasks_status_idx").on(table.status),
   index("tasks_due_date_idx").on(table.dueDate),
