@@ -13,9 +13,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Plus, ChevronLeft, ChevronRight, Calendar, Trash2, Link2,
   Share2, Copy, Check, FileText, CheckCircle2, Clock, AlertTriangle, RotateCcw, Building2,
-   Download, FileX, Sheet, Printer, Film, Zap,
+  Download, FileX, Sheet, Printer, Film, Zap, User, UserPlus, UserCheck,
 } from "lucide-react";
 import { format, addMonths, subMonths, getDaysInMonth, startOfMonth, getDay } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -222,6 +229,7 @@ export default function ContentPage() {
       scheduledAt: freshPost.scheduledAt ?? "",
       shootDate: freshPost.shootDate ?? "",
       clientId: freshPost.clientId ?? "",
+      assigneeId: (freshPost as any).assigneeId ?? "",
       assetsLink: freshPost.assetsLink ?? "",
       format: freshPost.format ?? "",
       needsRevision: isNeedsRevision(freshPost.needsRevision),
@@ -233,6 +241,28 @@ export default function ContentPage() {
     setNewComment("");
     setPanel({ mode: "edit", post: freshPost as PostRecord });
   }
+
+  const handleQuickAssign = (postId: string, assigneeId: string) => {
+    const targetUser = (users ?? []).find((u: any) => u.id === assigneeId);
+    const targetName = targetUser?.name || "Unassigned";
+    updateMutation.mutate(
+      {
+        id: postId,
+        data: {
+          assigneeId: assigneeId === "none" || !assigneeId ? null : assigneeId,
+        } as any,
+      },
+      {
+        onSuccess: () => {
+          if (assigneeId === "none" || !assigneeId) {
+            toast.success("Post unassigned");
+          } else {
+            toast.success(`Task assigned to ${targetName}! Synced with Task Board.`);
+          }
+        },
+      }
+    );
+  };
 
   function savePost(overridePayload?: Partial<typeof draft>) {
     const activeDraft = overridePayload ? { ...draft, ...overridePayload } : draft;
@@ -266,6 +296,7 @@ export default function ContentPage() {
       scheduledAt: activeDraft.scheduledAt || undefined,
       shootDate: activeDraft.shootDate || undefined,
       clientId: activeDraft.clientId || null,
+      assigneeId: activeDraft.assigneeId && activeDraft.assigneeId !== "none" ? activeDraft.assigneeId : null,
       assetsLink: activeDraft.assetsLink || undefined,
       format: activeDraft.format || undefined,
       needsRevision: String(activeDraft.needsRevision),
@@ -631,6 +662,27 @@ export default function ContentPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {/* Fast Assign Task to Assignee */}
+                    <div className="flex items-center gap-1">
+                      <Select
+                        value={(post as any).assigneeId || "none"}
+                        onValueChange={(val) => handleQuickAssign(post.id, val)}
+                      >
+                        <SelectTrigger className="h-7 text-xs px-2.5 bg-muted/50 border border-primary/20 hover:border-primary rounded-lg font-medium gap-1 min-w-[130px]">
+                          <User className="h-3 w-3 text-primary shrink-0" />
+                          <SelectValue placeholder="Assign task…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">-- Unassigned --</SelectItem>
+                          {(users ?? []).map((u: any) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.name} ({u.systemRole || u.role || "Team"})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     {fileUrl ? (
                       <Button
                         size="sm"
@@ -689,6 +741,11 @@ export default function ContentPage() {
                     {dayPosts.slice(0, 3).map((p) => {
                       const isRevision = isNeedsRevision((p as any).needsRevision) || (p as any).approvalStatus === "NEEDS_CHANGES";
                       const pFileUrl = getPostAttachmentUrl(p);
+                      const postAssigneeId = (p as any).assigneeId;
+                      const assignedUser = (users ?? []).find((u: any) => u.id === postAssigneeId);
+                      const assigneeInitials = assignedUser?.name
+                        ? assignedUser.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
+                        : "";
                       return (
                         <div
                           key={p.id}
@@ -702,6 +759,39 @@ export default function ContentPage() {
                         >
                           {isRevision ? <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" /> : PLATFORM_ICON[p.platform ?? "INSTAGRAM"]}
                           <span className="truncate flex-1">{p.title ?? p.caption?.slice(0, 20) ?? p.contentType}</span>
+
+                          {/* Quick Assign Dropdown directly on Calendar chip */}
+                          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                            <Select
+                              value={(p as any).assigneeId || "none"}
+                              onValueChange={(val) => handleQuickAssign(p.id, val)}
+                            >
+                              <SelectTrigger
+                                title={assignedUser ? `Assigned to: ${assignedUser.name} (Click to reassign)` : "Click to assign task directly"}
+                                className={cn(
+                                  "h-4 text-[9px] px-1 py-0 rounded border-0 shadow-none font-bold gap-0.5 max-w-[28px] focus:ring-0",
+                                  assignedUser
+                                    ? "bg-primary/20 text-primary hover:bg-primary/30"
+                                    : "bg-muted/70 text-muted-foreground hover:bg-muted opacity-60 group-hover/item:opacity-100"
+                                )}
+                              >
+                                {assigneeInitials ? (
+                                  <span className="uppercase text-[9px] font-extrabold">{assigneeInitials}</span>
+                                ) : (
+                                  <UserPlus className="h-2.5 w-2.5" />
+                                )}
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">-- Unassigned --</SelectItem>
+                                {(users ?? []).map((u: any) => (
+                                  <SelectItem key={u.id} value={u.id}>
+                                    {u.name} ({u.systemRole || u.role || "Team"})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
                           {pFileUrl && (
                             <button
                               type="button"
@@ -741,6 +831,7 @@ export default function ContentPage() {
         activeClient={activeClient}
         clients={clients}
         clientsLoading={isLoadingClients}
+        users={(users ?? []) as any[]}
         isPending={isPending}
         savePost={savePost}
         deleteMutation={deleteMutation}

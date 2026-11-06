@@ -212,6 +212,26 @@ export function WorkReportManager() {
 
   // IF A REPORT IS SELECTED -> RENDER FULL-PAGE VIEW
   if (selectedReportId) {
+    const currentReport = selectedReport || reports.find((r: any) => r.id === selectedReportId);
+    if (!currentReport) {
+      return (
+        <div className="p-12 text-center text-muted-foreground space-y-4 max-w-md mx-auto">
+          <RefreshCw className="h-8 w-8 mx-auto animate-spin text-primary opacity-60" />
+          <p className="text-sm font-medium">Loading work report…</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setIsEditorOpen(false);
+              setSelectedReportId(null);
+            }}
+            className="text-xs"
+          >
+            Cancel & Return
+          </Button>
+        </div>
+      );
+    }
     return (
       <div className="p-4 md:p-6 w-full max-w-none">
         <WorkReportEditorView
@@ -220,7 +240,7 @@ export function WorkReportManager() {
             setSelectedReportId(null);
           }}
           reportId={selectedReportId}
-          report={selectedReport}
+          report={currentReport}
           isManagerOrAdmin={isManagerOrAdmin}
           currentUserId={user?.id}
           onRefresh={() => {
@@ -983,23 +1003,23 @@ function WorkReportEditorView({
 
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
-              {report.title}
+              {report?.title || "Work Report"}
             </h1>
             {renderStatusBadge(status)}
-            <Badge variant="outline" className="text-xs font-mono">v{report.currentVersion}</Badge>
+            <Badge variant="outline" className="text-xs font-mono">v{report?.currentVersion || 1}</Badge>
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <User className="h-3.5 w-3.5 text-primary" />
-              <strong>{report.employeeName}</strong> ({report.employeeDesignation || "Team Member"})
+              <strong>{report?.employeeName || "Team Member"}</strong> ({report?.employeeDesignation || "Team Member"})
             </span>
             <span>•</span>
             <span className="flex items-center gap-1">
               <Calendar className="h-3.5 w-3.5" />
-              Period: <strong className="text-foreground">{report.period}</strong>
+              Period: <strong className="text-foreground">{report?.period || "Monthly"}</strong>
             </span>
-            {report.userEmail && (
+            {report?.userEmail && (
               <>
                 <span>•</span>
                 <span className="flex items-center gap-1">

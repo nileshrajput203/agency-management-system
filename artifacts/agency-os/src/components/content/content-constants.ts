@@ -186,6 +186,7 @@ export function emptyDraft(defaultDate?: string, clientId = "") {
     scheduledAt: defaultDate ?? "",
     shootDate: "",
     clientId,
+    assigneeId: "",
     assetsLink: "",
     format: "",
     needsRevision: false as boolean | string,

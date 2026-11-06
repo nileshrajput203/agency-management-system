@@ -16,7 +16,7 @@ import { isManagerOrAdminRole } from "@/lib/permissions";
 import {
   FileText, Trash2, Send, CheckCircle2, XCircle, AlertTriangle, RotateCcw,
   Paperclip, Clock, Calendar, Image, Link2, Settings2, Plus, X, MessageSquare,
-  UploadCloud, Download, FileX,
+  UploadCloud, Download, FileX, User, UserCheck, UserPlus,
 } from "lucide-react";
 import {
   STATUS_CONFIG, FORMAT_OPTIONS, PLATFORM_OPTIONS, parseClientRevision,
@@ -32,6 +32,7 @@ interface ContentPostDrawerProps {
   activeClient: any;
   clients: any[] | undefined;
   clientsLoading: boolean;
+  users?: any[] | undefined;
   isPending: boolean;
   savePost: (overridePayload?: any) => void;
   deleteMutation: any;
@@ -48,6 +49,7 @@ export function ContentPostDrawer({
   activeClient,
   clients,
   clientsLoading,
+  users,
   isPending,
   savePost,
   deleteMutation,
@@ -451,6 +453,43 @@ export function ContentPostDrawer({
                   </p>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Task Assignment Group */}
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <UserCheck className="h-3.5 w-3.5 text-primary" /> Task Assignment & Ownership
+              </h3>
+              {draft.assigneeId && draft.assigneeId !== "none" && (
+                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[10px] font-semibold gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Auto-syncs with Task Board
+                </Badge>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Assign Task Directly To</Label>
+              <Select
+                value={draft.assigneeId || "__none__"}
+                onValueChange={(val) => setField("assigneeId", val === "__none__" ? "" : val)}
+              >
+                <SelectTrigger className="text-xs">
+                  <SelectValue placeholder="Select team member to assign…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">-- Unassigned --</SelectItem>
+                  {(users ?? []).map((u: any) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name} ({u.systemRole || u.role || "Team"})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Assigning an employee automatically creates and updates a linked task on their Task Board with deadlines synced directly from this post.
+              </p>
             </div>
           </div>
 

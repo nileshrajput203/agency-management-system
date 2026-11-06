@@ -1927,11 +1927,12 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                           const mediaUrl =
                             p.coverImageUrl ||
                             p.assetsLink ||
-                            (Array.isArray(p.mediaUrls) ? p.mediaUrls[0] : null) ||
-                            (Array.isArray(p.mediaFiles) ? p.mediaFiles[0] : null) ||
+                            (Array.isArray(p.mediaUrls) ? p.mediaUrls[0] : (typeof p.mediaUrls === "string" ? p.mediaUrls : null)) ||
+                            (Array.isArray(p.mediaFiles) ? p.mediaFiles[0] : (typeof p.mediaFiles === "string" ? p.mediaFiles : null)) ||
                             (Array.isArray(p.assetVersions) && p.assetVersions.length > 0
                               ? p.assetVersions[p.assetVersions.length - 1]?.url
                               : null) ||
+                            p.referenceUrl ||
                             "";
                           const parsed = parseMediaUrl(mediaUrl);
                           const isReel = p.format === "REEL" || p.contentType === "REEL";
@@ -1958,102 +1959,105 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                                   : "border-border/60 hover:opacity-95 hover:border-primary/50"
                               )}
                             >
-                              {mediaUrl ? (
-                                parsed.type === "gdrive" ? (
-                                  <div className="relative w-full h-full bg-slate-950">
-                                    <img
-                                      src={parsed.previewUrl.replace("/preview", "/thumbnail?sz=w600")}
-                                      alt={p.title || "Post"}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        (e.target as HTMLElement).style.display = "none";
-                                      }}
-                                    />
-                                    {isReel && (
+                              {/* Background aesthetic info tile: visible when media is absent or loading */}
+                              <div className={cn("absolute inset-0 bg-gradient-to-br flex flex-col justify-between p-2 select-none z-0", gradientClass)}>
+                                <div className="flex items-center justify-between text-[9px] font-bold">
+                                  <span className="flex items-center gap-1 opacity-80 uppercase text-[8px] tracking-wider">
+                                    {isReel ? <Film className="h-2.5 w-2.5" /> : isCarousel ? <Layers className="h-2.5 w-2.5" /> : <Camera className="h-2.5 w-2.5" />}
+                                    {p.format || p.contentType || "POST"}
+                                  </span>
+                                  {p.scheduledAt && (
+                                    <span className="text-[8px] bg-white/10 px-1 py-0.5 rounded opacity-90 font-mono">
+                                      {format(new Date(p.scheduledAt), "dd MMM")}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="text-center my-auto px-0.5">
+                                  <p className="font-bold text-[11px] leading-tight text-white line-clamp-2">
+                                    {p.title || `Post #${i + 1}`}
+                                  </p>
+                                  {p.conceptHook && (
+                                    <p className="text-[8px] text-white/70 line-clamp-1 mt-0.5 italic">
+                                      "{p.conceptHook}"
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="flex items-center justify-between text-[8px] pt-1 border-t border-white/10">
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "text-[8px] px-1 py-0 h-4 border-0 font-semibold",
+                                      p.status === "ADMIN_APPROVED" || p.status === "SCHEDULED"
+                                        ? "bg-emerald-500/20 text-emerald-300"
+                                        : p.status === "IN_REVIEW"
+                                        ? "bg-amber-500/20 text-amber-300"
+                                        : "bg-white/10 text-white/70"
+                                    )}
+                                  >
+                                    {p.status || "IDEA"}
+                                  </Badge>
+                                  <span className="text-[8px] text-white/50 group-hover:text-primary transition-colors flex items-center gap-0.5 font-medium">
+                                    <Upload className="h-2.5 w-2.5" /> Cut
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Media overlay if file exists */}
+                              {mediaUrl && (
+                                <div className="relative w-full h-full z-1">
+                                  {parsed.type === "gdrive" ? (
+                                    <div className="relative w-full h-full">
+                                      <img
+                                        src={parsed.previewUrl.replace("/preview", "/thumbnail?sz=w600")}
+                                        alt={p.title || "Post"}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          (e.target as HTMLElement).style.display = "none";
+                                        }}
+                                      />
+                                      {isReel && (
+                                        <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
+                                          <Film className="h-3 w-3" />
+                                        </div>
+                                      )}
+                                      {isCarousel && (
+                                        <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
+                                          <Layers className="h-3 w-3" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : parsed.type === "video" || isReel || mediaUrl.match(/\.(mp4|mov|webm|m4v)/i) ? (
+                                    <div className="relative w-full h-full">
+                                      <video
+                                        src={parsed.streamUrl || mediaUrl}
+                                        className="w-full h-full object-cover pointer-events-none"
+                                        preload="metadata"
+                                        muted
+                                        playsInline
+                                      />
                                       <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
                                         <Film className="h-3 w-3" />
                                       </div>
-                                    )}
-                                    {isCarousel && (
-                                      <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
-                                        <Layers className="h-3 w-3" />
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : parsed.type === "video" || isReel || mediaUrl.match(/\.(mp4|mov|webm|m4v)/i) ? (
-                                  <div className="relative w-full h-full bg-slate-950">
-                                    <video
-                                      src={parsed.streamUrl || mediaUrl}
-                                      className="w-full h-full object-cover pointer-events-none"
-                                      preload="metadata"
-                                      muted
-                                      playsInline
-                                    />
-                                    <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
-                                      <Film className="h-3 w-3" />
                                     </div>
-                                  </div>
-                                ) : (
-                                  <div className="relative w-full h-full bg-slate-950">
-                                    <img
-                                      src={mediaUrl}
-                                      alt={p.title || "Post"}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        (e.target as HTMLElement).style.display = "none";
-                                      }}
-                                    />
-                                    {isCarousel && (
-                                      <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
-                                        <Layers className="h-3 w-3" />
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              ) : (
-                                /* Creative Aesthetic Placeholder Tile when no final media is uploaded yet */
-                                <div className={cn("w-full h-full bg-gradient-to-br flex flex-col justify-between p-2 select-none", gradientClass)}>
-                                  <div className="flex items-center justify-between text-[9px] font-bold">
-                                    <span className="flex items-center gap-1 opacity-80 uppercase text-[8px] tracking-wider">
-                                      {isReel ? <Film className="h-2.5 w-2.5" /> : isCarousel ? <Layers className="h-2.5 w-2.5" /> : <Camera className="h-2.5 w-2.5" />}
-                                      {p.format || p.contentType || "POST"}
-                                    </span>
-                                    {p.scheduledAt && (
-                                      <span className="text-[8px] bg-white/10 px-1 py-0.5 rounded opacity-90 font-mono">
-                                        {format(new Date(p.scheduledAt), "dd MMM")}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <div className="text-center my-auto px-0.5">
-                                    <p className="font-bold text-[11px] leading-tight text-white line-clamp-2">
-                                      {p.title || `Post #${i + 1}`}
-                                    </p>
-                                    {p.conceptHook && (
-                                      <p className="text-[8px] text-white/70 line-clamp-1 mt-0.5 italic">
-                                        "{p.conceptHook}"
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  <div className="flex items-center justify-between text-[8px] pt-1 border-t border-white/10">
-                                    <Badge
-                                      variant="outline"
-                                      className={cn(
-                                        "text-[8px] px-1 py-0 h-4 border-0 font-semibold",
-                                        p.status === "ADMIN_APPROVED" || p.status === "SCHEDULED"
-                                          ? "bg-emerald-500/20 text-emerald-300"
-                                          : p.status === "IN_REVIEW"
-                                          ? "bg-amber-500/20 text-amber-300"
-                                          : "bg-white/10 text-white/70"
+                                  ) : (
+                                    <div className="relative w-full h-full">
+                                      <img
+                                        src={mediaUrl}
+                                        alt={p.title || "Post"}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          (e.target as HTMLElement).style.display = "none";
+                                        }}
+                                      />
+                                      {isCarousel && (
+                                        <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-xs p-1 rounded-md text-white">
+                                          <Layers className="h-3 w-3" />
+                                        </div>
                                       )}
-                                    >
-                                      {p.status || "IDEA"}
-                                    </Badge>
-                                    <span className="text-[8px] text-white/50 group-hover:text-primary transition-colors flex items-center gap-0.5 font-medium">
-                                      <Upload className="h-2.5 w-2.5" /> Cut
-                                    </span>
-                                  </div>
+                                    </div>
+                                  )}
                                 </div>
                               )}
 

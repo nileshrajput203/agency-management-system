@@ -791,7 +791,7 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
     }
   }
 
-  // Bi-directional Auto-Sync: create linked task if assignee was just added
+  // Bi-directional Auto-Sync: create or update linked task if assignee was modified
   let targetTaskId = existing.linkedTaskId || sanitized.linkedTaskId;
   const effectiveAssignee = sanitized.currentOwnerId || sanitized.assigneeId || existing.assigneeId;
 
@@ -816,8 +816,39 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
 
       targetTaskId = newTask.id;
       sanitized.linkedTaskId = newTask.id;
+
+      if (effectiveAssignee && effectiveAssignee !== (req as any).userId) {
+        NotificationService.createNotification({
+          userId: effectiveAssignee,
+          title: `📝 New Content Task Assigned: ${sanitized.title || existing.title || "Social Post"}`,
+          message: `You were assigned to "${sanitized.title || existing.title || "Content Post"}" on the Content Calendar.`,
+          type: "TASK",
+          priority: "MEDIUM",
+          referenceId: newTask.id,
+          referenceType: "CONTENT",
+          senderId: (req as any).userId,
+        }).catch(() => {});
+      }
     } catch (tErr) {
       logger.warn({ tErr }, "Failed to auto-create task for content post");
+    }
+  } else if (targetTaskId && sanitized.assigneeId !== undefined) {
+    try {
+      await db.update(tasksTable).set({ assigneeId: sanitized.assigneeId || null }).where(eq(tasksTable.id, targetTaskId));
+      if (sanitized.assigneeId && sanitized.assigneeId !== (req as any).userId) {
+        NotificationService.createNotification({
+          userId: sanitized.assigneeId,
+          title: `📝 Content Task Assigned: ${sanitized.title || existing.title || "Social Post"}`,
+          message: `You were assigned to "${sanitized.title || existing.title || "Content Post"}" on the Content Calendar.`,
+          type: "TASK",
+          priority: "MEDIUM",
+          referenceId: targetTaskId,
+          referenceType: "CONTENT",
+          senderId: (req as any).userId,
+        }).catch(() => {});
+      }
+    } catch (aErr) {
+      logger.warn({ aErr }, "Failed to update linked task assignee");
     }
   }
 

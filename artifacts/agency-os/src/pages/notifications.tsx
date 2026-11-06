@@ -61,11 +61,15 @@ export default function NotificationsPage() {
   const currentUser = getUser();
   const canBroadcastAnnouncement = canManageModule(currentUser, "team");
 
-  const fetchNotifications = async (isBackground = false) => {
+  const fetchNotifications = async (isBackground: boolean | any = false) => {
+    const bg = typeof isBackground === "boolean" ? isBackground : false;
     const token = getToken();
-    if (!token) return;
+    if (!token) {
+      setLoading(false);
+      return;
+    }
 
-    if (!isBackground && notifications.length === 0) {
+    if (!bg && notifications.length === 0) {
       setLoading(true);
     }
     try {
@@ -87,7 +91,7 @@ export default function NotificationsPage() {
       setNotifications(data.notifications || []);
       setUnreadCount(data.unreadCount || 0);
     } catch (err: any) {
-      if (!isBackground) {
+      if (!bg) {
         toast.error(err.message || "Failed to fetch notifications");
       }
     } finally {
@@ -103,6 +107,7 @@ export default function NotificationsPage() {
       if (e?.detail?.notifications && activeTab === "ALL" && priorityFilter === "ALL" && !unreadOnly && !searchQuery) {
         setNotifications(e.detail.notifications);
         setUnreadCount(e.detail.unreadCount || 0);
+        setLoading(false);
       } else {
         fetchNotifications(true);
       }
@@ -451,7 +456,7 @@ export default function NotificationsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 divide-y divide-border">
-          {loading ? (
+          {loading && notifications.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground space-y-2">
               <RefreshCw className="h-8 w-8 mx-auto animate-spin opacity-40" />
               <p className="text-xs font-medium">Loading notifications...</p>

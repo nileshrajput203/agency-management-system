@@ -243,6 +243,9 @@ async function parseJsonBody(
   try {
     return JSON.parse(normalized);
   } catch (cause) {
+    if (normalized.trim().startsWith("<")) {
+      throw new Error(`Server returned HTML instead of JSON for ${requestInfo.method} ${requestInfo.url}. Please verify the route.`);
+    }
     throw new ResponseParseError(response, raw, cause, requestInfo);
   }
 }

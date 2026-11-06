@@ -114,16 +114,30 @@ export default function EmployeeProjectsPage() {
     hasExplicitModuleAccess(user?.allowedModules, "projects")
   );
 
-  // Filter projects assigned to logged-in employee
-  const myProjects = (projects ?? []).filter((p: any) =>
-    p.assignedTo === user?.id ||
-    p.assignedTo === user?.name ||
-    (Array.isArray(p.teamMembers) && p.teamMembers.includes(user?.id))
-  );
+  // Filter projects assigned to logged-in employee (primary assignee or co-assignee)
+  const myProjects = (projects ?? []).filter((p: any) => {
+    const isLead =
+      p.assignedTo === user?.id ||
+      p.assigned_to === user?.id ||
+      p.assignedTo === user?.name ||
+      p.assigned_to === user?.name;
+    const isCoAssignee =
+      (Array.isArray(p.coAssignees) && (p.coAssignees.includes(user?.id) || p.coAssignees.includes(user?.name))) ||
+      (Array.isArray(p.co_assignees) && (p.co_assignees.includes(user?.id) || p.co_assignees.includes(user?.name))) ||
+      (Array.isArray(p.teamMembers) && (p.teamMembers.includes(user?.id) || p.teamMembers.includes(user?.name)));
+    return isLead || isCoAssignee;
+  });
 
   const displayProjects = canManageProjects
     ? (viewFilter === "all" ? (projects ?? []) : myProjects)
-    : (myProjects.length > 0 ? myProjects : (projects ?? []).filter((p: any) => p.assignedTo === user?.id || p.assignedTo === user?.name));
+    : (myProjects.length > 0
+        ? myProjects
+        : (projects ?? []).filter((p: any) =>
+            p.assignedTo === user?.id ||
+            p.assigned_to === user?.id ||
+            p.assignedTo === user?.name ||
+            p.assigned_to === user?.name
+          ));
 
   const filteredProjects = displayProjects.filter((p: any) => {
     if (!search) return true;
