@@ -51,7 +51,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 const GST_RATES = [0, 5, 12, 18, 28];
 
 type LineItem = { description: string; hsnSac?: string; qty: number; unitPrice: number; taxPercent: number };
-type POFormData = Omit<PurchaseOrderInput, "lineItems"> & { lineItems: LineItem[] };
+type POFormData = Omit<PurchaseOrderInput, "lineItems"> & { lineItems: LineItem[]; number?: string };
 
 function calcTotals(items: LineItem[]) {
   let subtotal = 0;
@@ -111,7 +111,7 @@ export default function PurchaseOrdersPage() {
 
   const { data: orders, isLoading } = useListPurchaseOrders();
   const { data: clients } = useListClients(undefined, {
-    query: { enabled: canManageModule(user, "clients") },
+    query: { enabled: canManageModule(user, "clients") } as any,
   });
 
   const selected = selectedState ? (orders ?? []).find(o => o.id === selectedState.id) as PurchaseOrder || selectedState : null;

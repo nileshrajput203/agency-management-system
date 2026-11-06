@@ -21,4 +21,11 @@ export interface TaskInput {
   approvedAt?: string | null;
   rejectionReason?: string | null;
   requestedAt?: string | null;
+  startDate?: string | null;
+  objective?: string | null;
+  requirements?: string | null;
+  deliverables?: string | null;
+  notes?: string | null;
+  assignmentNote?: string | null;
+  coAssignees?: string[] | null;
 }

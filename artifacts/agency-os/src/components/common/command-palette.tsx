@@ -50,7 +50,7 @@ export function GlobalCommandPalette() {
     command();
   };
 
-  const isEmployee = user?.portalMode === "MODE_2" || user?.role === "TEAM_MEMBER" || user?.role === "EMPLOYEE";
+  const isEmployee = (user as any)?.portalMode === "MODE_2" || (user as any)?.role === "TEAM_MEMBER" || (user as any)?.role === "EMPLOYEE";
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>

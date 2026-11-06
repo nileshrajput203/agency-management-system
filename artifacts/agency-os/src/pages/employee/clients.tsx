@@ -34,7 +34,7 @@ export default function EmployeeClientsPage() {
     search: search || undefined,
   });
   const { data: projects } = useListProjects({
-    query: { enabled: canManageModule(user, "projects") },
+    query: { enabled: canManageModule(user, "projects") } as any,
   });
 
   // Find projects assigned to this employee to get assigned client IDs

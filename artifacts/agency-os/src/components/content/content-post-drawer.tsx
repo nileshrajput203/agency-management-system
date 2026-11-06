@@ -389,7 +389,7 @@ export function ContentPostDrawer({
                 <Label className="text-xs font-semibold">Status</Label>
                 <Select
                   value={draft.status}
-                  onValueChange={(v) => {
+                  onValueChange={(v: string) => {
                     if (["ADMIN_APPROVED", "SCHEDULED"].includes(v) && !isManagerOrAdmin) {
                       toast.error("Content approval can only be done by a manager or administrator.");
                       return;
@@ -412,7 +412,7 @@ export function ContentPostDrawer({
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Platform</Label>
-                <Select value={draft.platform} onValueChange={(v) => setField("platform", v)}>
+                <Select value={draft.platform} onValueChange={(v: string) => setField("platform", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {PLATFORM_OPTIONS.map((p) => (
@@ -426,7 +426,7 @@ export function ContentPostDrawer({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Format</Label>
-                <Select value={draft.format || "__none__"} onValueChange={(v) => setField("format", v === "__none__" ? "" : v)}>
+                <Select value={draft.format || "__none__"} onValueChange={(v: string) => setField("format", v === "__none__" ? "" : v)}>
                   <SelectTrigger><SelectValue placeholder="Select format" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">None</SelectItem>
@@ -438,7 +438,7 @@ export function ContentPostDrawer({
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Client</Label>
-                <Select value={draft.clientId || "__none__"} onValueChange={(v) => setField("clientId", v === "__none__" ? "" : v)}>
+                <Select value={draft.clientId || "__none__"} onValueChange={(v: string) => setField("clientId", v === "__none__" ? "" : v)}>
                   <SelectTrigger disabled={clientsLoading}>
                     <SelectValue placeholder={clientsLoading ? "Loading clients…" : "Select client"} />
                   </SelectTrigger>
@@ -473,7 +473,7 @@ export function ContentPostDrawer({
               <Label className="text-xs font-semibold">Assign Task Directly To</Label>
               <Select
                 value={draft.assigneeId || "__none__"}
-                onValueChange={(val) => setField("assigneeId", val === "__none__" ? "" : val)}
+                onValueChange={(val: string) => setField("assigneeId", val === "__none__" ? "" : val)}
               >
                 <SelectTrigger className="text-xs">
                   <SelectValue placeholder="Select team member to assign…" />

@@ -88,7 +88,7 @@ export default function AttendancePage() {
   const { user } = useAuth();
   const isUserAdminOrManager = isManagerOrAdminRole(user);
   const [selectedUserId, setSelectedUserId] = useState<string>("ALL");
-  const { data: usersList } = useListUsers({ query: { enabled: isUserAdminOrManager } });
+  const { data: usersList } = useListUsers({ query: { enabled: isUserAdminOrManager } as any });
 
   const queryParams = !isUserAdminOrManager && user?.id
     ? { userId: user.id }
@@ -202,7 +202,7 @@ export default function AttendancePage() {
     ? (attendanceHistory ?? []).filter((r) => {
         const isToday = r.date === todayDateStr;
         const activeRegular = r.checkInAt !== null && r.checkOutAt === null;
-        const activeOvertime = r.overtimeCheckInAt !== null && r.overtimeCheckOutAt === null;
+        const activeOvertime = (r as any).overtimeCheckInAt !== null && (r as any).overtimeCheckOutAt === null;
         return isToday && (activeRegular || activeOvertime);
       })
     : [];
@@ -364,14 +364,14 @@ export default function AttendancePage() {
                 )}
 
                 {/* Overtime Shift Details */}
-                {todayStatus.overtimeCheckInAt && (
+                {(todayStatus as any).overtimeCheckInAt && (
                   <div className="rounded-lg bg-violet-50 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-900/50 p-4 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-violet-800 dark:text-violet-300 font-semibold text-sm">
                         <span className="h-2 w-2 rounded-full bg-violet-500 animate-pulse" />
                         <span>Overtime Shift</span>
                       </div>
-                      {todayStatus.overtimeCheckOutAt ? (
+                      {(todayStatus as any).overtimeCheckOutAt ? (
                         <Badge variant="secondary" className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300 text-[10px]">
                           Completed
                         </Badge>
@@ -384,12 +384,12 @@ export default function AttendancePage() {
                     <div className="text-xs text-violet-700 dark:text-violet-400 space-y-1">
                       <p>
                         <strong>Overtime Check In:</strong>{" "}
-                        {format(new Date(todayStatus.overtimeCheckInAt), "p")}
+                        {format(new Date((todayStatus as any).overtimeCheckInAt), "p")}
                       </p>
-                      {todayStatus.overtimeCheckOutAt && (
+                      {(todayStatus as any).overtimeCheckOutAt && (
                         <p>
                           <strong>Overtime Check Out:</strong>{" "}
-                          {format(new Date(todayStatus.overtimeCheckOutAt), "p")}
+                          {format(new Date((todayStatus as any).overtimeCheckOutAt), "p")}
                         </p>
                       )}
                     </div>
@@ -407,7 +407,7 @@ export default function AttendancePage() {
                   >
                     {checkOutMutation.isPending ? "Checking out..." : "Check Out Shift"}
                   </Button>
-                ) : !todayStatus.overtimeCheckInAt ? (
+                ) : !(todayStatus as any).overtimeCheckInAt ? (
                   <div className="space-y-2 pt-2 border-t border-border">
                     <p className="text-xs text-muted-foreground text-center">
                       Regular shift completed. Start overtime?
@@ -422,7 +422,7 @@ export default function AttendancePage() {
                       {overtimeCheckInMutation.isPending ? "Starting Overtime..." : "Overtime Check In"}
                     </Button>
                   </div>
-                ) : !todayStatus.overtimeCheckOutAt ? (
+                ) : !(todayStatus as any).overtimeCheckOutAt ? (
                   <Button
                     variant="outline"
                     onClick={() => overtimeCheckOutMutation.mutate()}

@@ -319,7 +319,7 @@ export function PublicCalendarDialogs({
                 <Label className="text-xs font-semibold">Category</Label>
                 <Select
                   value={changeForm.category}
-                  onValueChange={(val) => setChangeForm((f) => ({ ...f, category: val }))}
+                  onValueChange={(val: string) => setChangeForm((f) => ({ ...f, category: val }))}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -334,7 +334,7 @@ export function PublicCalendarDialogs({
                 <Label className="text-xs font-semibold">Priority</Label>
                 <Select
                   value={changeForm.priority}
-                  onValueChange={(val) => setChangeForm((f) => ({ ...f, priority: val }))}
+                  onValueChange={(val: string) => setChangeForm((f) => ({ ...f, priority: val }))}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -439,7 +439,7 @@ export function PublicCalendarDialogs({
                 <Label className="text-xs font-semibold">Target Platform</Label>
                 <Select
                   value={ideaForm.platform}
-                  onValueChange={(val) => setIdeaForm((f) => ({ ...f, platform: val }))}
+                  onValueChange={(val: string) => setIdeaForm((f) => ({ ...f, platform: val }))}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -457,7 +457,7 @@ export function PublicCalendarDialogs({
                 <Label className="text-xs font-semibold">Content Type</Label>
                 <Select
                   value={ideaForm.contentType}
-                  onValueChange={(val) => setIdeaForm((f) => ({ ...f, contentType: val }))}
+                  onValueChange={(val: string) => setIdeaForm((f) => ({ ...f, contentType: val }))}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

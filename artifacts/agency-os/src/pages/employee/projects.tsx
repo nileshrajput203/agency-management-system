@@ -100,10 +100,10 @@ export default function EmployeeProjectsPage() {
 
   const { data: projects, isLoading } = useListProjects();
   const { data: clients } = useListClients(undefined, {
-    query: { enabled: Boolean(user) },
+    query: { enabled: Boolean(user) } as any,
   });
   const { data: users } = useListUsers({
-    query: { enabled: Boolean(user) },
+    query: { enabled: Boolean(user) } as any,
   });
 
   // Permission check: managers, admins, or users granted access to projects module

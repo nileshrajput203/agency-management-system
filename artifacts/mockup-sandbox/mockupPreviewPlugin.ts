@@ -5,3 +5,4 @@ export function mockupPreviewPlugin(): Plugin {
     name: "mockup-preview-plugin",
   };
 }
+

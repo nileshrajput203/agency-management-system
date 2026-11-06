@@ -294,11 +294,13 @@ export default function NotificationsPage() {
 
           {canBroadcastAnnouncement && (
             <Dialog open={announcementOpen} onOpenChange={setAnnouncementOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-1.5 text-xs bg-primary text-primary-foreground">
-                  <Megaphone className="h-3.5 w-3.5" /> Broadcast Announcement
-                </Button>
-              </DialogTrigger>
+              <DialogTrigger
+                render={
+                  <Button size="sm" className="gap-1.5 text-xs bg-primary text-primary-foreground">
+                    <Megaphone className="h-3.5 w-3.5" /> Broadcast Announcement
+                  </Button>
+                }
+              />
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">

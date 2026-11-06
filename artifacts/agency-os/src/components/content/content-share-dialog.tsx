@@ -131,7 +131,7 @@ export function ContentShareDialog({
           <Label className="text-xs font-semibold">Client calendar</Label>
           <Select
             value={clientId || "__none__"}
-            onValueChange={(value) => {
+            onValueChange={(value: string) => {
               onClientIdChange(value === "__none__" ? "" : value);
               setShareFormLabel("");
             }}

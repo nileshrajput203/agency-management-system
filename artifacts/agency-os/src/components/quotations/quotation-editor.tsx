@@ -56,7 +56,7 @@ export function QuotationEditor({
   const { user } = useAuth();
   const qc = useQueryClient();
   const { data: clients } = useListClients(undefined, {
-    query: { enabled: canManageModule(user, "clients") },
+    query: { enabled: canManageModule(user, "clients") } as any,
   });
 
   const createMutation = useCreateQuotation({
@@ -237,9 +237,9 @@ export function QuotationEditor({
                 render={({ field }) => (
                   <Select
                     value={field.value}
-                    onValueChange={(val) => {
+                    onValueChange={(val: string) => {
                       field.onChange(val);
-                      const c = clients?.find((cl) => cl.id === val);
+                      const c = clients?.find((cl) => cl.id === val) as any;
                       if (c) {
                         if (c.phone) setValue("clientPhone", c.phone);
                         if (c.email) setValue("clientEmail", c.email);

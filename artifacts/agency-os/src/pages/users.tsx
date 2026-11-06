@@ -373,7 +373,7 @@ export default function UsersPage() {
                         <Badge variant="secondary" className={cn("text-[11px]", rc?.className)}>
                           {roleLabel(u.systemRole ?? "ACCOUNT_MANAGER")}
                         </Badge>
-                        {u.isDelegatedAdmin && (
+                        {(u as any).isDelegatedAdmin && (
                           <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300">
                             Delegated Admin
                           </Badge>

@@ -282,8 +282,6 @@ export interface Task {
   /** @nullable */
   projectId?: string | null;
   /** @nullable */
-  subprojectId?: string | null;
-  /** @nullable */
   projectName?: string | null;
   /** @nullable */
   subprojectId?: string | null;
@@ -317,6 +315,20 @@ export interface Task {
   rejectionReason?: string | null;
   /** @nullable */
   requestedAt?: string | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  objective?: string | null;
+  /** @nullable */
+  requirements?: string | null;
+  /** @nullable */
+  deliverables?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  assignmentNote?: string | null;
+  /** @nullable */
+  coAssignees?: string[] | null;
 }
 
 export interface TaskInput {
@@ -347,10 +359,39 @@ export interface TaskInput {
   rejectionReason?: string | null;
   /** @nullable */
   requestedAt?: string | null;
+  /** @nullable */
+  startDate?: string | null;
+  /** @nullable */
+  objective?: string | null;
+  /** @nullable */
+  requirements?: string | null;
+  /** @nullable */
+  deliverables?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  /** @nullable */
+  assignmentNote?: string | null;
+  /** @nullable */
+  coAssignees?: string[] | null;
 }
 
 export interface ContentPost {
   id: string;
+  title?: string | null;
+  shootDate?: string | null;
+  format?: string | null;
+  assetsLink?: string | null;
+  mediaUrls?: string[] | null;
+  mediaFiles?: string[] | null;
+  coverImageUrl?: string | null;
+  customProperties?: Array<{ key: string; value: string }> | null;
+  comments?: any[] | null;
+  needsRevision?: string | boolean | null;
+  approvalStatus?: string | null;
+  rejectionNote?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  assigneeId?: string | null;
   /** @nullable */
   platform?: string | null;
   /** @nullable */
@@ -380,6 +421,7 @@ export interface ContentPost {
   /** @nullable */
   description?: string | null;
   createdAt?: string;
+  [key: string]: any;
 }
 
 export interface ContentPostInput {
@@ -639,6 +681,7 @@ export interface DashboardStats {
   monthlyRevenue?: number | null;
   /** @nullable */
   tasksDue?: number | null;
+  [key: string]: any;
 }
 
 export interface RevenueDataPoint {

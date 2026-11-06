@@ -272,7 +272,7 @@ export function WorkReportManager() {
                 title: `Work Report - ${new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })}`,
                 period: "Monthly",
                 employeeName: user?.name,
-                employeeDesignation: user?.role || "Team Member",
+                employeeDesignation: (user as any)?.role || (user as any)?.systemRole || "Team Member",
               });
             }}
             disabled={createDraftMutation.isPending}

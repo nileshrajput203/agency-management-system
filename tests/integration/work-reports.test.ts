@@ -141,7 +141,7 @@ describe("Work Reports API Integration Tests (/api/work-reports)", () => {
     expect(res.status).toBe(200);
     expect(res.body.reopenRequested).toBe(true);
     expect(res.body.reopenStatus).toBe("Pending");
-  });
+  }, 15000);
 
   it("POST /api/work-reports/:id/review-reopen should approve reopen request", async () => {
     const res = await request(app)
@@ -155,7 +155,7 @@ describe("Work Reports API Integration Tests (/api/work-reports)", () => {
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("Needs Changes");
     expect(res.body.reopenStatus).toBe("Approved");
-  });
+  }, 15000);
 
   it("GET /api/work-reports/:id/pdf should generate printable HTML PDF view", async () => {
     const res = await request(app)

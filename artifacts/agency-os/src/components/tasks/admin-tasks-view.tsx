@@ -139,7 +139,7 @@ export function AdminTasksView() {
   const selectedTaskForAction = selectedTaskForActionState ? (tasks ?? []).find((t: any) => t.id === selectedTaskForActionState.id) || selectedTaskForActionState : null;
   const { data: projects } = useListProjects();
   const { data: users } = useListUsers({
-    query: { enabled: canManageModule(user, "team") },
+    query: { enabled: canManageModule(user, "team") } as any,
   });
 
   const createMutation = useCreateTask({
@@ -477,7 +477,7 @@ export function AdminTasksView() {
           </div>
 
           <SearchBar placeholder="Search tasks…" value={searchQuery} onChange={setSearchQuery} className="max-w-xs" />
-          <Select value={priorityFilter} onValueChange={(val) => setPriorityFilter(val ?? "ALL")}>
+          <Select value={priorityFilter} onValueChange={(val: string) => setPriorityFilter(val ?? "ALL")}>
             <SelectTrigger className="w-32">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
@@ -849,7 +849,7 @@ export function AdminTasksView() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
                     {teamWorkloadList.map((member) => {
-                      const memberId = member.id || member.user?.id;
+                      const memberId = (member as any).id || member.user?.id;
                       const isExpanded = expandedUserId === memberId;
                       const hasActiveWork = member.todayTasks.length > 0 || member.pendingTasks.length > 0;
 
@@ -941,7 +941,7 @@ export function AdminTasksView() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => setExpandedUserId(isExpanded ? null : (member.id || member.user?.id))}
+                              onClick={() => setExpandedUserId(isExpanded ? null : ((member as any).id || member.user?.id))}
                               className="w-full h-7 text-xs text-muted-foreground hover:text-foreground justify-between px-2 pt-1 border-t"
                             >
                               <span>{isExpanded ? "Hide Assigned Tasks" : `View Assigned Tasks (${member.tasks.length})`}</span>

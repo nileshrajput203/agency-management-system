@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   useListProjects, useCreateProject, useUpdateProject, useDeleteProject,
   useListClients, useListUsers, getListProjectsQueryKey,
+  type Project,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -209,10 +210,10 @@ export default function ProjectsPage() {
   const canViewClients = isManagerOrAdminRole(user) || canManageModule(user, "clients") || isAdmin;
   const canViewUsers = isManagerOrAdminRole(user) || canManageModule(user, "team") || isAdmin;
   const { data: clients } = useListClients(undefined, {
-    query: { enabled: Boolean(user) },
+    query: { enabled: Boolean(user) } as any,
   });
   const { data: users } = useListUsers({
-    query: { enabled: Boolean(user) },
+    query: { enabled: Boolean(user) } as any,
   });
 
   const createMutation = useCreateProject({
@@ -375,8 +376,8 @@ export default function ProjectsPage() {
         const diff = new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
         if (diff !== 0) return diff;
       }
-      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      const aCreated = (a as any).createdAt ? new Date((a as any).createdAt).getTime() : 0;
+      const bCreated = (b as any).createdAt ? new Date((b as any).createdAt).getTime() : 0;
       return bCreated - aCreated;
     });
 
@@ -658,14 +659,14 @@ export default function ProjectsPage() {
                   <div className="mt-3 pt-2 border-t border-border/50 space-y-2">
                     <div className="flex items-center justify-between text-[11px] font-semibold">
                       <span className="text-muted-foreground uppercase">Progress</span>
-                      <span className="text-primary">{p.completionPercentage ?? p.completion ?? (p.status === "COMPLETED" ? 100 : p.status === "IN_PROGRESS" ? 25 : 0)}%</span>
+                      <span className="text-primary">{(p as any).completionPercentage ?? (p as any).completion ?? (p.status === "COMPLETED" ? 100 : p.status === "IN_PROGRESS" ? 25 : 0)}%</span>
                     </div>
                     <div className="w-full bg-muted h-1.5 rounded-full overflow-hidden">
                       <div
-                        style={{ width: `${p.completionPercentage ?? p.completion ?? (p.status === "COMPLETED" ? 100 : p.status === "IN_PROGRESS" ? 25 : 0)}%` }}
+                        style={{ width: `${(p as any).completionPercentage ?? (p as any).completion ?? (p.status === "COMPLETED" ? 100 : p.status === "IN_PROGRESS" ? 25 : 0)}%` }}
                         className={cn(
                           "h-full rounded-full transition-all duration-300",
-                          (p.completionPercentage ?? p.completion) === 100 || p.status === "COMPLETED" ? "bg-emerald-500" : "bg-primary"
+                          ((p as any).completionPercentage ?? (p as any).completion) === 100 || p.status === "COMPLETED" ? "bg-emerald-500" : "bg-primary"
                         )}
                       />
                     </div>

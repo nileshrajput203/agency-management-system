@@ -82,7 +82,7 @@ export function EmployeeTasksView() {
   const { data: tasks, isLoading } = useListTasks();
   const selectedTaskForAction = selectedTaskForActionState ? (tasks ?? []).find((t: any) => t.id === selectedTaskForActionState.id) || selectedTaskForActionState : null;
   const { data: projects } = useListProjects({
-    query: { enabled: canViewProjects },
+    query: { enabled: canViewProjects } as any,
   });
 
   const createRequestMutation = useCreateTask({
@@ -116,7 +116,7 @@ export function EmployeeTasksView() {
     },
   });
 
-  const { register, handleSubmit, control, reset, setValue } = useForm<TaskInput>({
+  const { register, handleSubmit, control, reset, setValue } = useForm<any>({
     defaultValues: { title: "", status: "TODO", priority: "MEDIUM" },
   });
 
@@ -257,7 +257,7 @@ export function EmployeeTasksView() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <SearchBar placeholder="Search my tasks…" value={searchQuery} onChange={setSearchQuery} className="max-w-xs" />
-          <Select value={priorityFilter} onValueChange={(val) => setPriorityFilter(val ?? "ALL")}>
+          <Select value={priorityFilter} onValueChange={(val: string) => setPriorityFilter(val ?? "ALL")}>
             <SelectTrigger className="w-32">
               <SelectValue placeholder="Priority" />
             </SelectTrigger>
@@ -362,7 +362,7 @@ export function EmployeeTasksView() {
                           </Button>
                           <Select
                             value={task.status ?? "TODO"}
-                            onValueChange={(newVal) => handleUpdateStatus(task.id, newVal)}
+                            onValueChange={(newVal: string) => handleUpdateStatus(task.id, newVal)}
                           >
                             <SelectTrigger className="w-32 h-8 text-xs font-semibold">
                               <SelectValue />
@@ -613,7 +613,7 @@ export function EmployeeTasksView() {
                   <Controller control={control} name="projectId" render={({ field }) => (
                     <Select
                       value={field.value || "none"}
-                      onValueChange={(val) => {
+                      onValueChange={(val: string) => {
                         const pVal = val === "none" ? "" : val;
                         field.onChange(pVal);
                         setValue("subprojectId", "");
@@ -635,7 +635,7 @@ export function EmployeeTasksView() {
                     return (
                       <Select
                         value={field.value || "none"}
-                        onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
+                        onValueChange={(val: string) => field.onChange(val === "none" ? "" : val)}
                         disabled={!watchProjectId}
                       >
                         <SelectTrigger>

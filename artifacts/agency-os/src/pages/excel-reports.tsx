@@ -149,16 +149,16 @@ function ExportCard({ sheet }: { sheet: SheetDef }) {
 export default function ExcelReportsPage() {
   const { user } = useAuth();
   const canViewFinance = canManageModule(user, "finance");
-  const { data: invoices, isLoading: loadInv } = useListInvoices({ query: { enabled: canViewFinance } });
-  const { data: quotations, isLoading: loadQt } = useListQuotations({ query: { enabled: canViewFinance } });
-  const { data: purchaseOrders, isLoading: loadPO } = useListPurchaseOrders({ query: { enabled: canViewFinance } });
-  const { data: proposals, isLoading: loadProp } = useListProposals({ query: { enabled: canViewFinance } });
-  const { data: leads, isLoading: loadLeads } = useListLeads({ query: { enabled: canManageModule(user, "sales") } });
+  const { data: invoices, isLoading: loadInv } = useListInvoices({ query: { enabled: canViewFinance } as any });
+  const { data: quotations, isLoading: loadQt } = useListQuotations({ query: { enabled: canViewFinance } as any });
+  const { data: purchaseOrders, isLoading: loadPO } = useListPurchaseOrders({ query: { enabled: canViewFinance } as any });
+  const { data: proposals, isLoading: loadProp } = useListProposals({ query: { enabled: canViewFinance } as any });
+  const { data: leads, isLoading: loadLeads } = useListLeads({ query: { enabled: canManageModule(user, "sales") } as any });
   const { data: clients, isLoading: loadClients } = useListClients(undefined, {
-    query: { enabled: canManageModule(user, "clients") },
+    query: { enabled: canManageModule(user, "clients") } as any,
   });
-  const { data: projects, isLoading: loadProj } = useListProjects({ query: { enabled: canManageModule(user, "projects") } });
-  const { data: tasks, isLoading: loadTasks } = useListTasks({ query: { enabled: canManageModule(user, "tasks") } });
+  const { data: projects, isLoading: loadProj } = useListProjects({ query: { enabled: canManageModule(user, "projects") } as any });
+  const { data: tasks, isLoading: loadTasks } = useListTasks({ query: { enabled: canManageModule(user, "tasks") } as any });
 
   const sheets: SheetDef[] = [
     {

@@ -4,7 +4,7 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-const Select = function Select({ children, ...props }: SelectPrimitive.Root.Props) {
+const Select = function Select({ children, ...props }: SelectPrimitive.Root.Props<any>) {
   const items = React.useMemo(() => {
     const collected: Array<{ value: any; label: React.ReactNode }> = []
 

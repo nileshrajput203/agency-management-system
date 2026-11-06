@@ -18,7 +18,7 @@ export default function EmployeeDashboardPage() {
       refetchInterval: 3000,
       refetchOnWindowFocus: true,
       refetchOnMount: true,
-    },
+    } as any,
   });
 
   // Content posts for current week
@@ -30,11 +30,11 @@ export default function EmployeeDashboardPage() {
 
   const { data: weekPosts } = useListContentPosts(
     { month: currentMonthStr } as any,
-    { query: { enabled: canViewContent } },
+    { query: { enabled: canViewContent } as any },
   );
   const { data: weekPostsNext } = useListContentPosts(
     { month: weekEndMonthStr } as any,
-    { query: { enabled: canViewContent } },
+    { query: { enabled: canViewContent } as any },
   );
   const allWeekPosts = needsBothMonths ? [...(weekPosts ?? []), ...(weekPostsNext ?? [])] : (weekPosts ?? []);
 

@@ -32,10 +32,10 @@ export default function DashboardPage() {
       staleTime: 60_000,
       refetchInterval: 120_000,
       refetchOnWindowFocus: false,
-    },
+    } as any,
   });
   // Only the root account can see cross-section company-wide metrics.
-  const isEmployee = !isSuperAdminRole(user?.systemRole ?? user?.role);
+  const isEmployee = !isSuperAdminRole((user as any)?.systemRole ?? (user as any)?.role);
 
   const { data: revenueChart, isLoading: chartLoading } = useQuery<{ month: string; amount: number }[]>({
     queryKey: ["revenue-chart", chartRange],
@@ -58,10 +58,10 @@ export default function DashboardPage() {
 
   const canViewContent = canManageModule(user, "content");
   const { data: weekPosts } = useListContentPosts({ month: currentMonthStr } as any, {
-    query: { enabled: canViewContent },
+    query: { enabled: canViewContent } as any,
   });
   const { data: weekPostsNext } = useListContentPosts({ month: weekEndMonthStr } as any, {
-    query: { enabled: canViewContent },
+    query: { enabled: canViewContent } as any,
   });
   const allWeekPosts = needsBothMonths ? [...(weekPosts ?? []), ...(weekPostsNext ?? [])] : (weekPosts ?? []);
 

@@ -62,8 +62,8 @@ export default function ContentPage() {
 
   const isManagerOrAdmin = Boolean(
     isManagerOrAdminRole(user) ||
-    user?.isDelegatedAdmin ||
-    isSuperAdminRole(user?.systemRole ?? user?.role)
+    (user as any)?.isDelegatedAdmin ||
+    isSuperAdminRole((user as any)?.systemRole ?? (user as any)?.role)
   );
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -112,10 +112,10 @@ export default function ContentPage() {
   const month = format(currentMonth, "yyyy-MM");
   const canViewClientDirectory = canManageModule(user, "clients");
   const { data: clientDirectory, isLoading: isLoadingClientDirectory } = useListClients(undefined, {
-    query: { enabled: Boolean(user) && canViewClientDirectory },
+    query: { enabled: Boolean(user) && canViewClientDirectory } as any,
   });
   const { data: contentHistory, isLoading: isLoadingContentHistory } = useListContentPosts(undefined, {
-    query: { enabled: Boolean(user) && !canViewClientDirectory },
+    query: { enabled: Boolean(user) && !canViewClientDirectory } as any,
   });
   const { data: posts, isLoading } = useListContentPosts({
     clientId: activeClientId || undefined,
@@ -141,7 +141,7 @@ export default function ContentPage() {
     : Boolean(user) && isLoadingContentHistory;
   const { data: existingShares, refetch: refetchShares } = useListCalendarShares(
     shareClientId ? { clientId: shareClientId } : undefined,
-    { query: { enabled: showShareModal && Boolean(shareClientId) } },
+    { query: { enabled: showShareModal && Boolean(shareClientId) } as any },
   );
 
   const shareClientName = (clients ?? []).find((c: any) => c.id === shareClientId)?.companyName || "";
@@ -219,7 +219,7 @@ export default function ContentPage() {
   }
 
   function openEdit(post: PostRecord) {
-    const freshPost = (posts ?? []).find(p => p.id === post.id) || post;
+    const freshPost: any = (posts ?? []).find(p => p.id === post.id) || post;
     setDraft({
       title: freshPost.title ?? "",
       platform: freshPost.platform ?? "INSTAGRAM",
@@ -229,11 +229,11 @@ export default function ContentPage() {
       scheduledAt: freshPost.scheduledAt ?? "",
       shootDate: freshPost.shootDate ?? "",
       clientId: freshPost.clientId ?? "",
-      assigneeId: (freshPost as any).assigneeId ?? "",
+      assigneeId: freshPost.assigneeId ?? "",
       assetsLink: freshPost.assetsLink ?? "",
       format: freshPost.format ?? "",
       needsRevision: isNeedsRevision(freshPost.needsRevision),
-      approvalStatus: (freshPost as any).approvalStatus ?? "PENDING",
+      approvalStatus: freshPost.approvalStatus ?? "PENDING",
       rejectionNote: freshPost.rejectionNote ?? "",
       customProperties: freshPost.customProperties ?? [],
       comments: freshPost.comments ?? [],
@@ -280,7 +280,7 @@ export default function ContentPage() {
     if (activeDraft.shootDate && isPastDate(activeDraft.shootDate)) {
       if (
         panel.mode === "create" ||
-        (panel.mode === "edit" && activePost && activeDraft.shootDate !== activePost.shootDate)
+        (panel.mode === "edit" && activePost && activeDraft.shootDate !== (activePost as any).shootDate)
       ) {
         toast.error("Shoot Date cannot be earlier than today's date. Please select today or a future date.");
         return;

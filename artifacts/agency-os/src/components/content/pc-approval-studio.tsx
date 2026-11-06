@@ -279,15 +279,30 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
     }
   }, [activePost, selectedPostId]);
 
-  // Reset temporary state when changing active post
+  // Reset temporary state when changing active post & auto-sync 3x3 grid pagination
   useEffect(() => {
     if (activePost) {
       setActiveSlide(0);
       setPendingPin(null);
       setRevisionNote("");
       setExternalAssetUrl("");
+
+      // Auto-sync gridPage so the selected post is always visible in the 3×3 grid
+      const clientGridPosts = posts.filter(
+        (p) => (!activePost?.clientId && !p.clientId) || p.clientId === activePost?.clientId || (activePost?.clientName && p.clientName === activePost.clientName)
+      );
+      const sorted = [...clientGridPosts].sort((a, b) => {
+        const timeA = a.scheduledAt ? new Date(a.scheduledAt).getTime() : 0;
+        const timeB = b.scheduledAt ? new Date(b.scheduledAt).getTime() : 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return (a.title || "").localeCompare(b.title || "");
+      });
+      const activeIdx = sorted.findIndex((p) => p.id === activePost.id);
+      if (activeIdx !== -1) {
+        setGridPage(Math.floor(activeIdx / 9));
+      }
     }
-  }, [activePost?.id]);
+  }, [activePost?.id, posts]);
 
   // Keyboard navigation: J (next), K (prev), Space (play/pause), A (approve)
   useEffect(() => {
@@ -778,8 +793,15 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
       });
 
       if (!saveRes.ok) {
-        const errJson = await saveRes.json().catch(() => ({}));
-        throw new Error(errJson.error || errJson.message || "Failed to update post with AI script");
+        let errMsg = "Failed to update post with AI script";
+        try {
+          const ct = saveRes.headers.get("content-type") || "";
+          if (ct.includes("application/json")) {
+            const errJson = await saveRes.json();
+            errMsg = errJson.error || errJson.message || errMsg;
+          }
+        } catch {}
+        throw new Error(errMsg);
       }
 
       toast.success("AI script, scene breakdown, and shot list generated & saved!");
@@ -1860,7 +1882,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
               /* MODE 5: 3×3 Instagram Profile Grid Preview */
               (() => {
                 const clientGridPosts = posts.filter(
-                  (p) => !activePost?.clientId || p.clientId === activePost.clientId
+                  (p) => (!activePost?.clientId && !p.clientId) || p.clientId === activePost?.clientId || (activePost?.clientName && p.clientName === activePost.clientName)
                 );
                 // Sort by scheduled date descending (newest on top, like Instagram feed)
                 const sortedClientGridPosts = [...clientGridPosts].sort((a, b) => {
@@ -2006,7 +2028,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
 
                               {/* Media overlay if file exists */}
                               {mediaUrl && (
-                                <div className="relative w-full h-full z-1">
+                                <div className="absolute inset-0 w-full h-full z-1">
                                   {parsed.type === "gdrive" ? (
                                     <div className="relative w-full h-full">
                                       <img
@@ -2376,7 +2398,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                     <span className="text-[10px] text-muted-foreground block mb-0.5">Strategist / Scriptwriter:</span>
                     <Select
                       value={activePost.ideationAssignedTo || "UNASSIGNED"}
-                      onValueChange={async (v) => {
+                      onValueChange={async (v: string) => {
                         await fetch(`/api/content/${activePost.id}`, {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
@@ -2397,7 +2419,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                     <span className="text-[10px] text-muted-foreground block mb-0.5">Videographer (Shoot):</span>
                     <Select
                       value={activePost.videographerId || "UNASSIGNED"}
-                      onValueChange={async (v) => {
+                      onValueChange={async (v: string) => {
                         await fetch(`/api/content/${activePost.id}`, {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },
@@ -2418,7 +2440,7 @@ export function PCApprovalStudio({ posts, clients, users = [], onRefresh, onOpen
                     <span className="text-[10px] text-muted-foreground block mb-0.5">Video Editor / Designer:</span>
                     <Select
                       value={activePost.editorId || "UNASSIGNED"}
-                      onValueChange={async (v) => {
+                      onValueChange={async (v: string) => {
                         await fetch(`/api/content/${activePost.id}`, {
                           method: "PATCH",
                           headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("agency_token") || localStorage.getItem("token") || ""}` },

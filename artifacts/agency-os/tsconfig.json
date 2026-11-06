@@ -19,7 +19,19 @@
     "src/components/tasks/**/*",
     "src/components/team/**/*",
     "src/lib/access.ts",
-    "src/lib/auth.config.ts"
+    "src/lib/auth.config.ts",
+    "src/lib/actions/**/*",
+    "src/lib/pdf-print.ts",
+    "src/components/finance/**/*",
+    "src/components/layout/app-sidebar.tsx",
+    "src/components/layout/command-palette.tsx",
+    "src/components/layout/notification-bell.tsx",
+    "src/components/projects/contract-detail-view.tsx",
+    "src/components/projects/contract-project-board.tsx",
+    "src/components/projects/project-detail-view.tsx",
+    "src/components/projects/projects-board.tsx",
+    "src/components/projects/projects-manager.tsx",
+    "src/components/providers.tsx"
   ],
   "compilerOptions": {
     "incremental": true,

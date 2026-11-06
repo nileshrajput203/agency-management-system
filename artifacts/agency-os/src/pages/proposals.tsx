@@ -59,7 +59,7 @@ export default function ProposalsPage() {
 
   const { data: proposals, isLoading } = useListProposals();
   const { data: clients } = useListClients(undefined, {
-    query: { enabled: canManageModule(user, "clients") },
+    query: { enabled: canManageModule(user, "clients") } as any,
   });
 
   const createMutation = useCreateProposal({

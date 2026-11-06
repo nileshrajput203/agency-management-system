@@ -489,7 +489,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
   if (!user) return <Redirect to="/login" />;
 
-  if (isSuperAdminRole(user.systemRole ?? user.role)) return <>{children}</>;
+  if (isSuperAdminRole((user as any).systemRole ?? (user as any).role)) return <>{children}</>;
   const requiredModule = getRequiredModule(location);
   if (requiredModule === null) return <>{children}</>;
   if (requiredModule && hasModuleAccess(user.allowedModules, requiredModule)) {
@@ -513,7 +513,7 @@ function EmployeeRoute({ children }: { children: React.ReactNode }) {
     );
   }
   if (!user) return <Redirect to="/login" />;
-  if (isSuperAdminRole(user.systemRole ?? user.role)) return <>{children}</>;
+  if (isSuperAdminRole((user as any).systemRole ?? (user as any).role)) return <>{children}</>;
   const requiredModule = getRequiredModule(location);
   if (requiredModule === null) return <>{children}</>;
   if (requiredModule && hasModuleAccess(user.allowedModules, requiredModule)) {
@@ -570,7 +570,7 @@ function AdminRoute({ children, module }: { children: React.ReactNode; module: s
     );
   }
   if (!user) return <Redirect to="/login" />;
-  if (!isSuperAdminRole(user.systemRole ?? user.role) && !hasModuleAccess(user.allowedModules, module)) {
+  if (!isSuperAdminRole((user as any).systemRole ?? (user as any).role) && !hasModuleAccess(user.allowedModules, module)) {
     return <AccessDeniedPage />;
   }
   return <>{children}</>;

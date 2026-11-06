@@ -104,13 +104,13 @@ export default function ClientDetailPage({ id }: { id: string }) {
 
   const { data: client, isLoading } = useGetClient(id);
   const { data: contracts } = useGetClientContracts(id, {
-    query: { enabled: canViewFinance },
+    query: { enabled: canViewFinance } as any,
   });
   const { data: allProjects } = useListProjects({
-    query: { enabled: canViewProjects },
+    query: { enabled: canViewProjects } as any,
   });
   const { data: allInvoices } = useListInvoices({
-    query: { enabled: canViewFinance },
+    query: { enabled: canViewFinance } as any,
   });
 
   const { data: activityLogs, refetch: refetchActivity } = useQuery<ActivityLog[]>({
@@ -307,8 +307,8 @@ export default function ClientDetailPage({ id }: { id: string }) {
     );
   }
 
-  if (!isAdmin && client.assignedTo !== user?.id) {
-    const isAssignedToProject = (allProjects ?? []).some(p => p.clientId === id && p.assignedTo === user?.id);
+  if (!isAdmin && (client as any).assignedTo !== user?.id) {
+    const isAssignedToProject = (allProjects ?? []).some(p => p.clientId === id && (p as any).assignedTo === user?.id);
     if (!isAssignedToProject) {
       return (
         <div className="p-12 text-center">
@@ -466,10 +466,10 @@ export default function ClientDetailPage({ id }: { id: string }) {
                         <span>{client.socialHandles}</span>
                       </div>
                     )}
-                    {client.onboardingDate && (
+                    {(client as any).onboardingDate && (
                       <div className="flex items-center gap-2 text-muted-foreground text-xs">
                         <Calendar className="h-4 w-4 shrink-0 text-primary" />
-                        <span>Onboarded: {formatDateOnly(client.onboardingDate)}</span>
+                        <span>Onboarded: {formatDateOnly((client as any).onboardingDate)}</span>
                       </div>
                     )}
 

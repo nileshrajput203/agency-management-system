@@ -87,7 +87,7 @@ export default function HawanHubPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: clients } = useListClients(undefined, {
-    query: { enabled: canManageModule(user, "clients") },
+    query: { enabled: canManageModule(user, "clients") } as any,
   });
 
   const token = typeof window !== "undefined" ? localStorage.getItem("agency_token") : null;

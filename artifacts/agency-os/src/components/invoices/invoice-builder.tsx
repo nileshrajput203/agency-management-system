@@ -45,7 +45,7 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
   const qc = useQueryClient();
   const canViewClients = canManageModule(user, "clients");
   const { data: clients } = useListClients(undefined, {
-    query: { enabled: canViewClients },
+    query: { enabled: canViewClients } as any,
   });
   const logoRef = useRef<HTMLInputElement>(null);
   const sigRef = useRef<HTMLInputElement>(null);
@@ -91,8 +91,8 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
     signatureUrl: (editData?.signatureUrl as string) ?? "",
     ...(!editData && {
       invoiceNumber: "",
-      currency: (editData as Record<string, string>)?.currency ?? "INR",
-      gstType: (editData as Record<string, string>)?.gstType ?? "CGST_SGST",
+      currency: (editData as any)?.currency ?? "INR",
+      gstType: (editData as any)?.gstType ?? "CGST_SGST",
     }),
   };
   if (editData) {

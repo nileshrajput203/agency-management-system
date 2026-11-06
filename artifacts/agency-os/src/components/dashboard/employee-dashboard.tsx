@@ -33,7 +33,7 @@ export function EmployeeDashboard({
 }) {
   const { token } = useAuth();
 
-  const authHeader = () => {
+  const authHeader = (): Record<string, string> => {
     const t = token || localStorage.getItem("agency_token") || "";
     return t ? { Authorization: `Bearer ${t}` } : {};
   };

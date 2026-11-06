@@ -76,7 +76,7 @@ export function TaskActionDialogs({
   onConfirmAdminEdit,
   isUpdatePending,
 }: TaskActionDialogsProps) {
-  const { register, handleSubmit, control, setValue, reset } = useForm<TaskInput>({
+  const { register, handleSubmit, control, setValue, reset } = useForm<any>({
     defaultValues: {
       status: defaultStatus,
       priority: "MEDIUM",
@@ -306,7 +306,7 @@ export function TaskActionDialogs({
                 <Controller control={control} name="projectId" render={({ field }) => (
                   <Select
                     value={field.value || "none"}
-                    onValueChange={(val) => {
+                    onValueChange={(val: string) => {
                       const pVal = val === "none" ? "" : val;
                       field.onChange(pVal);
                       setValue("subprojectId", "", { shouldDirty: true });
@@ -344,7 +344,7 @@ export function TaskActionDialogs({
                   return (
                     <Select
                       value={field.value || "none"}
-                      onValueChange={(val) => field.onChange(val === "none" ? "" : val)}
+                      onValueChange={(val: string) => field.onChange(val === "none" ? "" : val)}
                       disabled={!watchProjectId}
                     >
                       <SelectTrigger>
@@ -367,7 +367,7 @@ export function TaskActionDialogs({
             <div className="space-y-1.5">
               <Label>Primary Assignee</Label>
               <Controller control={control} name="assigneeId" render={({ field }) => (
-                <Select value={field.value || "unassigned"} onValueChange={(val) => field.onChange(val === "unassigned" ? "" : val)}>
+                <Select value={field.value || "unassigned"} onValueChange={(val: string) => field.onChange(val === "unassigned" ? "" : val)}>
                   <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unassigned">Unassigned</SelectItem>
@@ -499,7 +499,7 @@ export function TaskActionDialogs({
                 <Select
                   name="projectId"
                   value={modifyProjectId}
-                  onValueChange={(val) => {
+                  onValueChange={(val: string) => {
                     setModifyProjectId(val);
                     setModifySubprojectId("none");
                   }}
@@ -663,7 +663,7 @@ export function TaskActionDialogs({
                 <Select
                   name="projectId"
                   value={editProjectId}
-                  onValueChange={(val) => {
+                  onValueChange={(val: string) => {
                     setEditProjectId(val);
                     setEditSubprojectId("none");
                   }}

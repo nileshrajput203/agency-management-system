@@ -118,7 +118,7 @@ export default function ClientsPage() {
     category: category !== "ALL" ? category : undefined,
   });
   const { data: users } = useListUsers({
-    query: { enabled: canManageModule(user, "team") },
+    query: { enabled: canManageModule(user, "team") } as any,
   });
 
   const editClient = editClientState ? (clients ?? []).find((c) => c.id === editClientState.id) as any || editClientState : null;

@@ -973,6 +973,12 @@ export interface WorkReportPdfData {
   employeeDesignation?: string;
   userEmail?: string;
   clientHandled?: string;
+  managerName?: string;
+  employeeId?: string;
+  department?: string;
+  role?: string;
+  approvedByName?: string;
+  managerRemarks?: string;
   projects?: Array<{
     projectName?: string;
     clientName?: string;
@@ -981,6 +987,7 @@ export interface WorkReportPdfData {
     hoursSpent?: number;
     status?: string;
     managerComment?: string;
+    remarks?: string;
   }>;
   selfAssessment?: string;
   summary?: string;
@@ -989,6 +996,7 @@ export interface WorkReportPdfData {
   submittedAt?: string;
   reviewedAt?: string;
   approvedAt?: string;
+  [key: string]: any;
 }
 
 export function buildWorkReportHtml(r: WorkReportPdfData): string {

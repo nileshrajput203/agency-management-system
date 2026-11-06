@@ -33,12 +33,13 @@ function TooltipTrigger({
         render={(triggerProps) => {
           const child = children as React.ReactElement<any>;
           const childProps = child.props || {};
-          const mergedProps: Record<string, any> = { ...childProps, ...triggerProps };
+          const tp = triggerProps as Record<string, any>;
+          const mergedProps: Record<string, any> = { ...childProps, ...tp };
 
-          for (const key of Object.keys(triggerProps)) {
-            if (key.startsWith("on") && typeof triggerProps[key] === "function") {
+          for (const key of Object.keys(tp)) {
+            if (key.startsWith("on") && typeof tp[key] === "function") {
               const childHandler = childProps[key];
-              const triggerHandler = triggerProps[key];
+              const triggerHandler = tp[key];
               if (typeof childHandler === "function") {
                 mergedProps[key] = (e: any) => {
                   try {

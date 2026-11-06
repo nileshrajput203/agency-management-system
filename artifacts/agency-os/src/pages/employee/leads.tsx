@@ -40,7 +40,7 @@ export default function EmployeeLeadsPage() {
 
   const { data: leads, isLoading } = useListLeads({
     search: search || undefined,
-  });
+  } as any);
 
   // The API already scopes this response to the current employee. Never use
   // an unscoped fallback here, otherwise an empty result would reveal the
