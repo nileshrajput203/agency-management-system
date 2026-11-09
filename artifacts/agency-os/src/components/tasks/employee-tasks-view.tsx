@@ -46,7 +46,7 @@ export function EmployeeTasksView() {
   const qc = useQueryClient();
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [hideCompleted, setHideCompleted] = useState(true);
+  const [hideCompleted, setHideCompleted] = useState(false);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [employeeEditDialogOpen, setEmployeeEditDialogOpen] = useState(false);
   const [selectedTaskForActionState, setSelectedTaskForAction] = useState<any | null>(null);

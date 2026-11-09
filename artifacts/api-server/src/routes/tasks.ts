@@ -56,7 +56,8 @@ function sanitizeTask(body: any, isUpdate = false) {
 router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
+  const requesterUserRole = (req as any).userRoleText || (req as any).userRole;
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
 
   const whereClause = !isPrivileged
     ? or(
@@ -134,8 +135,9 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
   const sanitized = sanitizeTask(body, false);
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
+  const requesterUserRole = (req as any).userRoleText || (req as any).userRole;
   const requesterRole = (req as any).userRole || requesterSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
 
   if (!isPrivileged) {
     if (
@@ -216,7 +218,8 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
 router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
+  const requesterUserRole = (req as any).userRoleText || (req as any).userRole;
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
 
   const [row] = await db
     .select({
@@ -334,7 +337,7 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
   } else {
     // Admin / Manager is modifying/approving
     if (sanitized.status === "DONE" || sanitized.status === "COMPLETED") {
-      if (task.approvalStatus === "PENDING") {
+      if (task.approvalStatus === "PENDING" || task.approvalStatus === "MANAGER_APPROVED") {
         sanitized.approvalStatus = "APPROVED";
         sanitized.approvedBy = requesterId;
         sanitized.approvedAt = new Date();
@@ -520,7 +523,7 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
             actionUrl: "/tasks",
           });
         }
-      } else if (!canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules)) {
+      } else if (!canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole)) {
         // Employee updated status to something else (e.g., IN_PROGRESS, BLOCKED)
         await NotificationService.notifyAdminsAndManagers({
           title: "📝 Task Status Updated",
@@ -580,7 +583,8 @@ router.delete("/:id", requirePermission("tasks.delete"), asyncHandler(async (req
 
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
+  const requesterUserRole = (req as any).userRoleText || (req as any).userRole;
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
 
   if (!isPrivileged) {
     if (!canEmployeeAccessTask(task, requesterId)) {
@@ -601,7 +605,8 @@ router.delete("/:id", requirePermission("tasks.delete"), asyncHandler(async (req
 router.get("/:id/subtasks", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
+  const requesterUserRole = (req as any).userRoleText || (req as any).userRole;
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
 
   if (!isPrivileged) {
     const [parentTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, req.params.id as string));

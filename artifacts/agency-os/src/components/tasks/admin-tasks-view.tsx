@@ -70,7 +70,7 @@ export function AdminTasksView() {
     }
   };
 
-  const [hideCompleted, setHideCompleted] = useState(true);
+  const [hideCompleted, setHideCompleted] = useState(false);
 
   // Dialog/modal states for administrative actions
   const [selectedTaskForActionState, setSelectedTaskForAction] = useState<any | null>(null);
@@ -95,8 +95,8 @@ export function AdminTasksView() {
     const deliverables = (formData.get("deliverables") as string) || "";
     const notes = (formData.get("notes") as string) || "";
     const startDateRaw = formData.get("startDate") as string;
-    const priority = (formData.get("priority") as string) || "MEDIUM";
-    const status = (formData.get("status") as string) || "TODO";
+    const priority = (formData.get("priority") as string) || selectedTaskForAction.priority || "MEDIUM";
+    const status = (formData.get("status") as string) || (isCompletedTask(selectedTaskForAction.status) ? "DONE" : selectedTaskForAction.status) || "TODO";
     const rawProjectId = formData.get("projectId") as string;
     const projectId = (!rawProjectId || rawProjectId === "none" || rawProjectId === "unassigned") ? null : rawProjectId;
     const rawSubprojectId = formData.get("subprojectId") as string;
@@ -253,25 +253,36 @@ export function AdminTasksView() {
     e.preventDefault();
     if (!selectedTaskForAction) return;
     const formData = new FormData(e.currentTarget);
-    const title = formData.get("title") as string;
-    const description = formData.get("description") as string;
-    const objective = formData.get("objective") as string;
-    const requirements = formData.get("requirements") as string;
-    const deliverables = formData.get("deliverables") as string;
-    const notes = formData.get("notes") as string;
-    const startDate = formData.get("startDate") as string || null;
-    const priority = formData.get("priority") as string;
-    const status = formData.get("status") as string;
+    const title = (formData.get("title") as string)?.trim() || selectedTaskForAction.title;
+    const description = (formData.get("description") as string) || "";
+    const objective = (formData.get("objective") as string) || "";
+    const requirements = (formData.get("requirements") as string) || "";
+    const deliverables = (formData.get("deliverables") as string) || "";
+    const notes = (formData.get("notes") as string) || "";
+    const startDateRaw = formData.get("startDate") as string;
+    const priority = (formData.get("priority") as string) || selectedTaskForAction.priority || "MEDIUM";
+    const status = (formData.get("status") as string) || (isCompletedTask(selectedTaskForAction.status) ? "DONE" : selectedTaskForAction.status) || "TODO";
     const rawProjectId = formData.get("projectId") as string;
-    const projectId = (!rawProjectId || rawProjectId === "none") ? null : rawProjectId;
+    const projectId = (!rawProjectId || rawProjectId === "none" || rawProjectId === "unassigned") ? null : rawProjectId;
     const rawSubprojectId = formData.get("subprojectId") as string;
-    const subprojectId = (!rawSubprojectId || rawSubprojectId === "none") ? null : rawSubprojectId;
+    const subprojectId = (!rawSubprojectId || rawSubprojectId === "none" || rawSubprojectId === "unassigned") ? null : rawSubprojectId;
     const rawAssigneeId = formData.get("assigneeId") as string;
-    const assigneeId = (!rawAssigneeId || rawAssigneeId === "unassigned") ? null : rawAssigneeId;
-    const dueDate = formData.get("dueDate") as string || null;
+    const assigneeId = (!rawAssigneeId || rawAssigneeId === "unassigned" || rawAssigneeId === "none") ? null : rawAssigneeId;
+    const dueDateRaw = formData.get("dueDate") as string;
     const assignmentNote = (formData.get("assignmentNote") as string) || null;
     const rawCoAssignees = formData.get("coAssignees") as string;
-    const coAssignees = rawCoAssignees ? JSON.parse(rawCoAssignees) : [];
+    let coAssignees: string[] = [];
+    try {
+      coAssignees = rawCoAssignees ? JSON.parse(rawCoAssignees) : [];
+    } catch {
+      coAssignees = [];
+    }
+
+    const safeIso = (val?: string | null) => {
+      if (!val || typeof val !== "string" || !val.trim()) return null;
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    };
 
     updateMutation.mutate({
       id: selectedTaskForAction.id,
@@ -283,20 +294,24 @@ export function AdminTasksView() {
         deliverables,
         notes,
         assignmentNote,
-        startDate: startDate ? new Date(startDate).toISOString() : null,
+        startDate: safeIso(startDateRaw),
         priority,
         status,
         projectId,
         subprojectId,
         assigneeId,
         coAssignees,
-        dueDate: dueDate || null,
+        dueDate: safeIso(dueDateRaw),
         approvalStatus: "MODIFIED",
       } as any,
     }, {
       onSuccess: () => {
         toast.success("Task modified and approved!");
         setModifyDialogOpen(false);
+      },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error || err?.message || "Failed to update task";
+        toast.error(msg);
       }
     });
   };
@@ -320,7 +335,8 @@ export function AdminTasksView() {
     return true;
   });
 
-  const byStatus = (status: string) => sortTasksByDueDate(filteredActive.filter((t) => t.status === status));
+  const byStatus = (status: string) =>
+    sortTasksByDueDate(filteredActive.filter((t) => (status === "DONE" ? isCompletedTask(t.status) : t.status === status)));
 
   const pendingTasks = (tasks ?? []).filter((t) => t.approvalStatus === "PENDING" || t.approvalStatus === "MANAGER_APPROVED");
   const filteredPending = sortTasksByDueDate(pendingTasks.filter((t) => {
@@ -582,7 +598,7 @@ export function AdminTasksView() {
                     <div className="p-2 space-y-2 min-h-16">
                       {colTasks.map((task) => {
                         const pc = PRIORITY_CONFIG[task.priority ?? "MEDIUM"] ?? PRIORITY_CONFIG.MEDIUM;
-                        const isOverdue = task.dueDate && task.status !== "DONE" && isBefore(parseISO(task.dueDate), startOfDay(new Date()));
+                        const isOverdue = task.dueDate && !isCompletedTask(task.status) && isBefore(parseISO(task.dueDate), startOfDay(new Date()));
                         const cardEl = (
                           <div
                             key={task.id}
@@ -597,6 +613,21 @@ export function AdminTasksView() {
                             <div className="flex items-start justify-between gap-1.5">
                               <p className="text-sm font-medium leading-snug line-clamp-2 flex-1">{task.title}</p>
                               <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {!isCompletedTask(task.status) && (
+                                  <Button
+                                    size="icon" variant="ghost"
+                                    className="h-5 w-5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                                    title="Mark as Done"
+                                    onClick={() =>
+                                      updateMutation.mutate(
+                                        { id: task.id, data: { status: "DONE" } as any },
+                                        { onSuccess: () => toast.success("Task completed!") }
+                                      )
+                                    }
+                                  >
+                                    <CheckCircle2 className="h-3 w-3" />
+                                  </Button>
+                                )}
                                 <Button
                                   size="icon" variant="ghost"
                                   className="h-5 w-5 text-muted-foreground hover:text-foreground"
@@ -975,7 +1006,7 @@ export function AdminTasksView() {
                               ) : (
                                 member.tasks.map((t: any) => {
                                   const isDueToday = t.dueDate && t.dueDate.startsWith(todayStr);
-                                  const isTaskOverdue = t.dueDate && t.status !== "DONE" && isBefore(parseISO(t.dueDate), startOfDay(new Date()));
+                                  const isTaskOverdue = t.dueDate && !isCompletedTask(t.status) && isBefore(parseISO(t.dueDate), startOfDay(new Date()));
                                   return (
                                     <div
                                       key={t.id}
@@ -1052,7 +1083,7 @@ export function AdminTasksView() {
                     : allPendingTasksList
                   ).map((task: any) => {
                     const isDueToday = task.dueDate && task.dueDate.startsWith(todayStr);
-                    const isTaskOverdue = task.dueDate && task.status !== "DONE" && isBefore(parseISO(task.dueDate), startOfDay(new Date()));
+                    const isTaskOverdue = task.dueDate && !isCompletedTask(task.status) && isBefore(parseISO(task.dueDate), startOfDay(new Date()));
 
                     return (
                       <Card

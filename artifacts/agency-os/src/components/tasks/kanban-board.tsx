@@ -282,7 +282,7 @@ export function KanbanBoard({ initialTasks }: { initialTasks: TaskItem[] }) {
     >
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {TASK_COLUMNS.map((col) => {
-          const colTasks = tasks.filter((t) => t.status === col.id);
+          const colTasks = tasks.filter((t) => col.id === "DONE" ? (t.status === "DONE" || t.status === "COMPLETED") : t.status === col.id);
           return (
             <DroppableColumn key={col.id} id={col.id}>
               <Card className="bg-muted/30 h-full">

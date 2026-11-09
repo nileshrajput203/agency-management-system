@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { MultiAssigneePicker } from "@/components/common/MultiAssigneePicker";
-import { COLUMNS } from "./task-constants";
+import { COLUMNS, isCompletedTask } from "./task-constants";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { useEffect, useState } from "react";
 import type { TaskInput } from "@workspace/api-client-react";
@@ -101,11 +101,16 @@ export function TaskActionDialogs({
   // Modify dialog states
   const [modifyProjectId, setModifyProjectId] = useState<string>("");
   const [modifySubprojectId, setModifySubprojectId] = useState<string>("");
+  const [modifyStatus, setModifyStatus] = useState<string>("TODO");
+  const [modifyPriority, setModifyPriority] = useState<string>("MEDIUM");
+  const [modifyAssigneeId, setModifyAssigneeId] = useState<string>("unassigned");
 
   // Admin edit dialog states
   const [editProjectId, setEditProjectId] = useState<string>("");
   const [editSubprojectId, setEditSubprojectId] = useState<string>("");
   const [editAssigneeId, setEditAssigneeId] = useState<string>("unassigned");
+  const [editStatus, setEditStatus] = useState<string>("TODO");
+  const [editPriority, setEditPriority] = useState<string>("MEDIUM");
 
   // coAssignees state per dialog
   const [createCoAssignees, setCreateCoAssignees] = useState<string[]>([]);
@@ -155,12 +160,17 @@ export function TaskActionDialogs({
       setModifyCoAssignees(coAssignees);
       setModifyProjectId(selectedTaskForAction.projectId || "none");
       setModifySubprojectId(selectedTaskForAction.subprojectId || "none");
+      setModifyStatus(isCompletedTask(selectedTaskForAction.status) ? "DONE" : (selectedTaskForAction.status || "TODO"));
+      setModifyPriority(selectedTaskForAction.priority || "MEDIUM");
+      setModifyAssigneeId(selectedTaskForAction.assigneeId || "unassigned");
     }
     if (adminEditDialogOpen) {
       setEditCoAssignees(coAssignees);
       setEditProjectId(selectedTaskForAction.projectId || "none");
       setEditSubprojectId(selectedTaskForAction.subprojectId || "none");
       setEditAssigneeId(selectedTaskForAction.assigneeId || "unassigned");
+      setEditStatus(isCompletedTask(selectedTaskForAction.status) ? "DONE" : (selectedTaskForAction.status || "TODO"));
+      setEditPriority(selectedTaskForAction.priority || "MEDIUM");
     }
   }, [selectedTaskForAction?.id, modifyDialogOpen, adminEditDialogOpen]);
 
@@ -473,7 +483,7 @@ export function TaskActionDialogs({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Status</Label>
-                <Select name="status" defaultValue={selectedTaskForAction?.status || "TODO"}>
+                <Select value={modifyStatus} onValueChange={setModifyStatus}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {COLUMNS.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
@@ -482,7 +492,7 @@ export function TaskActionDialogs({
               </div>
               <div className="space-y-1.5">
                 <Label>Priority</Label>
-                <Select name="priority" defaultValue={selectedTaskForAction?.priority || "MEDIUM"}>
+                <Select value={modifyPriority} onValueChange={setModifyPriority}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="LOW">Low</SelectItem>
@@ -499,7 +509,6 @@ export function TaskActionDialogs({
               <div className="space-y-1.5">
                 <Label>Project</Label>
                 <Select
-                  name="projectId"
                   value={modifyProjectId}
                   onValueChange={(val: string) => {
                     setModifyProjectId(val);
@@ -533,7 +542,6 @@ export function TaskActionDialogs({
                   )}
                 </div>
                 <Select
-                  name="subprojectId"
                   value={modifySubprojectId}
                   onValueChange={setModifySubprojectId}
                   disabled={!modifyProjectId || modifyProjectId === "none"}
@@ -556,12 +564,15 @@ export function TaskActionDialogs({
             </div>
 
             {/* Hidden fields for explicit FormData delivery */}
+            <input type="hidden" name="status" value={modifyStatus} />
+            <input type="hidden" name="priority" value={modifyPriority} />
             <input type="hidden" name="projectId" value={modifyProjectId} />
             <input type="hidden" name="subprojectId" value={modifySubprojectId} />
+            <input type="hidden" name="assigneeId" value={modifyAssigneeId} />
 
             <div className="space-y-1.5">
               <Label>Primary Assignee</Label>
-              <Select name="assigneeId" defaultValue={selectedTaskForAction?.assigneeId || "unassigned"}>
+              <Select value={modifyAssigneeId} onValueChange={setModifyAssigneeId}>
                 <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
@@ -637,7 +648,7 @@ export function TaskActionDialogs({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Status</Label>
-                <Select name="status" defaultValue={selectedTaskForAction?.status || "TODO"}>
+                <Select value={editStatus} onValueChange={setEditStatus}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {COLUMNS.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
@@ -646,7 +657,7 @@ export function TaskActionDialogs({
               </div>
               <div className="space-y-1.5">
                 <Label>Priority</Label>
-                <Select name="priority" defaultValue={selectedTaskForAction?.priority || "MEDIUM"}>
+                <Select value={editPriority} onValueChange={setEditPriority}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="LOW">Low</SelectItem>
@@ -657,6 +668,10 @@ export function TaskActionDialogs({
                 </Select>
               </div>
             </div>
+
+            {/* Hidden fields for explicit FormData delivery */}
+            <input type="hidden" name="status" value={editStatus} />
+            <input type="hidden" name="priority" value={editPriority} />
 
             {/* Project & Subproject */}
             <div className="grid grid-cols-2 gap-3">
