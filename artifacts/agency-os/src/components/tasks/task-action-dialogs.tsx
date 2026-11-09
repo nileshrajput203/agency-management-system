@@ -105,6 +105,7 @@ export function TaskActionDialogs({
   // Admin edit dialog states
   const [editProjectId, setEditProjectId] = useState<string>("");
   const [editSubprojectId, setEditSubprojectId] = useState<string>("");
+  const [editAssigneeId, setEditAssigneeId] = useState<string>("unassigned");
 
   // coAssignees state per dialog
   const [createCoAssignees, setCreateCoAssignees] = useState<string[]>([]);
@@ -159,6 +160,7 @@ export function TaskActionDialogs({
       setEditCoAssignees(coAssignees);
       setEditProjectId(selectedTaskForAction.projectId || "none");
       setEditSubprojectId(selectedTaskForAction.subprojectId || "none");
+      setEditAssigneeId(selectedTaskForAction.assigneeId || "unassigned");
     }
   }, [selectedTaskForAction?.id, modifyDialogOpen, adminEditDialogOpen]);
 
@@ -661,7 +663,6 @@ export function TaskActionDialogs({
               <div className="space-y-1.5">
                 <Label>Project</Label>
                 <Select
-                  name="projectId"
                   value={editProjectId}
                   onValueChange={(val: string) => {
                     setEditProjectId(val);
@@ -695,7 +696,6 @@ export function TaskActionDialogs({
                   )}
                 </div>
                 <Select
-                  name="subprojectId"
                   value={editSubprojectId}
                   onValueChange={setEditSubprojectId}
                   disabled={!editProjectId || editProjectId === "none"}
@@ -720,10 +720,11 @@ export function TaskActionDialogs({
             {/* Explicit hidden inputs for FormData retrieval */}
             <input type="hidden" name="projectId" value={editProjectId} />
             <input type="hidden" name="subprojectId" value={editSubprojectId} />
+            <input type="hidden" name="assigneeId" value={editAssigneeId} />
 
             <div className="space-y-1.5">
               <Label>Primary Assignee</Label>
-              <Select name="assigneeId" defaultValue={selectedTaskForAction?.assigneeId || "unassigned"}>
+              <Select value={editAssigneeId} onValueChange={setEditAssigneeId}>
                 <SelectTrigger><SelectValue placeholder="Assign to" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unassigned">Unassigned</SelectItem>

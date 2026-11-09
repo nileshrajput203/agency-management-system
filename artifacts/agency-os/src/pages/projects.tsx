@@ -239,6 +239,28 @@ export default function ProjectsPage() {
     },
   });
 
+  const handleQuickCompleteProject = (p: NonNullable<typeof projects>[number]) => {
+    updateMutation.mutate(
+      {
+        id: p.id,
+        data: {
+          status: "COMPLETED",
+          completionPercentage: 100,
+          completionNotes: "Marked done by manager",
+        } as any,
+      },
+      {
+        onSuccess: () => {
+          toast.success(`🎉 Project "${p.name}" marked as Completed!`);
+          qc.invalidateQueries({ queryKey: getListProjectsQueryKey() });
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || "Failed to update project status");
+        },
+      }
+    );
+  };
+
   const deleteMutation = useDeleteProject({
     mutation: {
       onSuccess: () => {
@@ -672,16 +694,39 @@ export default function ProjectsPage() {
                     </div>
                   </div>
 
-                  {/* Request Resources & View Monitoring Actions */}
-                  <div className="mt-3 pt-2 border-t border-border/50 flex items-center justify-between gap-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-xs gap-1 text-muted-foreground hover:text-foreground h-7 px-2"
-                      onClick={(e) => { e.stopPropagation(); handleOpenRequestModal(p); }}
-                    >
-                      <MessageSquare className="h-3.5 w-3.5" /> Request
-                    </Button>
+                  {/* Request Resources, Mark Done & View Monitoring Actions */}
+                  <div className="mt-3 pt-2 border-t border-border/50 flex items-center justify-between gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-xs gap-1 text-muted-foreground hover:text-foreground h-7 px-2"
+                        onClick={(e) => { e.stopPropagation(); handleOpenRequestModal(p); }}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" /> Request
+                      </Button>
+
+                      {isAdmin && (
+                        p.status !== "COMPLETED" ? (
+                          <Button
+                            size="sm"
+                            className="text-xs gap-1 font-bold h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleQuickCompleteProject(p);
+                            }}
+                            disabled={updateMutation.isPending}
+                            title="Mark project as Completed"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Mark Done
+                          </Button>
+                        ) : (
+                          <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 gap-1 text-[11px] font-bold h-6 px-2">
+                            <CheckCircle2 className="h-3 w-3" /> Done
+                          </Badge>
+                        )
+                      )}
+                    </div>
 
                     <Button
                       size="sm"

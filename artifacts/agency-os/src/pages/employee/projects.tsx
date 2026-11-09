@@ -229,24 +229,24 @@ export default function EmployeeProjectsPage() {
   // Confirm complete project
   const handleConfirmComplete = () => {
     if (!completeProjectTarget) return;
-    if (!completionNotesText.trim()) {
-      toast.error("Please provide a completion summary note.");
-      return;
-    }
 
     updateProjectMutation.mutate(
       {
         id: completeProjectTarget.id,
         data: {
           status: "COMPLETED",
-          completionNotes: completionNotesText.trim(),
+          completionNotes: completionNotesText.trim() || "Project completed",
           completionPercentage: 100,
         } as any,
       },
       {
         onSuccess: () => {
+          toast.success("🎉 Project marked as Completed!");
           setCompleteProjectTarget(null);
           setCompletionNotesText("");
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || "Failed to complete project");
         },
       }
     );
@@ -482,7 +482,7 @@ export default function EmployeeProjectsPage() {
                       </Button>
                     )}
 
-                    {statusKey === "IN_PROGRESS" && (
+                    {(statusKey === "IN_PROGRESS" || (canManageProjects && statusKey !== "COMPLETED")) && (
                       <Button
                         size="sm"
                         onClick={(e) => handleOpenCompleteModal(e, p)}

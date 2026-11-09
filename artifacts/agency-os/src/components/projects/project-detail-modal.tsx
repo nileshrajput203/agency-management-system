@@ -83,24 +83,22 @@ export function ProjectDetailModal({ project, open, onOpenChange, isAdmin = fals
 
   // Confirm complete project
   const handleConfirmComplete = () => {
-    if (!completionNotesText.trim()) {
-      toast.error("Please provide a brief completion summary before marking completed.");
-      return;
-    }
-
     updateMutation.mutate(
       {
         id: project.id,
         data: {
           status: "COMPLETED",
-          completionNotes: completionNotesText.trim(),
+          completionNotes: completionNotesText.trim() || "Project marked completed",
           completionPercentage: 100,
         } as any,
       },
       {
         onSuccess: () => {
-          toast.success("Project marked as COMPLETED! Manager notified.");
+          toast.success("🎉 Project marked as COMPLETED!");
           setCompleteModalOpen(false);
+        },
+        onError: (err: any) => {
+          toast.error(err?.message || "Failed to complete project");
         },
       }
     );

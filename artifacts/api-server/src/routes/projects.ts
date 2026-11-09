@@ -13,7 +13,7 @@ import { eq, aliasedTable, sql, desc, asc, and } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate } from "../lib/validation";
-import { requirePermission, requireAnyPermission, canManageProjectWorkspace } from "../middleware/auth";
+import { requirePermission, requireAnyPermission, canManageProjectWorkspace, isManagerRole } from "../middleware/auth";
 import { NotificationService } from "../services/notificationService";
 
 const router = Router();
@@ -209,7 +209,12 @@ router.patch("/:id", requirePermission("projects.edit"), asyncHandler(async (req
   const requesterId = (req as any).userId;
   const requesterRole = (req as any).userRole;
   const systemRole = (req as any).userSystemRole;
-  const isPrivileged = canManageProjectWorkspace(systemRole, (req as any).userConfiguredModules);
+  const userRoleText = (req as any).userRoleText;
+  const isPrivileged = canManageProjectWorkspace(systemRole, (req as any).userConfiguredModules, userRoleText) || isManagerRole(userRoleText);
+
+  if (sanitized.status === "DONE") {
+    sanitized.status = "COMPLETED";
+  }
 
   if (!isPrivileged) {
     // Employees can update assignmentStatus, status, completionNotes, completionPercentage, startedAt, completedAt, activityTimeline
@@ -567,6 +572,77 @@ router.patch("/:id", requirePermission("projects.edit"), asyncHandler(async (req
     }
   } catch (e) {
     console.warn("Error sending project notification:", e);
+  }
+
+  return res.json(row);
+}));
+
+router.post("/:id/complete", requirePermission("projects.edit"), asyncHandler(async (req, res) => {
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, req.params.id as string));
+  if (!project) throw createError("Not found", 404);
+
+  const requesterId = (req as any).userId;
+  const systemRole = (req as any).userSystemRole;
+  const userRoleText = (req as any).userRoleText;
+  const isPrivileged = canManageProjectWorkspace(systemRole, (req as any).userConfiguredModules, userRoleText) || isManagerRole(userRoleText);
+
+  if (!isPrivileged) {
+    const [updaterUserCheck] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, requesterId));
+    const isAssigned =
+      !project.assignedTo ||
+      project.assignedTo === requesterId ||
+      (updaterUserCheck?.name && project.assignedTo.toLowerCase() === updaterUserCheck.name.toLowerCase()) ||
+      (Array.isArray((project as any).coAssignees) && (project as any).coAssignees.includes(requesterId)) ||
+      (Array.isArray((project as any).teamMembers) && (project as any).teamMembers.includes(requesterId));
+
+    if (!isAssigned) {
+      throw createError("Forbidden: You are not assigned to this project.", 403);
+    }
+  }
+
+  const [updaterUser] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, requesterId));
+  const updaterName = updaterUser?.name || "Manager";
+  const notes = req.body?.notes || req.body?.completionNotes || "Marked completed by manager";
+
+  let timeline: any[] = Array.isArray(project.activityTimeline) ? [...(project.activityTimeline as any[])] : [];
+  timeline.push({
+    id: crypto.randomUUID(),
+    type: "COMPLETED",
+    actorId: requesterId,
+    actorName: updaterName,
+    message: `${updaterName} marked project as COMPLETED`,
+    notes,
+    timestamp: new Date().toISOString(),
+  });
+
+  const [row] = await db
+    .update(projectsTable)
+    .set({
+      status: "COMPLETED",
+      completionPercentage: 100,
+      completionNotes: notes,
+      completedAt: new Date(),
+      activityTimeline: timeline,
+      updatedBy: requesterId,
+      updatedAt: new Date(),
+    })
+    .where(eq(projectsTable.id, req.params.id as string))
+    .returning();
+
+  try {
+    await NotificationService.notifyAdminsAndManagers({
+      title: "🎉 Project Completed",
+      message: `${updaterName} marked project "${row.name}" as COMPLETED.`,
+      type: "PROJECT",
+      priority: "HIGH",
+      referenceId: row.id,
+      referenceType: "PROJECT",
+      createdBy: requesterId,
+      action: "PROJECT_COMPLETED",
+      actionUrl: `/projects/${row.id}`,
+    });
+  } catch (e) {
+    console.warn("Error sending project completed notification:", e);
   }
 
   return res.json(row);

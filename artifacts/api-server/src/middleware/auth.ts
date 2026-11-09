@@ -50,8 +50,8 @@ export function isPrivilegedRole(systemRole?: string | null): boolean {
 // Account managers have delegated access to modules such as Sales, but they
 // are still employees for the task workspace. Only these roles can see and
 // manage the company-wide task board.
-export function canManageTaskWorkspace(systemRole?: string | null, allowedModules?: unknown): boolean {
-  if (isManagerRole(systemRole)) return true;
+export function canManageTaskWorkspace(systemRole?: string | null, allowedModules?: unknown, role?: string | null): boolean {
+  if (isManagerRole(systemRole) || isManagerRole(role)) return true;
   return canManageTaskWorkspaceFromModules(systemRole, allowedModules);
 }
 
@@ -66,8 +66,8 @@ export function canManageEnabledSection(
   return canManageModuleSection(systemRole, module, allowedModules);
 }
 
-export function canManageProjectWorkspace(systemRole?: string | null, allowedModules?: unknown): boolean {
-  if (isManagerRole(systemRole)) return true;
+export function canManageProjectWorkspace(systemRole?: string | null, allowedModules?: unknown, role?: string | null): boolean {
+  if (isManagerRole(systemRole) || isManagerRole(role)) return true;
   return canManageEnabledSection(systemRole, "projects", allowedModules);
 }
 
@@ -232,6 +232,7 @@ export const requireAuth = asyncHandler(async (req: Request, res: Response, next
     .select({
       isActive: usersTable.isActive,
       systemRole: usersTable.systemRole,
+      role: usersTable.role,
     })
     .from(usersTable)
     .where(eq(usersTable.id, userId));
@@ -246,6 +247,7 @@ export const requireAuth = asyncHandler(async (req: Request, res: Response, next
 
   (req as Request & { userId: string }).userId = userId;
   (req as any).userSystemRole = user.systemRole;
+  (req as any).userRoleText = user.role;
   return next();
 });
 
@@ -259,6 +261,7 @@ export function requirePermission(permission: Permission) {
     const [user] = await db
       .select({
         systemRole: usersTable.systemRole,
+        role: usersTable.role,
         isActive: usersTable.isActive,
         allowedModules: usersTable.allowedModules,
         isDelegatedAdmin: usersTable.isDelegatedAdmin,
@@ -276,12 +279,12 @@ export function requirePermission(permission: Permission) {
       return res.status(401).json({ error: "Your account is inactive or pending approval." });
     }
 
-    const isSuperAdmin = user.systemRole === "SUPER_ADMIN";
+    const isSuperAdmin = user.systemRole === "SUPER_ADMIN" || user.role === "SUPER_ADMIN";
     const isDelegated = Boolean(user.isDelegatedAdmin);
-    const isManager = isManagerRole(user.systemRole) || isDelegated;
+    const isManager = isManagerRole(user.systemRole) || isManagerRole(user.role) || isDelegated;
     const allowedModulesList = getEffectiveModules(user.allowedModules);
     const configuredModulesList = parseConfiguredModules(user.allowedModules);
-    const role: UserRole = isSuperAdmin || isManager || canManageTaskWorkspace(user.systemRole, configuredModulesList)
+    const role: UserRole = isSuperAdmin || isManager || canManageTaskWorkspace(user.systemRole, configuredModulesList, user.role)
       ? "ADMIN"
       : "EMPLOYEE";
     const basePermissions: string[] = isSuperAdmin
@@ -327,6 +330,7 @@ export function requirePermission(permission: Permission) {
 
     (req as any).userRole = role;
     (req as any).userSystemRole = user.systemRole;
+    (req as any).userRoleText = user.role;
     (req as any).userIsDelegatedAdmin = isDelegated;
     (req as any).userPortalMode = user.portalMode || "MODE_1";
     (req as any).userViewAllClients = Boolean(user.viewAllClients) || isSuperAdmin || isManager;

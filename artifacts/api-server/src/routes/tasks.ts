@@ -283,18 +283,20 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
 
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
+  const requesterUserRole = (req as any).userRoleText;
   const requesterRole = (req as any).userRole || requesterSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules);
+  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
   const canManageProjects = canManageProjectWorkspace(
     requesterSystemRole,
     (req as any).userConfiguredModules,
+    requesterUserRole,
   );
 
   if (!isPrivileged) {
     const isPending = task.approvalStatus === "PENDING";
 
     // Pending requests belong to their requester, even if a legacy row has
-    // no assignee yet. Active work remains limited to the assigned employee.
+    // no assignee yet. Active work remains limited to the assigned employee or co-assignees.
     if (!canEmployeeAccessTask(task, requesterId)) {
       throw createError("Forbidden: You do not have permission to access or modify this task", 403);
     }
@@ -314,14 +316,14 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
         throw createError("Forbidden: Pending requests allow edits to title, description, priority, due date, and enabled project assignment only", 403);
       }
     } else if (isApprovedOrModified) {
-      if (task.assigneeId !== requesterId) {
-        throw createError("Forbidden: You can only update the status of tasks assigned to you", 403);
+      if (!canEmployeeAccessTask(task, requesterId)) {
+        throw createError("Forbidden: You can only update tasks assigned to you", 403);
       }
-      // Active task: employees can only update status or description.
-      // Completing a task is a manager decision; employees submit it for review.
+      // Active task: employees can update status, description, notes, deliverables, and assignment notes
+      const allowedKeys = new Set(["status", "description", "notes", "deliverables", "assignmentNote", "objective", "requirements"]);
       const updateKeys = Object.keys(sanitized).filter((key) => sanitized[key] !== undefined);
-      if (updateKeys.some((key) => key !== "status" && key !== "description")) {
-        throw createError("Forbidden: Active tasks allow status and description updates only", 403);
+      if (updateKeys.some((key) => !allowedKeys.has(key))) {
+        throw createError("Forbidden: Active tasks allow status, notes, deliverables, and description updates only", 403);
       }
       if (sanitized.status === "DONE" || sanitized.status === "COMPLETED") {
         sanitized.status = "IN_REVIEW";
@@ -331,24 +333,20 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
     }
   } else {
     // Admin / Manager is modifying/approving
-    // Completion is only valid for a task that has already been approved.
-    // This keeps a manager's approval action and completion action separate,
-    // so a pending request can never jump directly to Done.
-    if ((sanitized.status === "DONE" || sanitized.status === "COMPLETED") &&
-        task.approvalStatus !== "APPROVED" &&
-        task.approvalStatus !== "MODIFIED") {
-      throw createError("Approve this task request before marking it as done", 409, undefined, "status");
+    if (sanitized.status === "DONE" || sanitized.status === "COMPLETED") {
+      if (task.approvalStatus === "PENDING") {
+        sanitized.approvalStatus = "APPROVED";
+        sanitized.approvedBy = requesterId;
+        sanitized.approvedAt = new Date();
+      } else if (!task.approvalStatus) {
+        sanitized.approvalStatus = "APPROVED";
+      }
     }
 
     if (sanitized.approvalStatus !== "REJECTED") {
       if (sanitized.approvalStatus === "APPROVED" || sanitized.approvalStatus === "MODIFIED") {
         sanitized.approvedBy = requesterId;
         sanitized.approvedAt = new Date();
-        if (task.approvalStatus === "PENDING" &&
-            (task.status === "DONE" || task.status === "COMPLETED" || task.status === "IN_REVIEW" ||
-             sanitized.status === "DONE" || sanitized.status === "COMPLETED" || sanitized.status === "IN_REVIEW")) {
-          sanitized.status = "TODO";
-        }
       } else if (sanitized.approvalStatus === "MANAGER_APPROVED") {
         sanitized.managerApprovedBy = requesterId;
         sanitized.managerApprovedAt = new Date();

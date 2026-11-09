@@ -88,25 +88,36 @@ export function AdminTasksView() {
     e.preventDefault();
     if (!selectedTaskForAction) return;
     const formData = new FormData(e.currentTarget);
-    const title = formData.get("title") as string;
-    const description = formData.get("description") as string;
-    const objective = formData.get("objective") as string;
-    const requirements = formData.get("requirements") as string;
-    const deliverables = formData.get("deliverables") as string;
-    const notes = formData.get("notes") as string;
-    const startDate = formData.get("startDate") as string || null;
-    const priority = formData.get("priority") as string;
-    const status = formData.get("status") as string;
+    const title = (formData.get("title") as string)?.trim() || selectedTaskForAction.title;
+    const description = (formData.get("description") as string) || "";
+    const objective = (formData.get("objective") as string) || "";
+    const requirements = (formData.get("requirements") as string) || "";
+    const deliverables = (formData.get("deliverables") as string) || "";
+    const notes = (formData.get("notes") as string) || "";
+    const startDateRaw = formData.get("startDate") as string;
+    const priority = (formData.get("priority") as string) || "MEDIUM";
+    const status = (formData.get("status") as string) || "TODO";
     const rawProjectId = formData.get("projectId") as string;
-    const projectId = (!rawProjectId || rawProjectId === "none") ? null : rawProjectId;
+    const projectId = (!rawProjectId || rawProjectId === "none" || rawProjectId === "unassigned") ? null : rawProjectId;
     const rawSubprojectId = formData.get("subprojectId") as string;
-    const subprojectId = (!rawSubprojectId || rawSubprojectId === "none") ? null : rawSubprojectId;
+    const subprojectId = (!rawSubprojectId || rawSubprojectId === "none" || rawSubprojectId === "unassigned") ? null : rawSubprojectId;
     const rawAssigneeId = formData.get("assigneeId") as string;
-    const assigneeId = (!rawAssigneeId || rawAssigneeId === "unassigned") ? null : rawAssigneeId;
-    const dueDate = formData.get("dueDate") as string || null;
-    const assignmentNote = (formData.get("assignmentNote") as string) || null;
+    const assigneeId = (!rawAssigneeId || rawAssigneeId === "unassigned" || rawAssigneeId === "none") ? null : rawAssigneeId;
+    const dueDateRaw = formData.get("dueDate") as string;
+    const assignmentNote = (formData.get("assignmentNote") as string) || "";
     const rawCoAssignees = formData.get("coAssignees") as string;
-    const coAssignees = rawCoAssignees ? JSON.parse(rawCoAssignees) : [];
+    let coAssignees: string[] = [];
+    try {
+      coAssignees = rawCoAssignees ? JSON.parse(rawCoAssignees) : [];
+    } catch {
+      coAssignees = [];
+    }
+
+    const safeIso = (val?: string | null) => {
+      if (!val || typeof val !== "string" || !val.trim()) return null;
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    };
 
     updateMutation.mutate({
       id: selectedTaskForAction.id,
@@ -118,19 +129,23 @@ export function AdminTasksView() {
         deliverables,
         notes,
         assignmentNote,
-        startDate: startDate ? new Date(startDate).toISOString() : null,
+        startDate: safeIso(startDateRaw),
         priority,
         status,
         projectId,
         subprojectId,
         assigneeId,
         coAssignees,
-        dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+        dueDate: safeIso(dueDateRaw),
       } as any,
     }, {
       onSuccess: () => {
         toast.success("Task updated successfully!");
         setAdminEditDialogOpen(false);
+      },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error || err?.message || "Failed to update task";
+        toast.error(msg);
       }
     });
   };
@@ -158,7 +173,10 @@ export function AdminTasksView() {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: getListTasksQueryKey() });
       },
-      onError: () => toast.error("Failed to update task"),
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error || err?.message || "Failed to update task";
+        toast.error(msg);
+      },
     },
   });
 
