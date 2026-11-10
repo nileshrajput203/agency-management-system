@@ -8,12 +8,12 @@ import { Progress } from "@/components/ui/progress";
 import {
   CheckSquare, Clock, FileText, Umbrella, ArrowRight, RefreshCw,
   AlertTriangle, CheckCircle2, Timer, CalendarClock, Activity,
-  FolderOpen, TrendingUp, Play, Send, Check, Undo2
+  FolderOpen, TrendingUp, Play, Send, Check, Undo2, Receipt, ShoppingCart
 } from "lucide-react";
 import { format, isPast, isToday, isTomorrow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { isManagerOrAdminRole } from "@/lib/permissions";
+import { isManagerOrAdminRole, hasModuleAccess } from "@/lib/permissions";
 
 export function EmployeeDashboard({
   stats,
@@ -78,6 +78,41 @@ export function EmployeeDashboard({
       return r.ok ? r.json() : { unreadCount: 0 };
     },
     refetchInterval: 15_000,
+  });
+
+  const canInvoices = hasModuleAccess(user?.allowedModules, "invoices");
+  const canQuotations = hasModuleAccess(user?.allowedModules, "quotations");
+  const canPurchaseOrders = hasModuleAccess(user?.allowedModules, "purchaseOrders");
+  const hasAnyFinance = canInvoices || canQuotations || canPurchaseOrders;
+
+  const { data: finSummary } = useQuery<any>({
+    queryKey: ["/api/invoices/financial-summary"],
+    queryFn: async () => {
+      const r = await fetch("/api/invoices/financial-summary", { headers: authHeader() });
+      return r.ok ? r.json() : null;
+    },
+    enabled: !!canInvoices,
+    refetchInterval: 60_000,
+  });
+
+  const { data: poList = [] } = useQuery<any[]>({
+    queryKey: ["/api/purchase-orders"],
+    queryFn: async () => {
+      const r = await fetch("/api/purchase-orders", { headers: authHeader() });
+      return r.ok ? r.json() : [];
+    },
+    enabled: !!canPurchaseOrders,
+    refetchInterval: 60_000,
+  });
+
+  const { data: quoteList = [] } = useQuery<any[]>({
+    queryKey: ["/api/quotations"],
+    queryFn: async () => {
+      const r = await fetch("/api/quotations", { headers: authHeader() });
+      return r.ok ? r.json() : [];
+    },
+    enabled: !!canQuotations,
+    refetchInterval: 60_000,
   });
 
   /* ── Derived values ── */
@@ -267,6 +302,84 @@ export function EmployeeDashboard({
           </Button>
         </div>
       </div>
+
+      {/* ── Finance & Documents Quick Access (if user has finance permissions) ── */}
+      {hasAnyFinance && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold font-heading flex items-center gap-2 text-foreground">
+              <Receipt className="h-4 w-4 text-emerald-500" /> Finance & Documents
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {canInvoices && (
+              <Card
+                className="bg-card border border-border/60 hover:border-emerald-500/50 cursor-pointer transition-all shadow-xs"
+                onClick={() => navigate("/invoices")}
+              >
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Invoices</p>
+                    <p className="text-2xl font-bold font-heading text-foreground">
+                      {finSummary?.totalInvoices ?? "—"}
+                    </p>
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                      Manage Invoices <ArrowRight className="h-3 w-3" />
+                    </p>
+                  </div>
+                  <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                    <Receipt className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {canQuotations && (
+              <Card
+                className="bg-card border border-border/60 hover:border-sky-500/50 cursor-pointer transition-all shadow-xs"
+                onClick={() => navigate("/quotations")}
+              >
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quotations</p>
+                    <p className="text-2xl font-bold font-heading text-foreground">
+                      {quoteList?.length ?? "—"}
+                    </p>
+                    <p className="text-[11px] text-sky-600 dark:text-sky-400 font-medium flex items-center gap-1">
+                      Estimates & Quotes <ArrowRight className="h-3 w-3" />
+                    </p>
+                  </div>
+                  <div className="h-10 w-10 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-500">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {canPurchaseOrders && (
+              <Card
+                className="bg-card border border-border/60 hover:border-violet-500/50 cursor-pointer transition-all shadow-xs"
+                onClick={() => navigate("/purchase-orders")}
+              >
+                <CardContent className="p-4 flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Purchase Orders</p>
+                    <p className="text-2xl font-bold font-heading text-foreground">
+                      {poList?.length ?? "—"}
+                    </p>
+                    <p className="text-[11px] text-violet-600 dark:text-violet-400 font-medium flex items-center gap-1">
+                      Vendor POs & Tracking <ArrowRight className="h-3 w-3" />
+                    </p>
+                  </div>
+                  <div className="h-10 w-10 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-500">
+                    <ShoppingCart className="h-5 w-5" />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Row 1: 4 Summary Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

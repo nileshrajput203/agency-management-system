@@ -13,10 +13,12 @@ import {
 import {
   LayoutDashboard, Users, TrendingUp, FolderKanban, CheckSquare,
   Calendar, Clock, Umbrella, Bell, User, Sun, Moon, LogOut, ChevronRight, CalendarDays, FileCheck, BarChart3,
+  Receipt, FileText, ShoppingCart, Wallet, ClipboardList, Sheet, UserCog, Settings,
 } from "lucide-react";
 import { NotificationsPopover } from "@/components/common/NotificationsPopover";
 import { CompanyLogo } from "@/components/common/CompanyLogo";
-import { getUserModules } from "@/lib/permissions";
+import { getUserModules, hasModuleAccess } from "@/lib/permissions";
+import { ENABLE_PROPOSALS } from "@/lib/constants";
 
 interface NavItem {
   label: string;
@@ -46,23 +48,42 @@ const ALL_EMPLOYEE_NAV_GROUPS: NavGroupDef[] = [
     ],
   },
   {
-    label: "My Work",
+    label: "Operations & CRM",
     items: [
       { label: "My Clients",        href: "/employee/clients",          icon: <Users className="h-4 w-4" />,                               modules: ["clients"] },
       { label: "Sales Funnel",      href: "/sales",                      icon: <TrendingUp className="h-4 w-4" />,                           modules: ["sales"] },
       { label: "My Projects",       href: "/employee/projects",         icon: <FolderKanban className="h-4 w-4" />,                         modules: ["projects"] },
       { label: "My Tasks",          href: "/employee/tasks",            icon: <CheckSquare className="h-4 w-4" />,                          modules: ["tasks"] },
-      { label: "Work Reports",      href: "/employee/work-reports",     icon: <FileCheck className="h-4 w-4 text-emerald-500" />, modules: ["reports"] },
-      { label: "Performance Report", href: "/employee/performance-report", icon: <BarChart3 className="h-4 w-4 text-violet-500" />, modules: ["reports"] },
-      { label: "Meetings",          href: "/employee/meetings",         icon: <CalendarDays className="h-4 w-4 text-blue-500" />,           modules: ["meetings"] },
+      { label: "Meetings",          href: "/employee/meetings",         icon: <CalendarDays className="h-4 w-4 text-blue-500" />,           modules: ["meetings", "time"] },
       { label: "Content Calendar",  href: "/employee/content-calendar", icon: <Calendar className="h-4 w-4" />,                            modules: ["content"] },
+    ],
+  },
+  {
+    label: "Finance & Docs",
+    items: [
+      { label: "Invoices",        href: "/invoices",        icon: <Receipt className="h-4 w-4 text-emerald-500" />,    modules: ["invoices", "finance"] },
+      { label: "Quotations",      href: "/quotations",      icon: <FileText className="h-4 w-4 text-sky-500" />,       modules: ["quotations", "finance"] },
+      { label: "Purchase Orders", href: "/purchase-orders", icon: <ShoppingCart className="h-4 w-4 text-violet-500" />,modules: ["purchaseOrders", "purchase_orders", "finance"] },
+      { label: "Expenses & Spends", href: "/expenses",      icon: <Wallet className="h-4 w-4 text-amber-500" />,     modules: ["expenses", "finance"] },
+      { label: "Vendors & Creators", href: "/vendors",      icon: <Users className="h-4 w-4 text-indigo-400" />,     modules: ["vendors", "team", "finance"] },
+      ...(ENABLE_PROPOSALS ? [{ label: "Proposals", href: "/proposals", icon: <ClipboardList className="h-4 w-4" />, modules: ["proposals", "finance"] }] : []),
+      { label: "Excel Reports",   href: "/excel-reports",   icon: <Sheet className="h-4 w-4 text-green-600" />,      modules: ["excelReports", "reports", "finance"] },
     ],
   },
   {
     label: "People & HR",
     items: [
-      { label: "Attendance", href: "/employee/attendance", icon: <Clock className="h-4 w-4" />,    modules: ["attendance"] },
-      { label: "Leave",      href: "/employee/leave",      icon: <Umbrella className="h-4 w-4" />, modules: ["leaves"] },
+      { label: "Work Reports",      href: "/employee/work-reports",     icon: <FileCheck className="h-4 w-4 text-emerald-500" />, modules: ["reports", "attendance", "tasks"] },
+      { label: "Performance Report", href: "/employee/performance-report", icon: <BarChart3 className="h-4 w-4 text-violet-500" />, modules: ["reports", "attendance", "tasks"] },
+      { label: "Attendance",        href: "/employee/attendance",       icon: <Clock className="h-4 w-4" />,                      modules: ["attendance"] },
+      { label: "Leave Management",  href: "/employee/leave",            icon: <Umbrella className="h-4 w-4" />,                   modules: ["leaves", "leave"] },
+      { label: "Team & Roles",      href: "/users",                     icon: <UserCog className="h-4 w-4" />,                    modules: ["team", "users"] },
+    ],
+  },
+  {
+    label: "Configuration",
+    items: [
+      { label: "Settings", href: "/settings", icon: <Settings className="h-4 w-4" />, modules: ["settings"] },
     ],
   },
   {
@@ -88,13 +109,12 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "E";
 
-  const userAllowedModules: string[] = getUserModules(user?.allowedModules);
   const employeeNavGroups = ALL_EMPLOYEE_NAV_GROUPS
     .map(group => ({
       ...group,
       items: group.items.filter(item => {
         if (!item.modules) return true; // no restriction = always visible
-        return item.modules.some(m => userAllowedModules.includes(m));
+        return item.modules.some(m => hasModuleAccess(user?.allowedModules, m));
       }),
     }))
     .filter(group => group.items.length > 0);
@@ -103,13 +123,22 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
     if (location.includes("work-reports")) return "Work Reports";
     if (location.includes("performance-report")) return "Performance Report";
     if (location.includes("clients")) return "My Clients";
-    if (location.includes("leads")) return "Sales Funnel";
+    if (location.includes("leads") || location.includes("sales")) return "Sales Funnel";
     if (location.includes("projects")) return "My Projects";
     if (location.includes("tasks")) return "My Tasks";
     if (location.includes("meetings")) return "Meetings";
     if (location.includes("content")) return "Content Calendar";
     if (location.includes("attendance")) return "Attendance";
     if (location.includes("leave")) return "Leave Management";
+    if (location.includes("invoices")) return "Invoices";
+    if (location.includes("quotations")) return "Quotations";
+    if (location.includes("purchase-orders")) return "Purchase Orders";
+    if (location.includes("expenses")) return "Expenses & Spends";
+    if (location.includes("vendors")) return "Vendors & Creators";
+    if (location.includes("proposals")) return "Proposals";
+    if (location.includes("excel-reports")) return "Excel Reports";
+    if (location.includes("users")) return "Team & Roles";
+    if (location.includes("settings")) return "Settings";
     if (location.includes("notifications")) return "Notifications";
     if (location.includes("profile")) return "Profile Settings";
     return "Dashboard";
