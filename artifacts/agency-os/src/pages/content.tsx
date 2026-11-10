@@ -228,6 +228,10 @@ export default function ContentPage() {
   });
 
   function openCreate(defaultDate?: string) {
+    if (!isManagerOrAdmin) {
+      toast.error("Only managers and administrators can create new content posts.");
+      return;
+    }
     if (defaultDate && isPastDate(defaultDate)) {
       toast.error("Cannot schedule content for past dates. Please select today or a future date.");
       return;
@@ -328,8 +332,20 @@ export default function ContentPage() {
       comments: activeDraft.comments?.length ? activeDraft.comments : undefined,
     };
     if (panel.mode === "create") {
+      if (!isManagerOrAdmin) {
+        toast.error("Only managers and administrators can create new content posts.");
+        return;
+      }
       createMutation.mutate({ data: payload as any });
     } else if (panel.mode === "edit" && activePost) {
+      if (!isManagerOrAdmin) {
+        const deliverableOnlyPayload = {
+          assetsLink: activeDraft.assetsLink || undefined,
+          comments: activeDraft.comments?.length ? activeDraft.comments : undefined,
+        };
+        updateMutation.mutate({ id: activePost.id, data: deliverableOnlyPayload as any });
+        return;
+      }
       updateMutation.mutate({ id: activePost.id, data: payload as any });
     }
   }
@@ -499,9 +515,11 @@ export default function ContentPage() {
               <Share2 className="h-3.5 w-3.5" />
               Share Calendar
             </Button>
-            <Button onClick={() => openCreate()} size="sm" className="h-8 gap-1.5 text-xs btn-micro-anim">
-              <Plus className="h-3.5 w-3.5" /> Add Post
-            </Button>
+            {isManagerOrAdmin && (
+              <Button onClick={() => openCreate()} size="sm" className="h-8 gap-1.5 text-xs btn-micro-anim">
+                <Plus className="h-3.5 w-3.5" /> Add Post
+              </Button>
+            )}
           </div>
         </div>
       ) : (
@@ -552,9 +570,11 @@ export default function ContentPage() {
               <Printer className="h-3.5 w-3.5" />
               Print
             </Button>
-            <Button onClick={() => openCreate()} size="sm" className="h-8 gap-1.5 text-xs btn-micro-anim">
-              <Plus className="h-3.5 w-3.5" /> Add Post
-            </Button>
+            {isManagerOrAdmin && (
+              <Button onClick={() => openCreate()} size="sm" className="h-8 gap-1.5 text-xs btn-micro-anim">
+                <Plus className="h-3.5 w-3.5" /> Add Post
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -793,9 +813,11 @@ export default function ContentPage() {
                   ? `No posts with visual assets found for ${activeClient?.companyName}. Click "Add Post" to start scheduling.`
                   : `Click "Add Post" to schedule and attach artwork to your content calendar.`}
               </p>
-              <Button onClick={() => openCreate()} size="sm" className="mt-4 gap-1.5 text-xs font-semibold">
-                <Plus className="h-3.5 w-3.5" /> Add Post & Upload Artwork
-              </Button>
+              {isManagerOrAdmin && (
+                <Button onClick={() => openCreate()} size="sm" className="mt-4 gap-1.5 text-xs font-semibold">
+                  <Plus className="h-3.5 w-3.5" /> Add Post & Upload Artwork
+                </Button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
@@ -972,11 +994,11 @@ export default function ContentPage() {
                   onClick={() => {
                     if (hasPosts) {
                       setSelectedDayViewDate(dateStr);
-                    } else {
+                    } else if (isManagerOrAdmin) {
                       openCreate(dateStr);
                     }
                   }}
-                  title={hasPosts ? `Click date to view all ${dayPosts.length} posts for this day` : "Click to schedule post"}
+                  title={hasPosts ? `Click date to view all ${dayPosts.length} posts for this day` : isManagerOrAdmin ? "Click to schedule post" : ""}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-1">
@@ -987,7 +1009,7 @@ export default function ContentPage() {
                             e.stopPropagation();
                             if (hasPosts) {
                               setSelectedDayViewDate(dateStr);
-                            } else {
+                            } else if (isManagerOrAdmin) {
                               openCreate(dateStr);
                             }
                           }}
@@ -995,7 +1017,7 @@ export default function ContentPage() {
                             "text-xs font-bold px-1 py-0.5 rounded hover:bg-primary/20 hover:text-primary transition-colors cursor-pointer",
                             hasPosts ? "text-foreground font-extrabold" : "text-muted-foreground"
                           )}
-                          title={hasPosts ? `View all ${dayPosts.length} posts for ${dateStr}` : "Schedule new post"}
+                          title={hasPosts ? `View all ${dayPosts.length} posts for ${dateStr}` : isManagerOrAdmin ? "Schedule new post" : ""}
                         >
                           {day}
                         </button>
@@ -1013,17 +1035,19 @@ export default function ContentPage() {
                           </button>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        title="Schedule new post for this day"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openCreate(dateStr);
-                        }}
-                        className="h-4 w-4 rounded flex items-center justify-center hover:bg-primary/20 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Plus className="h-3 w-3" />
-                      </button>
+                      {isManagerOrAdmin && (
+                        <button
+                          type="button"
+                          title="Schedule new post for this day"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openCreate(dateStr);
+                          }}
+                          className="h-4 w-4 rounded flex items-center justify-center hover:bg-primary/20 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      )}
                     </div>
                     <div className="space-y-0.5">
                       {dayPosts.slice(0, 3).map((p) => {
@@ -1367,7 +1391,7 @@ export default function ContentPage() {
                           openEdit(post as PostRecord);
                         }}
                       >
-                        View & Edit
+                        {isManagerOrAdmin ? "View & Edit" : "View Post"}
                       </Button>
                     </div>
                   </div>
@@ -1384,18 +1408,20 @@ export default function ContentPage() {
             >
               Close
             </Button>
-            <Button
-              type="button"
-              className="gap-1.5"
-              onClick={() => {
-                const date = selectedDayViewDate;
-                setSelectedDayViewDate(null);
-                if (date) openCreate(date);
-              }}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Schedule New Post for this Day
-            </Button>
+            {isManagerOrAdmin && (
+              <Button
+                type="button"
+                className="gap-1.5"
+                onClick={() => {
+                  const date = selectedDayViewDate;
+                  setSelectedDayViewDate(null);
+                  if (date) openCreate(date);
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Schedule New Post for this Day
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

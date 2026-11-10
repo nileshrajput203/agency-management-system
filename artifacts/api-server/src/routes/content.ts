@@ -165,6 +165,15 @@ router.get("/", requirePermission("content.view"), asyncHandler(async (req, res)
 
 // ─── POST /api/content ────────────────────────────────────────
 router.post("/", requirePermission("content.create"), asyncHandler(async (req, res) => {
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+  const isManager = isManagerOrAdmin(requesterSystemRole, isDelegatedAdmin, requesterRole);
+
+  if (!isManager) {
+    throw createError("Forbidden: Only managers and administrators can create content posts", 403);
+  }
+
   const { id: _id, createdAt: _ts, ...body } = req.body;
   const sanitized = sanitizeContentPost(body, false);
 
@@ -760,15 +769,30 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
     throw createError("Not found", 404);
   }
 
-  // Strict rule: Other than a manager or administrator, no one can assign or unassign team members
-  const isAssigneeChanged =
-    (sanitized.assigneeId !== undefined && sanitized.assigneeId !== existing.assigneeId) ||
-    (sanitized.editorId !== undefined && sanitized.editorId !== existing.editorId) ||
-    (sanitized.videographerId !== undefined && sanitized.videographerId !== existing.videographerId) ||
-    (sanitized.ideationAssignedTo !== undefined && sanitized.ideationAssignedTo !== existing.ideationAssignedTo);
-
-  if (isAssigneeChanged && !isManager) {
-    throw createError("Forbidden: Only managers and administrators can assign or unassign team members", 403);
+  // Strict rule: Other than a manager or administrator, no one can assign or unassign team members or edit post specs
+  if (!isManager) {
+    const disallowedFields = [
+      "clientId",
+      "title",
+      "caption",
+      "platform",
+      "contentType",
+      "format",
+      "priority",
+      "scheduledAt",
+      "shootDate",
+      "status",
+      "assigneeId",
+      "editorId",
+      "videographerId",
+      "ideationAssignedTo",
+      "approverId",
+    ];
+    for (const f of disallowedFields) {
+      if ((sanitized as any)[f] !== undefined && (sanitized as any)[f] !== (existing as any)[f]) {
+        throw createError("Forbidden: Only managers and administrators can edit post specifications and assignments", 403);
+      }
+    }
   }
 
   if (
@@ -957,6 +981,15 @@ router.post("/:id/comments/pin", requirePermission("content.edit"), asyncHandler
 
 // ─── DELETE /api/content/:id ──────────────────────────────────
 router.delete("/:id", requirePermission("content.delete"), asyncHandler(async (req, res) => {
+  const requesterSystemRole = (req as any).userSystemRole;
+  const requesterRole = (req as any).userRole;
+  const isDelegatedAdmin = Boolean((req as any).userIsDelegatedAdmin);
+  const isManager = isManagerOrAdmin(requesterSystemRole, isDelegatedAdmin, requesterRole);
+
+  if (!isManager) {
+    throw createError("Forbidden: Only managers and administrators can delete content posts", 403);
+  }
+
   await db.delete(contentPostsTable).where(eq(contentPostsTable.id, (req.params.id as string)));
   return res.status(204).send();
 }));

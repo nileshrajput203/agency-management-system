@@ -95,11 +95,16 @@ export function ContentPostDrawer({
           <SheetHeader className="text-left">
             <SheetTitle className="text-base font-bold flex items-center gap-2">
               <FileText className="h-4 w-4 text-primary" />
-              {panel.mode === "create" ? "New Content Post" : "Edit Content Post"}
+              {panel.mode === "create" ? "New Content Post" : isManagerOrAdmin ? "Edit Content Post" : "Post Deliverables & Specifications"}
             </SheetTitle>
+            {!isManagerOrAdmin && (
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Read-only post specifications • Upload deliverables & comments below
+              </p>
+            )}
           </SheetHeader>
           <div className="flex items-center gap-2">
-            {panel.mode === "edit" && (
+            {panel.mode === "edit" && isManagerOrAdmin && (
               <Button
                 size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive"
                 onClick={() => { if (panel.mode === "edit" && activePost) deleteMutation.mutate({ id: activePost.id }); }}
@@ -120,7 +125,7 @@ export function ContentPostDrawer({
               className="gap-1.5 font-semibold btn-micro-anim"
             >
               <Send className="h-3.5 w-3.5" />
-              {isPending ? "Saving…" : panel.mode === "create" ? "Create Post" : "Save Changes"}
+              {isPending ? "Saving…" : panel.mode === "create" ? "Create Post" : isManagerOrAdmin ? "Save Changes" : "Save Deliverables"}
             </Button>
           </div>
         </div>
@@ -362,16 +367,18 @@ export function ContentPostDrawer({
             );
           })()}
 
-          <WriteWithAI
-            context="content-post"
-            onFill={(fields) => {
-              if (fields.title) setField("title", fields.title);
-              if (fields.caption) setField("caption", fields.caption);
-              if (fields.platform) setField("platform", fields.platform);
-              if (fields.contentType) setField("contentType", fields.contentType);
-              if (fields.status) setField("status", fields.status);
-            }}
-          />
+          {isManagerOrAdmin && (
+            <WriteWithAI
+              context="content-post"
+              onFill={(fields) => {
+                if (fields.title) setField("title", fields.title);
+                if (fields.caption) setField("caption", fields.caption);
+                if (fields.platform) setField("platform", fields.platform);
+                if (fields.contentType) setField("contentType", fields.contentType);
+                if (fields.status) setField("status", fields.status);
+              }}
+            />
+          )}
 
           {/* Basic Information Group */}
           <div className="bg-card border border-border rounded-xl p-4 space-y-4">
@@ -381,13 +388,20 @@ export function ContentPostDrawer({
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Content Title / Name</Label>
-              <Input placeholder="Post title or content name…" value={draft.title} onChange={(e) => setField("title", e.target.value)} />
+              <Input
+                placeholder="Post title or content name…"
+                value={draft.title}
+                onChange={(e) => setField("title", e.target.value)}
+                disabled={!isManagerOrAdmin}
+                className={cn(!isManagerOrAdmin && "bg-muted/50 cursor-not-allowed")}
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Status</Label>
                 <Select
+                  disabled={!isManagerOrAdmin}
                   value={draft.status}
                   onValueChange={(v: string) => {
                     if (["ADMIN_APPROVED", "SCHEDULED"].includes(v) && !isManagerOrAdmin) {
@@ -397,7 +411,7 @@ export function ContentPostDrawer({
                     setField("status", v);
                   }}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className={cn(!isManagerOrAdmin && "bg-muted/50 cursor-not-allowed")}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(STATUS_CONFIG).map(([k, v]) => {
                       if (k === "ADMIN_APPROVED" && !isManagerOrAdmin) {
@@ -412,8 +426,12 @@ export function ContentPostDrawer({
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Platform</Label>
-                <Select value={draft.platform} onValueChange={(v: string) => setField("platform", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  disabled={!isManagerOrAdmin}
+                  value={draft.platform}
+                  onValueChange={(v: string) => setField("platform", v)}
+                >
+                  <SelectTrigger className={cn(!isManagerOrAdmin && "bg-muted/50 cursor-not-allowed")}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {PLATFORM_OPTIONS.map((p) => (
                       <SelectItem key={p} value={p}>{p.charAt(0) + p.slice(1).toLowerCase()}</SelectItem>
@@ -426,8 +444,12 @@ export function ContentPostDrawer({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Format</Label>
-                <Select value={draft.format || "__none__"} onValueChange={(v: string) => setField("format", v === "__none__" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Select format" /></SelectTrigger>
+                <Select
+                  disabled={!isManagerOrAdmin}
+                  value={draft.format || "__none__"}
+                  onValueChange={(v: string) => setField("format", v === "__none__" ? "" : v)}
+                >
+                  <SelectTrigger className={cn(!isManagerOrAdmin && "bg-muted/50 cursor-not-allowed")}><SelectValue placeholder="Select format" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">None</SelectItem>
                     {FORMAT_OPTIONS.map((f) => (
@@ -438,8 +460,12 @@ export function ContentPostDrawer({
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Client</Label>
-                <Select value={draft.clientId || "__none__"} onValueChange={(v: string) => setField("clientId", v === "__none__" ? "" : v)}>
-                  <SelectTrigger disabled={clientsLoading}>
+                <Select
+                  disabled={!isManagerOrAdmin || clientsLoading}
+                  value={draft.clientId || "__none__"}
+                  onValueChange={(v: string) => setField("clientId", v === "__none__" ? "" : v)}
+                >
+                  <SelectTrigger disabled={!isManagerOrAdmin || clientsLoading} className={cn(!isManagerOrAdmin && "bg-muted/50 cursor-not-allowed")}>
                     <SelectValue placeholder={clientsLoading ? "Loading clients…" : "Select client"} />
                   </SelectTrigger>
                   <SelectContent>
@@ -516,6 +542,8 @@ export function ContentPostDrawer({
                 <Label className="text-xs font-semibold">Post Date</Label>
                 <Input
                   type="date"
+                  disabled={!isManagerOrAdmin}
+                  className={cn(!isManagerOrAdmin && "bg-muted/50 cursor-not-allowed")}
                   min={getTodayDateString()}
                   value={draft.scheduledAt?.slice(0, 10) ?? ""}
                   onChange={(e) => setField("scheduledAt", e.target.value)}
@@ -525,6 +553,8 @@ export function ContentPostDrawer({
                 <Label className="text-xs font-semibold">Shoot Date</Label>
                 <Input
                   type="date"
+                  disabled={!isManagerOrAdmin}
+                  className={cn(!isManagerOrAdmin && "bg-muted/50 cursor-not-allowed")}
                   min={getTodayDateString()}
                   value={draft.shootDate?.slice(0, 10) ?? ""}
                   onChange={(e) => setField("shootDate", e.target.value)}
@@ -602,7 +632,14 @@ export function ContentPostDrawer({
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Caption / Copy Notes</Label>
-              <Textarea placeholder="Write your caption or content copy here…" rows={4} value={draft.caption} onChange={(e) => setField("caption", e.target.value)} />
+              <Textarea
+                placeholder="Write your caption or content copy here…"
+                rows={4}
+                value={draft.caption}
+                onChange={(e) => setField("caption", e.target.value)}
+                disabled={!isManagerOrAdmin}
+                className={cn(!isManagerOrAdmin && "bg-muted/50 cursor-not-allowed")}
+              />
             </div>
           </div>
 
@@ -615,7 +652,11 @@ export function ContentPostDrawer({
                 <p className="text-xs text-muted-foreground">Flag this post for pending revisions or team attention</p>
               </div>
             </div>
-            <Switch checked={isNeedsRevision(draft.needsRevision)} onCheckedChange={(v) => setField("needsRevision", v)} />
+            <Switch
+              disabled={!isManagerOrAdmin}
+              checked={isNeedsRevision(draft.needsRevision)}
+              onCheckedChange={(v) => setField("needsRevision", v)}
+            />
           </div>
 
           {/* Custom Properties */}
