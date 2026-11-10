@@ -13,12 +13,13 @@ const MODULE_PERMISSIONS: Record<string, string[]> = {
     "quotations.view", "quotations.create", "quotations.edit", "quotations.delete",
     "proposals.view", "proposals.create", "proposals.edit", "proposals.delete",
     "purchase_orders.view", "purchase_orders.create", "purchase_orders.edit", "purchase_orders.delete",
+    "clients.view",
   ],
-  invoices: ["invoices.view", "invoices.create", "invoices.edit", "invoices.delete"],
-  quotations: ["quotations.view", "quotations.create", "quotations.edit", "quotations.delete"],
-  proposals: ["proposals.view", "proposals.create", "proposals.edit", "proposals.delete"],
-  purchaseOrders: ["purchase_orders.view", "purchase_orders.create", "purchase_orders.edit", "purchase_orders.delete"],
-  purchase_orders: ["purchase_orders.view", "purchase_orders.create", "purchase_orders.edit", "purchase_orders.delete"],
+  invoices: ["invoices.view", "invoices.create", "invoices.edit", "invoices.delete", "clients.view"],
+  quotations: ["quotations.view", "quotations.create", "quotations.edit", "quotations.delete", "clients.view"],
+  proposals: ["proposals.view", "proposals.create", "proposals.edit", "proposals.delete", "clients.view"],
+  purchaseOrders: ["purchase_orders.view", "purchase_orders.create", "purchase_orders.edit", "purchase_orders.delete", "clients.view"],
+  purchase_orders: ["purchase_orders.view", "purchase_orders.create", "purchase_orders.edit", "purchase_orders.delete", "clients.view"],
   attendance: ["attendance.view", "attendance.manage"],
   leaves: ["leave.view", "leave.apply", "leave.approve"],
   leave: ["leave.view", "leave.apply", "leave.approve"],
@@ -85,7 +86,7 @@ export function getModulePermissions(value: unknown): string[] {
     }
   }
   if (configured.some((module) =>
-    ["clients", "projects", "tasks", "content", "finance"].includes(module)
+    ["clients", "projects", "tasks", "content", "finance", "invoices", "quotations", "purchaseOrders", "purchase_orders", "proposals"].includes(module)
   )) {
     permissions.add("attachments.view");
     permissions.add("attachments.upload");
@@ -102,7 +103,22 @@ export function canManageModuleSection(
   module: string,
   configuredModules: unknown,
 ): boolean {
-  return systemRole === "SUPER_ADMIN" || hasConfiguredModule(configuredModules, module);
+  if (systemRole === "SUPER_ADMIN") return true;
+  if (hasConfiguredModule(configuredModules, module)) return true;
+  if (module === "finance") {
+    return ["invoices", "quotations", "purchaseOrders", "purchase_orders", "proposals", "expenses"].some((m) =>
+      hasConfiguredModule(configuredModules, m)
+    );
+  }
+  if (module === "purchase_orders" || module === "purchaseOrders") {
+    return hasConfiguredModule(configuredModules, "purchaseOrders") ||
+      hasConfiguredModule(configuredModules, "purchase_orders") ||
+      hasConfiguredModule(configuredModules, "finance");
+  }
+  if (["invoices", "quotations", "proposals"].includes(module)) {
+    return hasConfiguredModule(configuredModules, module) || hasConfiguredModule(configuredModules, "finance");
+  }
+  return false;
 }
 
 export function canManageTaskWorkspace(

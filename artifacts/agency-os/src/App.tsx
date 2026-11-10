@@ -98,16 +98,29 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const savedToken = localStorage.getItem("agency_token") || localStorage.getItem("token");
     const savedUser = localStorage.getItem("agency_user");
-    if (savedToken && savedUser) {
-      try {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
-        activeToken = savedToken;
-        localStorage.setItem("agency_token", savedToken);
-        localStorage.setItem("token", savedToken);
-      } catch {}
+    if (savedToken) {
+      setToken(savedToken);
+      activeToken = savedToken;
+      if (savedUser) {
+        try {
+          setUser(JSON.parse(savedUser));
+        } catch {}
+      }
+      fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${savedToken}` },
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((freshUser) => {
+          if (freshUser) {
+            setUser(freshUser);
+            localStorage.setItem("agency_user", JSON.stringify(freshUser));
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = (newToken: string, newUser: User) => {
@@ -428,7 +441,7 @@ import {
 } from "@/lib/permissions";
 
 // ─── Protected route wrapper ────────────────────────────────────
-const ROUTE_MODULES: Record<string, string | null> = {
+const ROUTE_MODULES: Record<string, string | string[] | null> = {
   "/dashboard": null,
   "/employee/dashboard": null,
   "/employee/notifications": null,
@@ -442,32 +455,32 @@ const ROUTE_MODULES: Record<string, string | null> = {
   "/employee/projects": "projects",
   "/tasks": "tasks",
   "/employee/tasks": "tasks",
-  "/meetings": "meetings",
-  "/employee/meetings": "meetings",
+  "/meetings": ["meetings", "time"],
+  "/employee/meetings": ["meetings", "time"],
   "/content": "content",
   "/employee/content-calendar": "content",
   "/hawan": "content",
   "/attendance": "attendance",
   "/employee/attendance": "attendance",
-  "/leaves": "leaves",
-  "/employee/leave": "leaves",
+  "/leaves": ["leaves", "leave"],
+  "/employee/leave": ["leaves", "leave"],
   "/work-reports": "reports",
   "/employee/work-reports": "reports",
   "/performance-report": "reports",
   "/employee/performance-report": "reports",
-  "/invoices": "finance",
-  "/quotations": "finance",
-  "/proposals": "finance",
-  "/purchase-orders": "finance",
-  "/expenses": "finance",
-  "/excel-reports": "finance",
-  "/users": "team",
-  "/vendors": "team",
-  "/payroll": "finance",
+  "/invoices": ["invoices", "finance"],
+  "/quotations": ["quotations", "finance"],
+  "/proposals": ["proposals", "finance"],
+  "/purchase-orders": ["purchaseOrders", "purchase_orders", "finance"],
+  "/expenses": ["expenses", "finance"],
+  "/excel-reports": ["excelReports", "reports", "finance"],
+  "/users": ["team", "users"],
+  "/vendors": ["vendors", "team", "finance"],
+  "/payroll": ["payroll", "attendance", "finance"],
   "/settings": "settings",
 };
 
-function getRequiredModule(path: string): string | null | undefined {
+function getRequiredModule(path: string): string | string[] | null | undefined {
   const route = Object.keys(ROUTE_MODULES)
     .sort((a, b) => b.length - a.length)
     .find((candidate) => path === candidate || path.startsWith(`${candidate}/`));
@@ -492,8 +505,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (isSuperAdminRole((user as any).systemRole ?? (user as any).role)) return <>{children}</>;
   const requiredModule = getRequiredModule(location);
   if (requiredModule === null) return <>{children}</>;
-  if (requiredModule && hasModuleAccess(user.allowedModules, requiredModule)) {
-    return <>{children}</>;
+  if (requiredModule) {
+    const hasAccess = Array.isArray(requiredModule)
+      ? requiredModule.some((m) => hasModuleAccess(user.allowedModules, m))
+      : hasModuleAccess(user.allowedModules, requiredModule);
+    if (hasAccess) return <>{children}</>;
   }
   return <AccessDeniedPage />;
 }
@@ -516,8 +532,11 @@ function EmployeeRoute({ children }: { children: React.ReactNode }) {
   if (isSuperAdminRole((user as any).systemRole ?? (user as any).role)) return <>{children}</>;
   const requiredModule = getRequiredModule(location);
   if (requiredModule === null) return <>{children}</>;
-  if (requiredModule && hasModuleAccess(user.allowedModules, requiredModule)) {
-    return <>{children}</>;
+  if (requiredModule) {
+    const hasAccess = Array.isArray(requiredModule)
+      ? requiredModule.some((m) => hasModuleAccess(user.allowedModules, m))
+      : hasModuleAccess(user.allowedModules, requiredModule);
+    if (hasAccess) return <>{children}</>;
   }
   return <AccessDeniedPage />;
 }
@@ -681,11 +700,11 @@ function AppRouter() {
       </Route>
       <Route path="/purchase-orders">
         {() => (
-          <AdminRoute module="finance">
+          <ProtectedRoute>
             <DashboardLayout>
               <PurchaseOrdersPage />
             </DashboardLayout>
-          </AdminRoute>
+          </ProtectedRoute>
         )}
       </Route>
       <Route path="/expenses">

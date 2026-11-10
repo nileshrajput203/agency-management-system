@@ -49,7 +49,37 @@ export function getExplicitUserModules(allowedModules?: unknown): string[] {
 
 export function getUserModules(allowedModules?: unknown, role?: string): string[] {
   const configured = getExplicitUserModules(allowedModules);
-  if (configured.length > 0) return configured;
+  const modules = new Set<string>();
+
+  for (const m of configured) {
+    modules.add(m);
+  }
+
+  // Finance alias / sub-module bidirectional mapping
+  const financeSubModules = ["invoices", "quotations", "purchaseOrders", "purchase_orders", "proposals", "expenses", "excelReports", "vendors"];
+  if (configured.some(m => financeSubModules.includes(m))) {
+    modules.add("finance");
+  }
+  if (configured.includes("finance")) {
+    financeSubModules.forEach(sm => modules.add(sm));
+  }
+
+  // Alias purchase_orders <-> purchaseOrders
+  if (modules.has("purchaseOrders")) modules.add("purchase_orders");
+  if (modules.has("purchase_orders")) modules.add("purchaseOrders");
+
+  // Alias leaves <-> leave
+  if (modules.has("leaves")) modules.add("leave");
+  if (modules.has("leave")) modules.add("leaves");
+
+  // Alias team <-> users <-> userManagement
+  if (modules.has("team") || modules.has("users") || modules.has("userManagement")) {
+    modules.add("team");
+    modules.add("users");
+    modules.add("userManagement");
+  }
+
+  if (configured.length > 0) return [...modules];
   if (role && (ROLE_MODULES as any)[role]) {
     return (ROLE_MODULES as any)[role];
   }
@@ -57,11 +87,44 @@ export function getUserModules(allowedModules?: unknown, role?: string): string[
 }
 
 export function hasModuleAccess(allowedModules: unknown, module: string): boolean {
-  return getUserModules(allowedModules).includes(module);
+  const userMods = getUserModules(allowedModules);
+  if (userMods.includes(module)) return true;
+
+  if (module === "finance") {
+    return userMods.some(m => ["finance", "invoices", "quotations", "purchaseOrders", "purchase_orders", "proposals"].includes(m));
+  }
+  if (["invoices", "quotations", "proposals"].includes(module)) {
+    return userMods.includes(module) || userMods.includes("finance");
+  }
+  if (module === "purchaseOrders" || module === "purchase_orders") {
+    return userMods.includes("purchaseOrders") || userMods.includes("purchase_orders") || userMods.includes("finance");
+  }
+  if (module === "team" || module === "users") {
+    return userMods.includes("team") || userMods.includes("users");
+  }
+  if (module === "leaves" || module === "leave") {
+    return userMods.includes("leaves") || userMods.includes("leave");
+  }
+
+  return false;
 }
 
 export function hasExplicitModuleAccess(allowedModules: unknown, module: string): boolean {
-  return getExplicitUserModules(allowedModules).includes(module);
+  const explicit = getExplicitUserModules(allowedModules);
+  if (explicit.includes(module)) return true;
+  if (module === "finance" && explicit.some(m => ["finance", "invoices", "quotations", "purchaseOrders", "purchase_orders", "proposals"].includes(m))) {
+    return true;
+  }
+  if (["invoices", "quotations", "proposals"].includes(module) && (explicit.includes(module) || explicit.includes("finance"))) {
+    return true;
+  }
+  if ((module === "purchaseOrders" || module === "purchase_orders") && (explicit.includes("purchaseOrders") || explicit.includes("purchase_orders") || explicit.includes("finance"))) {
+    return true;
+  }
+  if ((module === "team" || module === "users") && (explicit.includes("team") || explicit.includes("users"))) {
+    return true;
+  }
+  return false;
 }
 
 export function isSuperAdminRole(role?: string | null): boolean {

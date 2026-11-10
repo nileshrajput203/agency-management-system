@@ -18,7 +18,7 @@ import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
 import { sanitizeAndValidate, isValidUUID } from "../lib/validation";
 import { requirePermission, isManagerRole } from "../middleware/auth";
-import { canManageModuleSection } from "../middleware/moduleAccess";
+import { canManageModuleSection, hasConfiguredModule } from "../middleware/moduleAccess";
 
 function sanitizeClient(body: any, isUpdate = false) {
   if (body.assignedTo === "UNASSIGNED" || body.assignedTo === "") {
@@ -85,7 +85,14 @@ router.get("/", requirePermission("clients.view"), asyncHandler(async (req, res)
   const role = (req as any).userSystemRole || (req as any).userRole;
   const isManager = isManagerRole(role) || Boolean((req as any).userIsDelegatedAdmin);
   const hasClientModuleAccess = canManageClientSection(req) || isManager;
-  const canViewAllClients = hasClientModuleAccess || Boolean(userViewAllClients) || isManager;
+  const hasFinanceModuleAccess =
+    canManageModuleSection(role, "finance", req.userConfiguredModules) ||
+    hasConfiguredModule(req.userConfiguredModules, "invoices") ||
+    hasConfiguredModule(req.userConfiguredModules, "quotations") ||
+    hasConfiguredModule(req.userConfiguredModules, "purchaseOrders") ||
+    hasConfiguredModule(req.userConfiguredModules, "purchase_orders") ||
+    hasConfiguredModule(req.userConfiguredModules, "finance");
+  const canViewAllClients = hasClientModuleAccess || hasFinanceModuleAccess || Boolean(userViewAllClients) || isManager;
 
   const conditions = [];
   if (search) {

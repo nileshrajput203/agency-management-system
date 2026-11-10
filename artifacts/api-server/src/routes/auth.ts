@@ -97,6 +97,35 @@ router.post("/auth/login", asyncHandler(async (req, res) => {
   });
 }));
 
+router.get("/auth/me", requireAuth, asyncHandler(async (req, res) => {
+  const userId = (req as any).userId;
+  const [user] = await db
+    .select({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+      role: usersTable.role,
+      systemRole: usersTable.systemRole,
+      allowedModules: usersTable.allowedModules,
+      isActive: usersTable.isActive,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId));
+
+  if (!user || !user.isActive) {
+    throw createError("User not found or deactivated", 401);
+  }
+
+  return res.json({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    systemRole: user.systemRole,
+    allowedModules: parseAllowedModules(user.allowedModules),
+  });
+}));
+
 router.post("/auth/refresh", asyncHandler(async (req, res) => {
   let refreshToken = req.body?.refreshToken;
 

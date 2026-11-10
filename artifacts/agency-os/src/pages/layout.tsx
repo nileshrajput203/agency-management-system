@@ -18,7 +18,7 @@ import {
 import { NotificationsPopover } from "@/components/common/NotificationsPopover";
 import { CompanyLogo } from "@/components/common/CompanyLogo";
 import { CommandPalette } from "@/components/common/CommandPalette";
-import { getUserModules } from "@/lib/permissions";
+import { getUserModules, hasModuleAccess } from "@/lib/permissions";
 
 import { ENABLE_HAWAN_HUB, ENABLE_PROPOSALS } from "@/lib/constants";
 
@@ -111,23 +111,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     "/sales":               "sales",
     "/projects":            "projects",
     "/tasks":               "tasks",
-    "/meetings":            "meetings",
+    "/meetings":            ["meetings", "time"],
     "/content":             "content",
     "/hawan":               null,
     "/attendance":          "attendance",
-    "/leaves":              "leaves",
-    "/work-reports":        "reports",
-    "/performance-report":  "reports",
-    "/invoices":            "finance",
-    "/quotations":          "finance",
-    "/proposals":           "finance",
-    "/purchase-orders":     "finance",
-    "/expenses":            "finance",
-    "/vendors":             "finance",
-    "/payroll":             "attendance",
-    "/excel-reports":       "finance",
+    "/leaves":              ["leaves", "leave"],
+    "/work-reports":        ["reports", "attendance", "tasks"],
+    "/performance-report":  ["reports", "attendance", "tasks"],
+    "/invoices":            "invoices",
+    "/quotations":          "quotations",
+    "/proposals":           "proposals",
+    "/purchase-orders":     ["purchaseOrders", "purchase_orders"],
+    "/expenses":            ["expenses", "finance"],
+    "/vendors":             ["vendors", "team", "finance"],
+    "/payroll":             ["payroll", "attendance", "finance"],
+    "/excel-reports":       ["excelReports", "reports", "finance"],
     "/settings":            "settings",
-    "/users":               "team",
+    "/users":               ["team", "users"],
     "/notifications":       null,
   };
 
@@ -137,8 +137,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       if (isSuperAdmin) return true;
       if (required === null) return true;
-      if (Array.isArray(required)) return required.some(m => userAllowedModules.includes(m));
-      return userAllowedModules.includes(required);
+      if (Array.isArray(required)) return required.some(m => hasModuleAccess(user?.allowedModules, m));
+      return hasModuleAccess(user?.allowedModules, required);
     });
 
     return { ...group, items: filteredItems };
