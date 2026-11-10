@@ -1025,12 +1025,12 @@ export default function ContentPage() {
                           <div
                             key={p.id}
                             className={cn(
-                              "flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 truncate cursor-pointer transition-colors border group/item",
+                              "h-6 flex items-center gap-1.5 text-[10px] rounded-md px-1.5 py-0 truncate cursor-pointer transition-colors border group/item",
                               isRevision
                                 ? "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200 font-semibold"
                                 : "bg-primary/10 border-primary/20 hover:bg-primary/20"
                             )}
-                            onClick={(e) => { e.stopPropagation(); openEdit(p); }}
+                            onClick={(e) => { e.stopPropagation(); openEdit(p as PostRecord); }}
                           >
                             {isRevision ? <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" /> : PLATFORM_ICON[p.platform ?? "INSTAGRAM"]}
                             {pFileUrl && isMediaImage(pFileUrl) && (
@@ -1052,51 +1052,64 @@ export default function ContentPage() {
                                 }}
                               />
                             )}
-                            <span className="truncate flex-1">{p.title ?? p.caption?.slice(0, 20) ?? p.contentType}</span>
+                            <span className="truncate flex-1 min-w-0 font-medium leading-none">{p.title ?? p.caption?.slice(0, 20) ?? p.contentType}</span>
 
-                            {/* Quick Assign Dropdown directly on Calendar chip */}
-                            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                              <Select
-                                value={(p as any).assigneeId || "none"}
-                                onValueChange={(val) => handleQuickAssign(p.id, val)}
-                              >
-                                <SelectTrigger
-                                  title={assignedUser ? `Assigned to: ${assignedUser.name} (Click to reassign)` : "Click to assign task directly"}
-                                  className={cn(
-                                    "h-4 text-[9px] px-1 py-0 rounded border-0 shadow-none font-bold gap-0.5 max-w-[28px] focus:ring-0",
-                                    assignedUser
-                                      ? "bg-primary/20 text-primary hover:bg-primary/30"
-                                      : "bg-muted/70 text-muted-foreground hover:bg-muted opacity-60 group-hover/item:opacity-100"
-                                  )}
+                            {/* Clean Compact Assignee Avatar Pill */}
+                            <div onClick={(e) => e.stopPropagation()} className="shrink-0 relative flex items-center">
+                              {assignedUser ? (
+                                <div
+                                  title={`Assigned to: ${assignedUser.name} (Click to reassign)`}
+                                  className="h-4 min-w-4 px-1 rounded-full bg-primary/20 hover:bg-primary/30 text-primary font-bold text-[9px] flex items-center justify-center shrink-0 border border-primary/30 relative cursor-pointer"
                                 >
-                                  {assigneeInitials ? (
-                                    <span className="uppercase text-[9px] font-extrabold">{assigneeInitials}</span>
-                                  ) : (
-                                    <UserPlus className="h-2.5 w-2.5" />
-                                  )}
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">-- Unassigned --</SelectItem>
-                                  {(users ?? []).map((u: any) => (
-                                    <SelectItem key={u.id} value={u.id}>
-                                      {u.name} ({u.systemRole || u.role || "Team"})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                                  <span>{assigneeInitials}</span>
+                                  <select
+                                    value={(p as any).assigneeId || "none"}
+                                    onChange={(e) => handleQuickAssign(p.id, e.target.value)}
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                    title={`Assigned to: ${assignedUser.name} (Click to reassign)`}
+                                  >
+                                    <option value="none">-- Unassigned --</option>
+                                    {(users ?? []).map((u: any) => (
+                                      <option key={u.id} value={u.id}>
+                                        {u.name} ({u.systemRole || u.role || "Team"})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ) : (
+                                <div
+                                  title="Click to assign team member"
+                                  className="h-4 w-4 rounded-full bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center opacity-0 group-hover/item:opacity-100 relative cursor-pointer transition-opacity"
+                                >
+                                  <UserPlus className="h-2.5 w-2.5" />
+                                  <select
+                                    value="none"
+                                    onChange={(e) => handleQuickAssign(p.id, e.target.value)}
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                    title="Assign team member"
+                                  >
+                                    <option value="none">-- Assign team member --</option>
+                                    {(users ?? []).map((u: any) => (
+                                      <option key={u.id} value={u.id}>
+                                        {u.name} ({u.systemRole || u.role || "Team"})
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
                             </div>
 
                             {pFileUrl && (
                               <button
                                 type="button"
-                                title="Download attached file"
-                                className="p-0.5 text-primary hover:text-primary-foreground hover:bg-primary/30 rounded shrink-0"
+                                title="Download deliverable file"
+                                className="h-4 w-4 rounded flex items-center justify-center text-primary/80 hover:text-primary hover:bg-primary/20 transition-colors shrink-0"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   triggerFileDownload(pFileUrl, p.title || "content-media");
                                 }}
                               >
-                                <Download className="h-3 w-3" />
+                                <Download className="h-2.5 w-2.5" />
                               </button>
                             )}
                           </div>
