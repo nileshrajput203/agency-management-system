@@ -193,8 +193,20 @@ export function EmployeeTasksView() {
     });
   };
 
+  const isAssignedToMe = (t: any) => {
+    if (t.assigneeId === user?.id) return true;
+    if (Array.isArray(t.coAssignees) && t.coAssignees.includes(user?.id)) return true;
+    if (typeof t.coAssignees === "string") {
+      try {
+        const parsed = JSON.parse(t.coAssignees);
+        if (Array.isArray(parsed) && parsed.includes(user?.id)) return true;
+      } catch {}
+    }
+    return false;
+  };
+
   const assignedTasks = (tasks ?? []).filter(
-    (t) => t.assigneeId === user?.id && (t.approvalStatus === "APPROVED" || t.approvalStatus === "MODIFIED" || !t.approvalStatus)
+    (t) => isAssignedToMe(t) && (t.approvalStatus === "APPROVED" || t.approvalStatus === "MODIFIED" || !t.approvalStatus)
   );
 
   const filteredAssigned = sortTasksByDueDate(assignedTasks.filter((t) => {

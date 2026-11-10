@@ -62,14 +62,23 @@ export function parseConfiguredModules(value: unknown): string[] {
 
 export function getEffectiveModules(value: unknown): string[] {
   const configured = parseConfiguredModules(value);
-  return configured.length > 0 ? configured : [...DEFAULT_EMPLOYEE_MODULES];
+  const modules = new Set<string>(configured.length > 0 ? configured : [...DEFAULT_EMPLOYEE_MODULES]);
+  // Core employee modules: every employee can access their own tasks, attendance, and leaves
+  modules.add("tasks");
+  modules.add("attendance");
+  modules.add("leaves");
+  return [...modules];
 }
 
 export function getModulePermissions(value: unknown): string[] {
   const configured = parseConfiguredModules(value);
-  if (configured.length === 0) return [...DEFAULT_EMPLOYEE_PERMISSIONS];
-
   const permissions = new Set<string>();
+
+  // Every employee always has baseline permissions to view and update their own assigned tasks & attendance
+  for (const perm of DEFAULT_EMPLOYEE_PERMISSIONS) {
+    permissions.add(perm);
+  }
+
   for (const module of configured) {
     for (const permission of MODULE_PERMISSIONS[module] ?? []) {
       permissions.add(permission);

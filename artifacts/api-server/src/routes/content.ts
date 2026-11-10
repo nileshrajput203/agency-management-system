@@ -205,8 +205,8 @@ router.post("/", requirePermission("content.create"), asyncHandler(async (req, r
   }
 
   // If assigneeId or role assignee is provided and no linkedTaskId exists, auto-create SOP task in Task Board
-  const effectiveAssignee = sanitized.assigneeId || sanitized.ideationAssignedTo || sanitized.editorId || sanitized.videographerId;
-  if (effectiveAssignee && !sanitized.linkedTaskId) {
+  const effectiveAssignee = sanitized.assigneeId || sanitized.editorId || sanitized.videographerId || sanitized.ideationAssignedTo || sanitized.currentOwnerId;
+  if (effectiveAssignee && effectiveAssignee !== "UNASSIGNED" && !sanitized.linkedTaskId) {
     try {
       const [clientProject] = sanitized.clientId
         ? await db.select({ id: projectsTable.id }).from(projectsTable).where(eq(projectsTable.clientId, sanitized.clientId)).limit(1)
@@ -221,11 +221,25 @@ router.post("/", requirePermission("content.create"), asyncHandler(async (req, r
           : new Date(Date.now() + 5 * 86400000),
         status: ["SCRIPTING", "DESIGNING", "PRODUCTION", "SHOOTING"].includes(sanitized.status) ? "IN_PROGRESS" : "TODO",
         priority: "MEDIUM",
+        approvalStatus: "APPROVED",
         description: `Auto-linked from Content Studio: ${sanitized.format || sanitized.contentType || "Post"} for ${sanitized.platform || "Social"}.\n\nCaption/Hook: ${sanitized.conceptHook || sanitized.caption || "None"}`,
         createdBy: (req as any).userId,
       }).returning();
 
       sanitized.linkedTaskId = task.id;
+
+      if (effectiveAssignee && effectiveAssignee !== (req as any).userId) {
+        NotificationService.createNotification({
+          userId: effectiveAssignee,
+          title: `📝 New Content Task Assigned: ${sanitized.title || "Social Media Post"}`,
+          message: `You were assigned to "${sanitized.title || "Content Post"}" on the Content Calendar.`,
+          type: "TASK",
+          priority: "MEDIUM",
+          referenceId: task.id,
+          referenceType: "CONTENT",
+          senderId: (req as any).userId,
+        }).catch(() => {});
+      }
     } catch (err: any) {
       logger.warn({ err }, "Could not auto-create linked task for content post");
     }
@@ -793,9 +807,21 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
 
   // Bi-directional Auto-Sync: create or update linked task if assignee was modified
   let targetTaskId = existing.linkedTaskId || sanitized.linkedTaskId;
-  const effectiveAssignee = sanitized.currentOwnerId || sanitized.assigneeId || existing.assigneeId;
+  const newAssigneeCandidate = sanitized.assigneeId !== undefined
+    ? sanitized.assigneeId
+    : (sanitized.editorId !== undefined
+      ? sanitized.editorId
+      : (sanitized.videographerId !== undefined
+        ? sanitized.videographerId
+        : (sanitized.ideationAssignedTo !== undefined
+          ? sanitized.ideationAssignedTo
+          : sanitized.currentOwnerId)));
 
-  if (!targetTaskId && effectiveAssignee) {
+  const effectiveAssignee = (newAssigneeCandidate && newAssigneeCandidate !== "UNASSIGNED")
+    ? newAssigneeCandidate
+    : (sanitized.assigneeId || sanitized.editorId || sanitized.videographerId || sanitized.ideationAssignedTo || sanitized.currentOwnerId || existing.assigneeId || existing.editorId || existing.videographerId || existing.ideationAssignedTo);
+
+  if (!targetTaskId && effectiveAssignee && effectiveAssignee !== "UNASSIGNED") {
     try {
       const [clientProject] = (sanitized.clientId || existing.clientId)
         ? await db.select({ id: projectsTable.id }).from(projectsTable).where(eq(projectsTable.clientId, sanitized.clientId || existing.clientId)).limit(1)
@@ -810,6 +836,7 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
           : new Date(Date.now() + 5 * 86400000),
         status: "TODO",
         priority: "MEDIUM",
+        approvalStatus: "APPROVED",
         description: `Auto-linked from Content Studio: ${sanitized.title || existing.title || "Post"}`,
         createdBy: (req as any).userId,
       }).returning();
@@ -832,12 +859,18 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
     } catch (tErr) {
       logger.warn({ tErr }, "Failed to auto-create task for content post");
     }
-  } else if (targetTaskId && sanitized.assigneeId !== undefined) {
+  } else if (targetTaskId && (newAssigneeCandidate !== undefined || sanitized.assigneeId !== undefined)) {
     try {
-      await db.update(tasksTable).set({ assigneeId: sanitized.assigneeId || null }).where(eq(tasksTable.id, targetTaskId));
-      if (sanitized.assigneeId && sanitized.assigneeId !== (req as any).userId) {
+      const rawTarget = newAssigneeCandidate !== undefined ? newAssigneeCandidate : sanitized.assigneeId;
+      const targetAssignee = (!rawTarget || rawTarget === "UNASSIGNED" || rawTarget === "__none__") ? null : rawTarget;
+      await db.update(tasksTable).set({
+        assigneeId: targetAssignee,
+        approvalStatus: "APPROVED"
+      }).where(eq(tasksTable.id, targetTaskId));
+
+      if (targetAssignee && targetAssignee !== (req as any).userId) {
         NotificationService.createNotification({
-          userId: sanitized.assigneeId,
+          userId: targetAssignee,
           title: `📝 Content Task Assigned: ${sanitized.title || existing.title || "Social Post"}`,
           message: `You were assigned to "${sanitized.title || existing.title || "Content Post"}" on the Content Calendar.`,
           type: "TASK",

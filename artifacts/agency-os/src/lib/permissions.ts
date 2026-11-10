@@ -104,6 +104,10 @@ export function canManageModule(user: any, module: string): boolean {
       return true;
     }
   }
+  // Core personal modules: every employee can access their own tasks, attendance, leaves, and reports
+  if (["tasks", "attendance", "leaves", "reports"].includes(module)) {
+    return true;
+  }
   return hasExplicitModuleAccess(user?.allowedModules, module);
 }
 

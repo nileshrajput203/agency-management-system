@@ -194,19 +194,32 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
         action: "Review Task",
         actionUrl: "/tasks",
       }, requesterId);
-    } else if (row.assigneeId && row.assigneeId !== requesterId) {
-      await NotificationService.createNotification({
-        userId: row.assigneeId,
-        title: "📋 New Task Assigned",
-        message: `You have been assigned task "${row.title}"`,
-        type: "TASK",
-        priority: (row.priority as any) || "MEDIUM",
-        referenceId: row.id,
-        referenceType: "TASK",
-        createdBy: requesterId,
-        action: "View Task",
-        actionUrl: "/tasks",
-      });
+    } else {
+      const notifyUserIds = new Set<string>();
+      if (row.assigneeId && row.assigneeId !== requesterId) {
+        notifyUserIds.add(row.assigneeId);
+      }
+      if (Array.isArray(row.coAssignees)) {
+        for (const ca of row.coAssignees) {
+          if (ca && typeof ca === "string" && ca !== requesterId) {
+            notifyUserIds.add(ca);
+          }
+        }
+      }
+      for (const targetUid of notifyUserIds) {
+        await NotificationService.createNotification({
+          userId: targetUid,
+          title: "📋 New Task Assigned",
+          message: `You have been assigned task "${row.title}"`,
+          type: "TASK",
+          priority: (row.priority as any) || "MEDIUM",
+          referenceId: row.id,
+          referenceType: "TASK",
+          createdBy: requesterId,
+          action: "View Task",
+          actionUrl: "/tasks",
+        });
+      }
     }
   } catch (err) {
     notificationLogger.error({ err }, "Error sending task creation notification");
@@ -405,10 +418,21 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
     const [emp] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, requesterId));
     const empName = emp?.name || "An employee";
 
-    // 1. Assignee changed — notify even if self-assigned (manager assigning to themselves)
-    if (row.assigneeId && row.assigneeId !== task.assigneeId) {
+    // 1. Assignee or co-assignees changed — notify team members
+    const notifyAssignees = new Set<string>();
+    if (row.assigneeId && row.assigneeId !== task.assigneeId && row.assigneeId !== requesterId) {
+      notifyAssignees.add(row.assigneeId);
+    }
+    const oldCo = new Set(Array.isArray(task.coAssignees) ? (task.coAssignees as string[]) : []);
+    const newCo = Array.isArray(row.coAssignees) ? (row.coAssignees as string[]) : [];
+    for (const ca of newCo) {
+      if (ca && typeof ca === "string" && !oldCo.has(ca) && ca !== requesterId) {
+        notifyAssignees.add(ca);
+      }
+    }
+    for (const uid of notifyAssignees) {
       await NotificationService.createNotification({
-        userId: row.assigneeId,
+        userId: uid,
         title: "📋 Task Assigned",
         message: `You have been assigned task "${row.title}"`,
         type: "TASK",

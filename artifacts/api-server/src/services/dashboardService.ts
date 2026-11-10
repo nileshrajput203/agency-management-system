@@ -3,7 +3,7 @@ import {
   clientsTable, projectsTable, leadsTable, tasksTable, invoicesTable,
   quotationsTable, purchaseOrdersTable, leaveRequestsTable, usersTable,
 } from "@workspace/db/schema";
-import { eq, gte, sql, and } from "drizzle-orm";
+import { eq, gte, sql, and, or } from "drizzle-orm";
 import { getEffectiveModules } from "../middleware/moduleAccess";
 
 function toIso(val: any): string | null {
@@ -33,8 +33,8 @@ export async function getDashboardStatsService(userId: string) {
     const canViewProjects = modules.includes("projects");
     const canViewLeaves = modules.includes("leaves") || modules.includes("leave");
 
-    // 1. Employee Work Summary
-    const employeeTasks = canViewTasks ? await db
+    // 1. Employee Work Summary — include all tasks directly assigned or co-assigned to this employee
+    const employeeTasks = await db
       .select({
         id: tasksTable.id,
         title: tasksTable.title,
@@ -50,9 +50,12 @@ export async function getDashboardStatsService(userId: string) {
         approvedAt: tasksTable.approvedAt,
       })
       .from(tasksTable)
-      .where(eq(tasksTable.assigneeId, userId)) : [];
+      .where(or(
+        eq(tasksTable.assigneeId, userId),
+        sql`${tasksTable.coAssignees}::text LIKE ${`%"${userId}"%`}`
+      ));
 
-    const employeeTaskRequests = canViewTasks ? await db
+    const employeeTaskRequests = await db
       .select({
         id: tasksTable.id,
         title: tasksTable.title,
@@ -69,7 +72,7 @@ export async function getDashboardStatsService(userId: string) {
         approvedAt: tasksTable.approvedAt,
       })
       .from(tasksTable)
-      .where(eq(tasksTable.requestedBy, userId)) : [];
+      .where(eq(tasksTable.requestedBy, userId));
 
     const activeEmployeeTasks = employeeTasks.filter((t) =>
       t.approvalStatus === "APPROVED" ||
@@ -220,8 +223,8 @@ export async function getDashboardStatsService(userId: string) {
 
     upcomingDeadlines.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // My Tasks
-    const myTasksList = canViewTasks ? await db
+    // My Tasks — include directly assigned and co-assigned tasks with project names
+    const myTasksList = await db
       .select({
         id: tasksTable.id,
         title: tasksTable.title,
@@ -229,27 +232,29 @@ export async function getDashboardStatsService(userId: string) {
         priority: tasksTable.priority,
         dueDate: tasksTable.dueDate,
         projectId: tasksTable.projectId,
+        projectName: projectsTable.name,
         approvalStatus: tasksTable.approvalStatus,
         rejectionReason: tasksTable.rejectionReason,
       })
       .from(tasksTable)
-      .where(eq(tasksTable.assigneeId, userId)) : [];
+      .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
+      .where(or(
+        eq(tasksTable.assigneeId, userId),
+        sql`${tasksTable.coAssignees}::text LIKE ${`%"${userId}"%`}`
+      ));
 
     const approvedMyTasks = myTasksList.filter((t) =>
       t.approvalStatus === "APPROVED" || t.approvalStatus === "MODIFIED" || !t.approvalStatus
     );
 
-    const formattedMyTasks = approvedMyTasks.map((t) => {
-      const proj = allProjects.find((p) => p.id === t.projectId);
-      return {
-        id: t.id,
-        title: t.title,
-        status: t.status,
-        priority: t.priority,
-        dueDate: toIso(t.dueDate),
-        projectName: proj ? proj.name : "Direct Assignment",
-      };
-    });
+    const formattedMyTasks = approvedMyTasks.map((t) => ({
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      priority: t.priority,
+      dueDate: toIso(t.dueDate),
+      projectName: t.projectName || "Direct Assignment",
+    }));
 
     const formattedTaskRequests = employeeTaskRequests.map((tr) => {
       const proj = allProjects.find((p) => p.id === tr.projectId);
