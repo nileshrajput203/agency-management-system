@@ -620,11 +620,42 @@ export async function exportInvoiceToCsv(inv: InvoiceExportData) {
 
 /**
  * Downloads the exact Excel workbook (.xlsx) matching the 20-column dual template.
+ * Uses direct master template ZIP injection on the backend for 100% byte-level fidelity.
  */
 export async function exportInvoiceToExcel(inv: InvoiceExportData) {
   const invNumber = inv.number || inv.invoiceNumber || "0003";
-  const clientName = inv.clientName || "Client";
+  const clientName = (inv.clientName || "Client").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const filename = `Invoice_${invNumber}_${clientName}.xlsx`;
 
+  // First try the backend master excel generator (produces 100% byte-for-byte identical output from original 14_Invoice_Format.xlsx)
+  try {
+    const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch("/api/invoices/export-excel", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(inv),
+    });
+
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return;
+    }
+  } catch (err) {
+    console.warn("Backend excel export failed, falling back to local generator", err);
+  }
+
+  // Fallback to client-side generator if offline
   const workbook = await populateExactTemplate(inv);
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
@@ -633,7 +664,7 @@ export async function exportInvoiceToExcel(inv: InvoiceExportData) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Invoice_${invNumber}_${clientName.replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

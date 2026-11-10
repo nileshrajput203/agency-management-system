@@ -14,6 +14,7 @@ import { createError } from "../middleware/errorHandler";
 import { syncParentInsert, syncParentUpdate } from "../lib/dbSync";
 import { sanitizeAndValidate, validateLineItems, isValidUUID } from "../lib/validation";
 import { requirePermission } from "../middleware/auth";
+import { generateInvoiceMasterExcel } from "../lib/invoiceMasterExcel";
 
 const router = Router();
 
@@ -527,6 +528,78 @@ router.post("/:id/payments", requirePermission("invoices.edit"), asyncHandler(as
     status: newStatus,
     paymentStatus: newPaymentStatus,
   });
+}));
+
+// POST /api/invoices/export-excel
+router.post("/export-excel", requirePermission("invoices.view"), asyncHandler(async (req, res) => {
+  const inv = req.body;
+  if (!inv) throw createError("Missing invoice data", 400);
+
+  const excelBuffer = generateInvoiceMasterExcel(inv);
+  const invNumber = inv.number || inv.invoiceNumber || "INV";
+  const clientName = (inv.clientName || "Client").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const filename = `Invoice_${invNumber}_${clientName}.xlsx`;
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Content-Length", excelBuffer.length);
+  return res.send(excelBuffer);
+}));
+
+// GET /api/invoices/:id/excel
+router.get("/:id/excel", requirePermission("invoices.view"), asyncHandler(async (req, res) => {
+  const invoiceId = req.params.id as string;
+  if (!isValidUUID(invoiceId)) throw createError("Invalid invoice ID format", 400);
+
+  const [row] = await db
+    .select({
+      id: invoicesTable.id,
+      number: invoicesTable.number,
+      invoiceType: invoicesTable.invoiceType,
+      clientId: invoicesTable.clientId,
+      clientName: clientsTable.companyName,
+      status: invoicesTable.status,
+      paymentStatus: invoicesTable.paymentStatus,
+      invoiceDate: invoicesTable.invoiceDate,
+      dueDate: invoicesTable.dueDate,
+      currency: invoicesTable.currency,
+      subtotal: invoicesTable.subtotal,
+      taxAmount: invoicesTable.taxAmount,
+      cgstAmount: invoicesTable.cgstAmount,
+      sgstAmount: invoicesTable.sgstAmount,
+      igstAmount: invoicesTable.igstAmount,
+      discount: invoicesTable.discount,
+      total: invoicesTable.total,
+      lineItems: invoicesTable.lineItems,
+      notes: invoicesTable.notes,
+      termsAndConditions: invoicesTable.termsAndConditions,
+      companyGstin: invoicesTable.companyGstin,
+      clientGstin: invoicesTable.clientGstin,
+      billingAddress: invoicesTable.billingAddress,
+      shippingAddress: invoicesTable.shippingAddress,
+      clientPhone: invoicesTable.clientPhone,
+      clientEmail: invoicesTable.clientEmail,
+      clientPan: invoicesTable.clientPan,
+      clientCity: invoicesTable.clientCity,
+      clientPostalCode: invoicesTable.clientPostalCode,
+      clientState: invoicesTable.clientState,
+      gstType: invoicesTable.gstType,
+    })
+    .from(invoicesTable)
+    .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+    .where(and(eq(invoicesTable.id, invoiceId), isNull(invoicesTable.deletedAt)));
+
+  if (!row) throw createError("Invoice not found", 404);
+
+  const excelBuffer = generateInvoiceMasterExcel(row);
+  const invNumber = row.number || "INV";
+  const clientName = (row.clientName || "Client").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const filename = `Invoice_${invNumber}_${clientName}.xlsx`;
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Content-Length", excelBuffer.length);
+  return res.send(excelBuffer);
 }));
 
 export default router;
