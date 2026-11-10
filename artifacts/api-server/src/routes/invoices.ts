@@ -16,6 +16,7 @@ import { sanitizeAndValidate, validateLineItems, isValidUUID } from "../lib/vali
 import { requirePermission } from "../middleware/auth";
 import { generateInvoiceMasterExcel } from "../lib/invoiceMasterExcel";
 import { generateInvoiceMasterPdf } from "../lib/invoiceMasterPdf";
+import { generateInvoiceMasterHtml } from "../lib/invoiceMasterHtml";
 
 const router = Router();
 
@@ -644,15 +645,22 @@ router.post("/export-pdf", requirePermission("invoices.view"), asyncHandler(asyn
   const inv = req.body;
   if (!inv) throw createError("Missing invoice data", 400);
 
-  const pdfBuffer = await generateInvoiceMasterPdf(inv);
   const invNumber = inv.number || inv.invoiceNumber || "0003";
   const clientName = (inv.clientName || "Client").replace(/[^a-zA-Z0-9_-]/g, "_");
   const filename = `Invoice_${invNumber}_${clientName}.pdf`;
 
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.setHeader("Content-Length", pdfBuffer.length);
-  return res.send(pdfBuffer);
+  const pdfBuffer = await generateInvoiceMasterPdf(inv);
+  if (pdfBuffer && pdfBuffer.length > 0) {
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    return res.send(pdfBuffer);
+  }
+
+  // Graceful fallback to printable Master HTML if headless browser environment is unavailable
+  const html = generateInvoiceMasterHtml(inv);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  return res.send(html);
 }));
 
 // GET /api/invoices/:id/pdf
@@ -700,15 +708,22 @@ router.get("/:id/pdf", requirePermission("invoices.view"), asyncHandler(async (r
 
   if (!row) throw createError("Invoice not found", 404);
 
-  const pdfBuffer = await generateInvoiceMasterPdf(row);
   const invNumber = row.number || "0003";
   const clientName = (row.clientName || "Client").replace(/[^a-zA-Z0-9_-]/g, "_");
   const filename = `Invoice_${invNumber}_${clientName}.pdf`;
 
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.setHeader("Content-Length", pdfBuffer.length);
-  return res.send(pdfBuffer);
+  const pdfBuffer = await generateInvoiceMasterPdf(row);
+  if (pdfBuffer && pdfBuffer.length > 0) {
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
+    return res.send(pdfBuffer);
+  }
+
+  // Graceful fallback to printable Master HTML if headless browser environment is unavailable
+  const html = generateInvoiceMasterHtml(row);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  return res.send(html);
 }));
 
 export default router;

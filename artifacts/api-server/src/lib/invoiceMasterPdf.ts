@@ -9,12 +9,11 @@ import { generateInvoiceMasterHtml } from "./invoiceMasterHtml";
 const execFileAsync = promisify(execFile);
 const currentDir = typeof __dirname !== "undefined" ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
-function getPythonExecutable(): string {
+function getPythonExecutable(): string | null {
   const candidates = [
     process.env.PLAYWRIGHT_PYTHON,
-    "C:\\Users\\USER\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe",
-    "python",
     "python3",
+    "python",
   ].filter(Boolean) as string[];
 
   for (const cand of candidates) {
@@ -22,10 +21,10 @@ function getPythonExecutable(): string {
       return cand;
     }
   }
-  return candidates[0] || "python";
+  return candidates[0] || null;
 }
 
-function getGeneratePdfScript(): string {
+function getGeneratePdfScript(): string | null {
   const candidates = [
     path.resolve(currentDir, "generate_pdf.py"),
     path.resolve(currentDir, "src/lib/generate_pdf.py"),
@@ -36,31 +35,38 @@ function getGeneratePdfScript(): string {
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
   }
-  return candidates[0];
+  return null;
 }
 
-export async function generateInvoiceMasterPdf(inv: any): Promise<Buffer> {
+export async function generateInvoiceMasterPdf(inv: any): Promise<Buffer | null> {
+  const pythonExe = getPythonExecutable();
+  const scriptPath = getGeneratePdfScript();
+  if (!pythonExe || !scriptPath) {
+    return null;
+  }
+
   const htmlContent = generateInvoiceMasterHtml(inv);
   const randomSuffix = Math.random().toString(36).substring(2, 9);
   const tempHtml = path.join(os.tmpdir(), `invoice_${randomSuffix}.html`);
   const tempPdf = path.join(os.tmpdir(), `invoice_${randomSuffix}.pdf`);
-  const scriptPath = getGeneratePdfScript();
 
   try {
     await fs.promises.writeFile(tempHtml, htmlContent, "utf-8");
 
-    const pythonExe = getPythonExecutable();
     await execFileAsync(pythonExe, [scriptPath, tempHtml, tempPdf], {
       timeout: 30000,
       windowsHide: true,
     });
 
     if (!fs.existsSync(tempPdf)) {
-      throw new Error("PDF generator did not produce output file");
+      return null;
     }
 
     const pdfBuffer = await fs.promises.readFile(tempPdf);
     return pdfBuffer;
+  } catch (err) {
+    console.warn("Headless PDF generation failed, returning null for fallback:", err);
+    return null;
   } finally {
     try {
       if (fs.existsSync(tempHtml)) await fs.promises.unlink(tempHtml);

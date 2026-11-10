@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { amountToWords } from "./pdf-utils";
 import { INVOICE_TEMPLATE_BASE64 } from "../templates/invoice-template-base64";
+import { buildInvoiceHtml, openPrintWindow } from "./pdf-print";
 
 export interface InvoiceExportData {
   number?: string;
@@ -675,46 +676,56 @@ export async function exportInvoiceToExcel(inv: InvoiceExportData) {
 }
 
 /**
- * Downloads the exact Master Invoice PDF matching 14_Invoice_Format.xlsx (dual-sided A4 layout).
- * Performs direct server-side headless generation for 100% pixel-perfect vector A4 PDF.
+ * Downloads / prints the exact Master Invoice PDF matching 14_Invoice_Format.xlsx (dual-sided A4 layout).
+ * Attempts direct binary download from server when available, or renders client-side Master PDF print/save window.
  */
 export async function exportInvoiceToPdf(inv: InvoiceExportData | any) {
   const invNumber = inv.number || inv.invoiceNumber || "0003";
   const clientName = (inv.clientName || "Client").replace(/[^a-zA-Z0-9_-]/g, "_");
   const filename = `Invoice_${invNumber}_${clientName}.pdf`;
 
-  const token =
-    localStorage.getItem("agency_token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("auth_token");
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  try {
+    const token =
+      localStorage.getItem("agency_token") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("auth_token");
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  let res: Response;
-  if (inv.id && (!inv.lineItems || inv.lineItems.length === 0)) {
-    res = await fetch(`/api/invoices/${inv.id}/pdf`, { headers });
-  } else {
-    res = await fetch("/api/invoices/export-pdf", {
-      method: "POST",
-      headers,
-      body: JSON.stringify(inv),
-    });
+    let res: Response | null = null;
+    if (inv.id && (!inv.lineItems || inv.lineItems.length === 0)) {
+      res = await fetch(`/api/invoices/${inv.id}/pdf`, { headers });
+    } else {
+      res = await fetch("/api/invoices/export-pdf", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(inv),
+      });
+    }
+
+    if (res && res.ok) {
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("application/pdf")) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn("Direct server PDF download not available, opening Master PDF print dialog:", err);
   }
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Failed to generate PDF: ${res.statusText} (${errorText})`);
-  }
-
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Pure Client-side High-Fidelity Master PDF View & Print/Save
+  // Renders the exact 20-column dual-side sheet from 14_Invoice_Format.xlsx
+  const masterHtml = buildInvoiceHtml(inv as any);
+  openPrintWindow(masterHtml, filename);
 }
 
 
