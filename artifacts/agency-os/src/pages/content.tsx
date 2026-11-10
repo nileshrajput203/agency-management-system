@@ -30,6 +30,14 @@ import {
   STATUS_CONFIG, PLATFORM_ICON, DAYS, emptyDraft, buildShareUrl, getPostDateKey,
   PostRecord, PanelState, isPastDate, getPostAttachmentUrl, triggerFileDownload, isNeedsRevision,
 } from "@/components/content/content-constants";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { ContentShareDialog } from "@/components/content/content-share-dialog";
 import { ContentPostDrawer } from "@/components/content/content-post-drawer";
 import { PCApprovalStudio } from "@/components/content/pc-approval-studio";
@@ -106,6 +114,7 @@ export default function ContentPage() {
   const [newComment, setNewComment] = useState("");
   const [copiedShareId, setCopiedShareId] = useState<string | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [selectedDayViewDate, setSelectedDayViewDate] = useState<string | null>(null);
 
   const { data: users } = useListUsers();
 
@@ -359,6 +368,11 @@ export default function ContentPage() {
       }
     }
   });
+
+  const selectedDayPosts = selectedDayViewDate ? (postsByDay[selectedDayViewDate] ?? []) : [];
+  const formattedSelectedDate = selectedDayViewDate
+    ? format(new Date(selectedDayViewDate + "T00:00:00"), "EEEE, dd MMMM yyyy")
+    : "";
 
   const isPending = createMutation.isPending || updateMutation.isPending;
   const activeClient = clients?.find((c) => c.id === activeClientId);
@@ -734,7 +748,22 @@ export default function ContentPage() {
                   onClick={() => openCreate(dateStr)}
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs font-medium text-muted-foreground">{day}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className={cn("text-xs font-semibold", dayPosts.length > 0 ? "text-foreground font-bold" : "text-muted-foreground")}>{day}</p>
+                      {dayPosts.length > 0 && (
+                        <button
+                          type="button"
+                          title={`View all ${dayPosts.length} posts for this day`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDayViewDate(dateStr);
+                          }}
+                          className="text-[9px] px-1.5 py-0 rounded-full font-bold bg-primary/15 hover:bg-primary text-primary hover:text-primary-foreground transition-colors cursor-pointer"
+                        >
+                          {dayPosts.length}
+                        </button>
+                      )}
+                    </div>
                     <Plus className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
                   <div className="space-y-0.5">
@@ -809,7 +838,17 @@ export default function ContentPage() {
                       );
                     })}
                     {dayPosts.length > 3 && (
-                      <p className="text-[10px] text-muted-foreground px-1">+{dayPosts.length - 3} more</p>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDayViewDate(dateStr);
+                        }}
+                        className="w-full text-left flex items-center justify-between text-[10px] font-semibold text-primary hover:text-primary-foreground hover:bg-primary bg-primary/10 border border-primary/25 px-1.5 py-0.5 rounded transition-all cursor-pointer group/more shadow-2xs mt-0.5"
+                      >
+                        <span>+{dayPosts.length - 3} more</span>
+                        <span className="text-[9px] font-normal underline group-hover/more:text-primary-foreground">View all</span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -852,6 +891,180 @@ export default function ContentPage() {
         shareMutation={shareMutation}
         refetchShares={refetchShares}
       />
+
+      {/* Day Posts View Dialog */}
+      <Dialog open={!!selectedDayViewDate} onOpenChange={(open) => !open && setSelectedDayViewDate(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary shrink-0" />
+                <DialogTitle className="text-base font-bold">
+                  {formattedSelectedDate}
+                </DialogTitle>
+              </div>
+              <Badge variant="secondary" className="text-xs px-2.5 py-0.5 font-semibold bg-primary/10 text-primary border border-primary/20">
+                {selectedDayPosts.length} {selectedDayPosts.length === 1 ? "Post" : "Posts"} Scheduled
+              </Badge>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+              Review all posts scheduled for this day. Click any post to edit copy, assets, reassign, or update status.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Posts List */}
+          <div className="space-y-2.5 my-2">
+            {selectedDayPosts.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground border border-dashed rounded-xl">
+                <Calendar className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                <p className="text-sm font-medium">No posts scheduled for this day</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Click below to schedule a new post.</p>
+              </div>
+            ) : (
+              selectedDayPosts.map((post) => {
+                const isRevision = isNeedsRevision((post as any).needsRevision) || (post as any).approvalStatus === "NEEDS_CHANGES";
+                const pFileUrl = getPostAttachmentUrl(post);
+                const postAssigneeId = (post as any).assigneeId;
+                const assignedUser = (users ?? []).find((u: any) => u.id === postAssigneeId);
+                const postClient = (clients ?? []).find((c: any) => c.id === post.clientId);
+                const statusCfg = STATUS_CONFIG[post.status as keyof typeof STATUS_CONFIG] ?? STATUS_CONFIG.DRAFT;
+
+                return (
+                  <div
+                    key={post.id}
+                    onClick={() => {
+                      setSelectedDayViewDate(null);
+                      openEdit(post);
+                    }}
+                    className={cn(
+                      "p-3 rounded-xl border transition-all cursor-pointer hover:shadow-sm group flex flex-col sm:flex-row sm:items-center justify-between gap-3",
+                      isRevision
+                        ? "bg-amber-50/70 border-amber-300 dark:bg-amber-950/30 dark:border-amber-800"
+                        : "bg-card border-border/80 hover:border-primary/50"
+                    )}
+                  >
+                    {/* Left: Platform Icon + Title + Client + Caption preview */}
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 shrink-0 text-primary mt-0.5">
+                        {isRevision ? (
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                        ) : (
+                          PLATFORM_ICON[post.platform ?? "INSTAGRAM"]
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate">
+                            {post.title || post.caption?.slice(0, 40) || "Untitled Post"}
+                          </span>
+                          <Badge variant="outline" className="text-[10px] capitalize px-1.5 py-0">
+                            {post.contentType || "Post"}
+                          </Badge>
+                          {isRevision ? (
+                            <Badge className="text-[10px] bg-amber-500 hover:bg-amber-600 text-white font-semibold">
+                              Needs Changes
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className={cn("text-[10px] capitalize px-1.5 py-0 font-medium", statusCfg.className)}>
+                              {statusCfg.label}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Client & Caption snippet */}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground truncate">
+                          {postClient && (
+                            <span className="font-medium text-foreground/80 flex items-center gap-1 shrink-0">
+                              <Building2 className="h-3 w-3 text-muted-foreground" />
+                              {postClient.companyName}
+                            </span>
+                          )}
+                          {post.caption && (
+                            <span className="truncate italic text-[11px] opacity-80">
+                              "{post.caption.slice(0, 60)}{post.caption.length > 60 ? "…" : ""}"
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Assignee Select + Download + Open button */}
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center" onClick={(e) => e.stopPropagation()}>
+                      {/* Assignee select */}
+                      <Select
+                        value={(post as any).assigneeId || "none"}
+                        onValueChange={(val) => handleQuickAssign(post.id, val)}
+                      >
+                        <SelectTrigger className="h-8 text-xs w-[140px] bg-background/80">
+                          <User className="h-3 w-3 mr-1 text-muted-foreground" />
+                          <SelectValue placeholder="Assignee" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">-- Unassigned --</SelectItem>
+                          {(users ?? []).map((u: any) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.name} ({u.systemRole || u.role || "Team"})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {/* Download attachment */}
+                      {pFileUrl && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2 text-xs gap-1 text-primary hover:bg-primary/10 border-primary/30"
+                          title="Download attached file"
+                          onClick={() => triggerFileDownload(pFileUrl, post.title || "content-media")}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-8 text-xs font-medium"
+                        onClick={() => {
+                          setSelectedDayViewDate(null);
+                          openEdit(post);
+                        }}
+                      >
+                        View & Edit
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <DialogFooter className="pt-3 border-t border-border flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSelectedDayViewDate(null)}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              className="gap-1.5"
+              onClick={() => {
+                const date = selectedDayViewDate;
+                setSelectedDayViewDate(null);
+                if (date) openCreate(date);
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Schedule New Post for this Day
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
