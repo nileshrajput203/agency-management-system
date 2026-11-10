@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Layers, Plus, RefreshCw, FolderKanban } from "lucide-react";
 import { useAuth } from "@/App";
 import { isManagerOrAdminRole } from "@/lib/permissions";
+import { TaskDeliverablesUploader } from "./task-deliverables-uploader";
 
 interface SubprojectItem {
   id: string;
@@ -121,6 +122,8 @@ export function TaskActionDialogs({
   const [createCoAssignees, setCreateCoAssignees] = useState<string[]>([]);
   const [modifyCoAssignees, setModifyCoAssignees] = useState<string[]>([]);
   const [editCoAssignees, setEditCoAssignees] = useState<string[]>([]);
+  const [modifyDeliverables, setModifyDeliverables] = useState<string>("");
+  const [editDeliverables, setEditDeliverables] = useState<string>("");
 
   const fetchSubprojects = async () => {
     const token = localStorage.getItem("agency_token") || localStorage.getItem("token") || "";
@@ -168,6 +171,7 @@ export function TaskActionDialogs({
       setModifyStatus(isCompletedTask(selectedTaskForAction.status) ? "DONE" : (selectedTaskForAction.status || "TODO"));
       setModifyPriority(selectedTaskForAction.priority || "MEDIUM");
       setModifyAssigneeId(selectedTaskForAction.assigneeId || "unassigned");
+      setModifyDeliverables(selectedTaskForAction.deliverables || "");
     }
     if (adminEditDialogOpen) {
       setEditCoAssignees(coAssignees);
@@ -179,6 +183,7 @@ export function TaskActionDialogs({
         : (selectedTaskForAction.status || "TODO");
       setEditStatus(!isManager && (initialStatus === "DONE" || initialStatus === "COMPLETED") ? "IN_REVIEW" : initialStatus);
       setEditPriority(selectedTaskForAction.priority || "MEDIUM");
+      setEditDeliverables(selectedTaskForAction.deliverables || "");
     }
   }, [selectedTaskForAction?.id, modifyDialogOpen, adminEditDialogOpen]);
 
@@ -622,9 +627,28 @@ export function TaskActionDialogs({
               <Label>Requirements</Label>
               <Textarea name="requirements" rows={2} defaultValue={selectedTaskForAction?.requirements || ""} />
             </div>
+            {/* Work & Design Deliverables Upload Section */}
+            <TaskDeliverablesUploader
+              taskId={selectedTaskForAction?.id}
+              initialAttachments={selectedTaskForAction?.attachments || []}
+              deliverableLink={modifyDeliverables}
+              onDeliverableLinkChange={setModifyDeliverables}
+              onAttachmentsChange={(newAtts) => {
+                if (selectedTaskForAction) {
+                  selectedTaskForAction.attachments = newAtts;
+                }
+              }}
+            />
+
             <div className="space-y-1.5">
-              <Label>Deliverables</Label>
-              <Textarea name="deliverables" rows={2} defaultValue={selectedTaskForAction?.deliverables || ""} />
+              <Label>Deliverables (Notes or External Link)</Label>
+              <Textarea
+                name="deliverables"
+                rows={2}
+                value={modifyDeliverables}
+                onChange={(e) => setModifyDeliverables(e.target.value)}
+                placeholder="Link or details of expected deliverables..."
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Notes</Label>
@@ -808,9 +832,28 @@ export function TaskActionDialogs({
               <Label>Requirements</Label>
               <Textarea name="requirements" rows={2} defaultValue={selectedTaskForAction?.requirements || ""} />
             </div>
+            {/* Work & Design Deliverables Upload Section */}
+            <TaskDeliverablesUploader
+              taskId={selectedTaskForAction?.id}
+              initialAttachments={selectedTaskForAction?.attachments || []}
+              deliverableLink={modifyDeliverables}
+              onDeliverableLinkChange={setModifyDeliverables}
+              onAttachmentsChange={(newAtts) => {
+                if (selectedTaskForAction) {
+                  selectedTaskForAction.attachments = newAtts;
+                }
+              }}
+            />
+
             <div className="space-y-1.5">
-              <Label>Deliverables</Label>
-              <Textarea name="deliverables" rows={2} defaultValue={selectedTaskForAction?.deliverables || ""} />
+              <Label>Deliverables (Notes or External Link)</Label>
+              <Textarea
+                name="deliverables"
+                rows={2}
+                value={modifyDeliverables}
+                onChange={(e) => setModifyDeliverables(e.target.value)}
+                placeholder="Link or details of expected deliverables..."
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Notes</Label>

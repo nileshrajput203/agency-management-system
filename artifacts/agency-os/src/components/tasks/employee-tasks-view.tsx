@@ -23,8 +23,9 @@ import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import {
   Plus, Trash2, Calendar, CheckSquare, CheckCircle2, Edit3, FileText, EyeOff, Eye,
-  Play, Send, Clock, ArrowRight, Undo2
+  Play, Send, Clock, ArrowRight, Undo2, ExternalLink, Image as ImageIcon, Paperclip
 } from "lucide-react";
+import { TaskDeliverablesUploader } from "./task-deliverables-uploader";
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { SearchBar } from "@/components/common/SearchBar";
@@ -53,11 +54,13 @@ export function EmployeeTasksView() {
   const [selectedTaskForActionState, setSelectedTaskForAction] = useState<any | null>(null);
   const [employeeApprovedEditDialogOpen, setEmployeeApprovedEditDialogOpen] = useState(false);
   const [employeeEditStatus, setEmployeeEditStatus] = useState<string>("TODO");
+  const [employeeDeliverables, setEmployeeDeliverables] = useState<string>("");
 
   const handleOpenEmployeeApprovedEditDialog = (task: any) => {
     setSelectedTaskForAction(task);
     const initialStatus = isCompletedTask(task.status) ? "IN_REVIEW" : (task.status || "TODO");
     setEmployeeEditStatus(initialStatus);
+    setEmployeeDeliverables(task.deliverables || "");
     setEmployeeApprovedEditDialogOpen(true);
   };
 
@@ -73,6 +76,7 @@ export function EmployeeTasksView() {
       data: {
         description,
         status: finalStatus,
+        deliverables: employeeDeliverables || undefined,
       } as any,
     }, {
       onSuccess: () => {
@@ -425,6 +429,15 @@ export function EmployeeTasksView() {
                             </>
                           )}
                           <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10 font-semibold"
+                            onClick={() => handleOpenEmployeeApprovedEditDialog(task)}
+                            title="Upload artwork, graphics, or design files"
+                          >
+                            <Paperclip className="h-3 w-3" /> Upload Work
+                          </Button>
+                          <Button
                             size="icon"
                             variant="ghost"
                             className="h-8 w-8 text-muted-foreground hover:text-foreground"
@@ -449,6 +462,58 @@ export function EmployeeTasksView() {
                           </Select>
                         </div>
                       </div>
+
+                      {/* Uploaded Artwork / Attachments Preview */}
+                      {(task as any).attachments && (task as any).attachments.length > 0 && (
+                        <div className="space-y-1.5 p-2 rounded-lg bg-primary/5 border border-primary/15">
+                          <span className="text-[11px] font-bold text-foreground flex items-center gap-1">
+                            🎨 Attached Work ({(task as any).attachments.length}):
+                          </span>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {(task as any).attachments.map((att: any) => {
+                              const isImg = /\.(png|jpe?g|webp|gif|svg)$/i.test(att.filename || att.url || "");
+                              return (
+                                <a
+                                  key={att.id}
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-md bg-background border border-border/60 hover:border-primary font-medium text-foreground transition-all"
+                                  title={`View ${att.filename}`}
+                                >
+                                  {isImg ? (
+                                    <ImageIcon className="h-3.5 w-3.5 text-primary" />
+                                  ) : (
+                                    <FileText className="h-3.5 w-3.5 text-primary" />
+                                  )}
+                                  <span className="max-w-[120px] truncate">{att.filename}</span>
+                                  <ExternalLink className="h-2.5 w-2.5 opacity-60" />
+                                </a>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Design / Deliverable Link */}
+                      {task.deliverables && (
+                        <div className="text-xs">
+                          {task.deliverables.startsWith("http://") || task.deliverables.startsWith("https://") ? (
+                            <a
+                              href={task.deliverables}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline bg-primary/10 px-2 py-1 rounded border border-primary/20"
+                            >
+                              <ExternalLink className="h-3 w-3" /> View Design Link (Figma/Drive)
+                            </a>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground bg-muted/30 p-2 rounded border border-border/30">
+                              <span className="font-semibold text-foreground">Deliverable:</span> {task.deliverables}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       {task.description && (
                         <p className="text-sm text-muted-foreground bg-muted/20 p-2.5 rounded-lg border border-border/30 font-normal">
@@ -810,7 +875,7 @@ export function EmployeeTasksView() {
 
       {/* EMPLOYEE EDIT APPROVED TASK DIALOG */}
       <Dialog open={employeeApprovedEditDialogOpen} onOpenChange={setEmployeeApprovedEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Approved Task</DialogTitle>
           </DialogHeader>
@@ -856,9 +921,24 @@ export function EmployeeTasksView() {
                 <Input type="date" value={selectedTaskForAction?.dueDate ? selectedTaskForAction.dueDate.split("T")[0] : ""} disabled className="bg-muted text-muted-foreground cursor-not-allowed" />
               </div>
             </div>
+
+            {/* Work & Design Deliverables Upload Section */}
+            <TaskDeliverablesUploader
+              taskId={selectedTaskForAction?.id}
+              initialAttachments={selectedTaskForAction?.attachments || []}
+              deliverableLink={employeeDeliverables}
+              onDeliverableLinkChange={setEmployeeDeliverables}
+              onAttachmentsChange={(newAtts) => {
+                if (selectedTaskForAction) {
+                  selectedTaskForAction.attachments = newAtts;
+                }
+                qc.invalidateQueries({ queryKey: getListTasksQueryKey() });
+              }}
+            />
+
             <div className="space-y-1.5">
-              <Label>Description</Label>
-              <Textarea name="description" rows={4} defaultValue={selectedTaskForAction?.description || ""} placeholder="Add details or progress updates..." />
+              <Label>Description & Progress Notes</Label>
+              <Textarea name="description" rows={3} defaultValue={selectedTaskForAction?.description || ""} placeholder="Add details or progress updates..." />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEmployeeApprovedEditDialogOpen(false)}>Cancel</Button>

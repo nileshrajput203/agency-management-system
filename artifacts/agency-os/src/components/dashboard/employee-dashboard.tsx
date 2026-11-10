@@ -161,7 +161,7 @@ export function EmployeeDashboard({
     }
   };
 
-  const handleRequestChanges = async (taskId: string) => {
+  const handleRequestChanges = async (taskId: string, rejectionReason?: string) => {
     try {
       setActingTaskId(taskId);
       const res = await fetch(`/api/tasks/${taskId}`, {
@@ -170,7 +170,12 @@ export function EmployeeDashboard({
           "Content-Type": "application/json",
           ...authHeader(),
         },
-        body: JSON.stringify({ status: "IN_PROGRESS" }),
+        body: JSON.stringify({
+          status: "IN_PROGRESS",
+          notes: rejectionReason || undefined,
+          assignmentNote: rejectionReason || undefined,
+          rejectionReason: rejectionReason || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to request changes");

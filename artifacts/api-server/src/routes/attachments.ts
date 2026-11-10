@@ -9,6 +9,7 @@ import {
   requirePermission,
   canManageEnabledSection,
   canManageTaskWorkspace,
+  isManagerRole,
 } from "../middleware/auth";
 import { canEmployeeAccessTask } from "../middleware/taskAccess";
 
@@ -70,19 +71,35 @@ async function assertEntityAccess(
 ): Promise<boolean> {
   const module = ENTITY_MODULES[entityType];
   if (module === "tasks") {
-    if (canManageTaskWorkspace(req.userSystemRole, req.userConfiguredModules)) return true;
+    const isPrivileged =
+      canManageTaskWorkspace(req.userSystemRole, req.userConfiguredModules, req.userRoleText) ||
+      isManagerRole(req.userSystemRole) ||
+      isManagerRole(req.userRole) ||
+      Boolean(req.userIsDelegatedAdmin);
+    if (isPrivileged) return true;
+
     const [task] = await db
       .select({
         assigneeId: tasksTable.assigneeId,
         requestedBy: tasksTable.requestedBy,
         approvalStatus: tasksTable.approvalStatus,
+        coAssignees: tasksTable.coAssignees,
       })
       .from(tasksTable)
       .where(eq(tasksTable.id, entityId));
-    if (!task || !canEmployeeAccessTask(task, req.userId)) {
+
+    if (!task) throw createError("Task not found", 404);
+
+    const isApprovedOrModified =
+      task.approvalStatus === "APPROVED" ||
+      task.approvalStatus === "MODIFIED" ||
+      !task.approvalStatus;
+
+    // Active tasks are accessible to all team members for uploading/viewing work
+    if (!isApprovedOrModified && !canEmployeeAccessTask(task, req.userId)) {
       throw createError("Forbidden: You do not have access to this task's attachments", 403);
     }
-    return false;
+    return true;
   }
 
   if (!canManageEnabledSection(req.userSystemRole, module, req.userConfiguredModules)) {

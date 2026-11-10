@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { tasksTable, projectsTable, subprojectsTable, usersTable, contentPostsTable } from "@workspace/db/schema";
-import { and, eq, or, sql, desc, asc, isNull } from "drizzle-orm";
+import { tasksTable, projectsTable, subprojectsTable, usersTable, contentPostsTable, fileAttachmentsTable } from "@workspace/db/schema";
+import { and, eq, or, sql, desc, asc, isNull, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
@@ -139,7 +139,34 @@ router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) =
     : rows.map((row) => ({ ...row, projectId: null, projectName: null, subprojectId: null, subprojectName: null }));
   const visibleRows = hiddenIds.length > 0 ? scopedRows.filter((r) => !hiddenIds.includes(r.id)) : scopedRows;
 
-  return res.json(visibleRows);
+  // Batch query task attachments (uploaded graphics, designs, files)
+  const taskIds = visibleRows.map((r) => r.id);
+  const attachments = taskIds.length > 0
+    ? await db
+        .select({
+          id: fileAttachmentsTable.id,
+          entityId: fileAttachmentsTable.entityId,
+          filename: fileAttachmentsTable.filename,
+          url: fileAttachmentsTable.url,
+          createdAt: fileAttachmentsTable.createdAt,
+        })
+        .from(fileAttachmentsTable)
+        .where(and(
+          inArray(fileAttachmentsTable.entityType, ["task", "tasks"]),
+          inArray(fileAttachmentsTable.entityId, taskIds),
+        ))
+    : [];
+  const attMap: Record<string, any[]> = {};
+  for (const a of attachments) {
+    if (!attMap[a.entityId]) attMap[a.entityId] = [];
+    attMap[a.entityId].push(a);
+  }
+  const rowsWithAttachments = visibleRows.map((r) => ({
+    ...r,
+    attachments: attMap[r.id] || [],
+  }));
+
+  return res.json(rowsWithAttachments);
 }));
 
 router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res) => {
@@ -298,7 +325,22 @@ router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res
     requesterSystemRole === "SUPER_ADMIN" ||
     Boolean((req as any).userIsDelegatedAdmin) ||
     ((req as any).userConfiguredModules || []).includes("projects");
-  return res.json(canViewProjects ? row : { ...row, projectId: null, projectName: null, subprojectId: null, subprojectName: null });
+  const attachments = await db
+    .select({
+      id: fileAttachmentsTable.id,
+      entityId: fileAttachmentsTable.entityId,
+      filename: fileAttachmentsTable.filename,
+      url: fileAttachmentsTable.url,
+      createdAt: fileAttachmentsTable.createdAt,
+    })
+    .from(fileAttachmentsTable)
+    .where(and(
+      inArray(fileAttachmentsTable.entityType, ["task", "tasks"]),
+      eq(fileAttachmentsTable.entityId, row.id),
+    ));
+
+  const scopedRow = canViewProjects ? row : { ...row, projectId: null, projectName: null, subprojectId: null, subprojectName: null };
+  return res.json({ ...scopedRow, attachments });
 }));
 
 router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, res) => {
@@ -418,8 +460,10 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
     if (linkedPost) {
       if (row.status === "IN_REVIEW" && linkedPost.status !== "IN_REVIEW") {
         await db.update(contentPostsTable).set({ status: "IN_REVIEW" }).where(eq(contentPostsTable.id, linkedPost.id));
-      } else if (row.status === "COMPLETED" && linkedPost.status !== "ADMIN_APPROVED" && linkedPost.status !== "PUBLISHED") {
+      } else if ((row.status === "DONE" || row.status === "COMPLETED") && linkedPost.status !== "ADMIN_APPROVED" && linkedPost.status !== "PUBLISHED") {
         await db.update(contentPostsTable).set({ status: "ADMIN_APPROVED" }).where(eq(contentPostsTable.id, linkedPost.id));
+      } else if (row.status === "IN_PROGRESS" && linkedPost.status === "IN_REVIEW") {
+        await db.update(contentPostsTable).set({ status: "PRODUCTION" }).where(eq(contentPostsTable.id, linkedPost.id));
       }
     }
   } catch (syncPostErr) {
@@ -539,6 +583,23 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
             referenceType: "TASK",
             createdBy: requesterId,
             action: "Review Task",
+            actionUrl: "/tasks",
+          });
+        }
+      } else if (task.status === "IN_REVIEW" && sanitized.status === "IN_PROGRESS") {
+        // Manager requested revisions / rejected work from review
+        if (row.assigneeId && row.assigneeId !== requesterId) {
+          const reasonText = sanitized.rejectionReason || sanitized.notes || sanitized.assignmentNote;
+          await NotificationService.createNotification({
+            userId: row.assigneeId,
+            title: "⚠️ Task Revisions Requested",
+            message: `${empName} requested changes on "${row.title}"${reasonText ? `: "${reasonText}"` : ". Please review the feedback and resubmit."}`,
+            type: "TASK",
+            priority: "HIGH",
+            referenceId: row.id,
+            referenceType: "TASK",
+            createdBy: requesterId,
+            action: "Update Task",
             actionUrl: "/tasks",
           });
         }

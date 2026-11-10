@@ -25,7 +25,8 @@ import { canManageModule, isManagerOrAdminRole } from "@/lib/permissions";
 import { useForm, Controller } from "react-hook-form";
 import {
   Plus, Trash2, Calendar, CheckSquare, Clock, AlertCircle, ListTodo, CheckCircle2, Edit3, EyeOff, Eye,
-  Users, ChevronDown, ChevronUp, Bell, User, Filter, AlertTriangle, ArrowRight, Check
+  Users, ChevronDown, ChevronUp, Bell, User, Filter, AlertTriangle, ArrowRight, Check,
+  Paperclip, ExternalLink, RotateCcw, FileText, Image as ImageIcon
 } from "lucide-react";
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { cn, formatDateOnly } from "@/lib/utils";
@@ -145,7 +146,7 @@ export function AdminTasksView() {
         setAdminEditDialogOpen(false);
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.error || err?.message || "Failed to update task";
+        const msg = err?.data?.error || err?.response?.data?.error || err?.message || "Failed to update task";
         toast.error(msg);
       }
     });
@@ -175,7 +176,7 @@ export function AdminTasksView() {
         qc.invalidateQueries({ queryKey: getListTasksQueryKey() });
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.error || err?.message || "Failed to update task";
+        const msg = err?.data?.error || err?.response?.data?.error || err?.message || "Failed to update task";
         toast.error(msg);
       },
     },
@@ -316,7 +317,7 @@ export function AdminTasksView() {
         setModifyDialogOpen(false);
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.error || err?.message || "Failed to update task";
+        const msg = err?.data?.error || err?.response?.data?.error || err?.message || "Failed to update task";
         toast.error(msg);
       }
     });
@@ -327,7 +328,6 @@ export function AdminTasksView() {
   );
 
   const filteredActive = activeTasks.filter((t) => {
-    if (hideCompleted && isCompletedTask(t.status)) return false;
     if (priorityFilter !== "ALL" && t.priority !== priorityFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -341,8 +341,16 @@ export function AdminTasksView() {
     return true;
   });
 
-  const byStatus = (status: string) =>
-    sortTasksByDueDate(filteredActive.filter((t) => (status === "DONE" ? isCompletedTask(t.status) : t.status === status)));
+  const completedCount = filteredActive.filter((t) => isCompletedTask(t.status)).length;
+
+  const byStatus = (status: string) => {
+    if (status === "DONE") {
+      const doneList = sortTasksByDueDate(filteredActive.filter((t) => isCompletedTask(t.status)));
+      if (hideCompleted) return [];
+      return doneList;
+    }
+    return sortTasksByDueDate(filteredActive.filter((t) => t.status === status));
+  };
 
   const pendingTasks = (tasks ?? []).filter((t) => t.approvalStatus === "PENDING" || t.approvalStatus === "MANAGER_APPROVED");
   const filteredPending = sortTasksByDueDate(pendingTasks.filter((t) => {
@@ -590,7 +598,7 @@ export function AdminTasksView() {
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold">{col.label}</p>
                         <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-muted text-[11px] font-semibold text-muted-foreground">
-                          {colTasks.length}
+                          {col.key === "DONE" && hideCompleted ? `${completedCount} hidden` : colTasks.length}
                         </span>
                       </div>
                       <Button
@@ -663,6 +671,29 @@ export function AdminTasksView() {
                               </div>
                             )}
 
+                            {/* Deliverables / External Design Link / Attached Artwork */}
+                            {((task.deliverables && (task.deliverables.startsWith("http://") || task.deliverables.startsWith("https://"))) || ((task as any).attachments && (task as any).attachments.length > 0)) && (
+                              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                {task.deliverables && (task.deliverables.startsWith("http://") || task.deliverables.startsWith("https://")) && (
+                                  <a
+                                    href={task.deliverables}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                                    title={task.deliverables}
+                                  >
+                                    <ExternalLink className="h-2.5 w-2.5" /> Design Link
+                                  </a>
+                                )}
+                                {(task as any).attachments && (task as any).attachments.length > 0 && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                    <Paperclip className="h-2.5 w-2.5" /> {(task as any).attachments.length} file{(task as any).attachments.length === 1 ? "" : "s"}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
                             <div className="flex items-center justify-between pt-1 border-t border-border/40">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <Badge variant="outline" className={cn("text-[10px] border px-1.5 py-0", pc.className)}>
@@ -674,20 +705,37 @@ export function AdminTasksView() {
                                   </Badge>
                                 )}
                                 {task.status === "IN_REVIEW" && (
-                                  <Button
-                                    size="sm"
-                                    className="h-5 text-[10px] px-2 py-0 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1 shadow-xs"
-                                    title="Approve task & mark as Done"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      updateMutation.mutate(
-                                        { id: task.id, data: { status: "DONE", approvalStatus: "APPROVED" } as any },
-                                        { onSuccess: () => toast.success("Task approved and marked as Done!") }
-                                      );
-                                    }}
-                                  >
-                                    <CheckCircle2 className="h-2.5 w-2.5" /> Approve
-                                  </Button>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      size="sm"
+                                      className="h-5 text-[10px] px-2 py-0 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1 shadow-xs"
+                                      title="Approve task & mark as Done"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateMutation.mutate(
+                                          { id: task.id, data: { status: "DONE", approvalStatus: "APPROVED" } as any },
+                                          { onSuccess: () => toast.success("Task approved and marked as Done!") }
+                                        );
+                                      }}
+                                    >
+                                      <CheckCircle2 className="h-2.5 w-2.5" /> Approve
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-5 text-[10px] px-1.5 py-0 border-rose-300 text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/30 font-semibold gap-0.5"
+                                      title="Request revisions / send back to In Progress"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        updateMutation.mutate(
+                                          { id: task.id, data: { status: "IN_PROGRESS" } as any },
+                                          { onSuccess: () => toast.success("Task sent back to In Progress for revisions.") }
+                                        );
+                                      }}
+                                    >
+                                      <RotateCcw className="h-2.5 w-2.5" /> Revisions
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
                               <div className="flex flex-col items-end gap-0.5">
@@ -723,13 +771,31 @@ export function AdminTasksView() {
                         );
                       })}
 
-                      {colTasks.length === 0 && (
+                      {col.key === "DONE" && hideCompleted ? (
+                        <div className="flex flex-col items-center justify-center py-6 px-3 text-center text-muted-foreground border border-dashed border-border/80 rounded-lg bg-card/40 space-y-2">
+                          <EyeOff className="h-5 w-5 opacity-40 text-muted-foreground" />
+                          <div>
+                            <p className="text-xs font-semibold text-foreground">Completed Tasks Hidden</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {completedCount} task{completedCount === 1 ? "" : "s"} marked as done
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-[10px] px-2 font-semibold"
+                            onClick={() => setHideCompleted(false)}
+                          >
+                            <Eye className="h-2.5 w-2.5 mr-1" /> Show Done
+                          </Button>
+                        </div>
+                      ) : colTasks.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/40">
                           <CheckSquare className="h-6 w-6 mb-1.5" />
                           <p className="text-xs font-medium">No tasks</p>
                           <p className="text-[10px] mt-0.5">Drag here or click +</p>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 );

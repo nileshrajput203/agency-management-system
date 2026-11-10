@@ -1,12 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users, Briefcase, CheckCircle2, BarChart3, Layers, TrendingUp, ArrowRight,
-  FolderOpen, Calendar, Sparkles, Plus, Clock, Flame, Check, Undo2
+  FolderOpen, Calendar, Sparkles, Plus, Clock, Flame, Check, Undo2,
+  ExternalLink, Eye, Download, FileText, Image as ImageIcon, Video, X
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -165,105 +171,266 @@ export function TasksInReviewAdminSection({
   stats: any;
   navigate: (path: string) => void;
   onApproveTask: (taskId: string) => void;
-  onRequestChanges: (taskId: string) => void;
+  onRequestChanges: (taskId: string, rejectionReason?: string) => void;
   actingTaskId?: string | null;
 }) {
   const tasksInReview = stats?.tasksInReview || [];
+  const [revisionTask, setRevisionTask] = useState<any | null>(null);
+  const [revisionRemarks, setRevisionRemarks] = useState<string>("");
+  const [previewMedia, setPreviewMedia] = useState<{ url: string; filename: string } | null>(null);
+
   if (tasksInReview.length === 0) return null;
 
+  const handleConfirmRevision = () => {
+    if (!revisionTask) return;
+    onRequestChanges(revisionTask.id, revisionRemarks.trim() || undefined);
+    setRevisionTask(null);
+    setRevisionRemarks("");
+  };
+
+  const isImageFile = (filename?: string, url?: string) => {
+    const str = (filename || url || "").toLowerCase();
+    return /\.(png|jpe?g|webp|gif|svg)$/.test(str) || str.startsWith("data:image");
+  };
+
   return (
-    <Card className="bg-card border-amber-500/40 shadow-xs overflow-hidden">
-      <CardHeader className="pb-3 bg-amber-500/5 border-b border-amber-500/20 flex flex-row items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
-            <Clock className="h-4 w-4" />
+    <>
+      <Card className="bg-card border-amber-500/40 shadow-xs overflow-hidden">
+        <CardHeader className="pb-3 bg-amber-500/5 border-b border-amber-500/20 flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+              <Clock className="h-4 w-4" />
+            </div>
+            <div>
+              <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+                Tasks Sent for Review
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs font-bold">
+                  {tasksInReview.length} awaiting approval
+                </Badge>
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Review work & graphic deliverables submitted by team members before making them Done.
+              </p>
+            </div>
           </div>
-          <div>
-            <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
-              Tasks Sent for Review
-              <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs font-bold">
-                {tasksInReview.length} awaiting approval
-              </Badge>
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Team members have completed these tasks and submitted them for manager/admin approval.
-            </p>
-          </div>
-        </div>
-        <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/tasks")}>
-          Kanban Board <ArrowRight className="h-3 w-3" />
-        </Button>
-      </CardHeader>
-      <CardContent className="pt-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {tasksInReview.map((task: any) => {
-            const isActing = actingTaskId === task.id;
-            return (
-              <div
-                key={task.id}
-                className="p-3.5 rounded-lg border border-border/80 bg-muted/15 hover:bg-muted/30 transition-all space-y-3 flex flex-col justify-between"
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold text-primary truncate flex items-center gap-1">
-                      👤 {task.assigneeName || "Team Member"}
-                    </span>
-                    {task.priority && (
-                      <Badge variant="outline" className={cn(
-                        "text-[9px] px-1.5 py-0 uppercase font-bold",
-                        task.priority === "HIGH" || task.priority === "URGENT"
-                          ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
-                          : "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                      )}>
-                        {task.priority}
-                      </Badge>
+          <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/tasks")}>
+            Kanban Board <ArrowRight className="h-3 w-3" />
+          </Button>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {tasksInReview.map((task: any) => {
+              const isActing = actingTaskId === task.id;
+              const attachments: any[] = task.attachments || [];
+              const isLink = task.deliverables && (task.deliverables.startsWith("http://") || task.deliverables.startsWith("https://"));
+
+              return (
+                <div
+                  key={task.id}
+                  className="p-3.5 rounded-lg border border-border/80 bg-muted/15 hover:bg-muted/30 transition-all space-y-3 flex flex-col justify-between"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold text-primary truncate flex items-center gap-1">
+                        👤 {task.assigneeName || "Team Member"}
+                      </span>
+                      {task.priority && (
+                        <Badge variant="outline" className={cn(
+                          "text-[9px] px-1.5 py-0 uppercase font-bold",
+                          task.priority === "HIGH" || task.priority === "URGENT"
+                            ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                            : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                        )}>
+                          {task.priority}
+                        </Badge>
+                      )}
+                    </div>
+                    <h4 className="text-sm font-bold text-foreground leading-snug line-clamp-2">
+                      {task.title}
+                    </h4>
+                    {task.projectName && (
+                      <p className="text-[11px] text-muted-foreground">📁 {task.projectName}</p>
+                    )}
+                    {task.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2 bg-background/60 p-2 rounded border border-border/40">
+                        {task.description}
+                      </p>
+                    )}
+
+                    {/* Uploaded Artwork / Attachments Preview */}
+                    {attachments.length > 0 && (
+                      <div className="space-y-1.5 pt-1.5 border-t border-border/40">
+                        <span className="text-[10px] font-bold text-foreground flex items-center gap-1">
+                          🎨 Uploaded Work ({attachments.length}):
+                        </span>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {attachments.map((att: any) => {
+                            const isImg = isImageFile(att.filename, att.url);
+                            return (
+                              <div
+                                key={att.id}
+                                onClick={() => setPreviewMedia(att)}
+                                className="group relative aspect-video rounded border border-border/60 bg-background overflow-hidden cursor-pointer hover:border-primary transition-all flex items-center justify-center shadow-2xs"
+                                title={`Click to inspect ${att.filename}`}
+                              >
+                                {isImg ? (
+                                  <img src={att.url} alt={att.filename} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                ) : (
+                                  <FileText className="h-5 w-5 text-primary" />
+                                )}
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Eye className="h-3.5 w-3.5 text-white" />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Deliverable Link / Note */}
+                    {task.deliverables && (
+                      <div className="pt-1">
+                        {isLink ? (
+                          <a
+                            href={task.deliverables}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline bg-primary/10 px-2 py-1 rounded border border-primary/20"
+                          >
+                            <ExternalLink className="h-3 w-3" /> View Design Link (Figma/Drive)
+                          </a>
+                        ) : (
+                          <p className="text-[11px] text-foreground font-medium bg-muted/40 p-1.5 rounded border border-border/40 line-clamp-2">
+                            📦 <span className="font-semibold">Deliverable:</span> {task.deliverables}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <h4 className="text-sm font-bold text-foreground leading-snug line-clamp-2">
-                    {task.title}
-                  </h4>
-                  {task.projectName && (
-                    <p className="text-[11px] text-muted-foreground">📁 {task.projectName}</p>
-                  )}
-                  {task.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2 bg-background/60 p-2 rounded border border-border/40">
-                      {task.description}
-                    </p>
-                  )}
-                </div>
 
-                <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-2">
-                  <span className="text-[10px] text-muted-foreground">
-                    {task.dueDate ? `Due ${format(new Date(task.dueDate), "dd MMM")}` : "No due date"}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={isActing}
-                      className="h-7 text-xs px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20 font-semibold"
-                      onClick={() => onRequestChanges(task.id)}
-                      title="Request revisions / Send back to In Progress"
-                    >
-                      <Undo2 className="h-3 w-3 mr-1" /> Revise
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={isActing}
-                      className="h-7 text-xs px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
-                      onClick={() => onApproveTask(task.id)}
-                      title="Approve task & mark as Done"
-                    >
-                      <Check className="h-3 w-3 mr-1" /> Approve
-                    </Button>
+                  <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-muted-foreground">
+                      {task.dueDate ? `Due ${format(new Date(task.dueDate), "dd MMM")}` : "No due date"}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isActing}
+                        className="h-7 text-xs px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 border-rose-300 font-semibold"
+                        onClick={() => {
+                          setRevisionTask(task);
+                          setRevisionRemarks("");
+                        }}
+                        title="Reject artwork / Request changes"
+                      >
+                        <Undo2 className="h-3 w-3 mr-1" /> Reject / Revise
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={isActing}
+                        className="h-7 text-xs px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                        onClick={() => onApproveTask(task.id)}
+                        title="Approve work & mark as Done"
+                      >
+                        <Check className="h-3 w-3 mr-1" /> Approve (Done)
+                      </Button>
+                    </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Revision Remarks Modal */}
+      <Dialog open={!!revisionTask} onOpenChange={(open) => !open && setRevisionTask(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
+              <Undo2 className="h-4 w-4 text-amber-600" />
+              Request Revisions on Task
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3.5 pt-2">
+            <div>
+              <p className="text-xs text-muted-foreground">
+                Task: <strong className="text-foreground">{revisionTask?.title}</strong>
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Assignee: <strong className="text-primary">{revisionTask?.assigneeName || "Team Member"}</strong>
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                Feedback / Rejection Remarks (Optional):
+              </Label>
+              <Textarea
+                rows={3}
+                placeholder="e.g. Please change logo position, adjust brand color, and export in 1080x1080 resolution…"
+                value={revisionRemarks}
+                onChange={(e) => setRevisionRemarks(e.target.value)}
+                className="text-xs"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                The task will be moved back to <strong>In Progress</strong> and the assignee will be notified of your remarks.
+              </p>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" size="sm" onClick={() => setRevisionTask(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleConfirmRevision}
+                className="font-semibold"
+              >
+                Send Rejection & Request Changes
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Full Resolution Artwork Inspection Lightbox */}
+      <Dialog open={!!previewMedia} onOpenChange={(open) => !open && setPreviewMedia(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-4">
+          <DialogHeader className="pb-2 border-b border-border/40">
+            <DialogTitle className="text-sm font-bold truncate flex items-center justify-between pr-6">
+              <span>{previewMedia?.filename}</span>
+              <a
+                href={previewMedia?.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+              >
+                Open Full <ExternalLink className="h-3 w-3" />
+              </a>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto flex items-center justify-center p-2 bg-muted/10 rounded-lg">
+            {previewMedia && isImageFile(previewMedia.filename, previewMedia.url) ? (
+              <img
+                src={previewMedia.url}
+                alt={previewMedia.filename}
+                className="max-h-[75vh] w-auto max-w-full rounded object-contain shadow-md"
+              />
+            ) : (
+              <div className="text-center p-8 space-y-3">
+                <FileText className="h-12 w-12 text-primary mx-auto" />
+                <p className="text-sm font-semibold">{previewMedia?.filename}</p>
+                <Button onClick={() => window.open(previewMedia?.url, "_blank")} size="sm" className="gap-1.5">
+                  <Download className="h-3.5 w-3.5" /> View / Download File
+                </Button>
               </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

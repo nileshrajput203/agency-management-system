@@ -2,8 +2,9 @@ import { db } from "@workspace/db";
 import {
   clientsTable, projectsTable, leadsTable, tasksTable, invoicesTable,
   quotationsTable, purchaseOrdersTable, leaveRequestsTable, usersTable,
+  fileAttachmentsTable,
 } from "@workspace/db/schema";
-import { eq, gte, sql, and, or, desc } from "drizzle-orm";
+import { eq, gte, sql, and, or, desc, inArray } from "drizzle-orm";
 import { getEffectiveModules } from "../middleware/moduleAccess";
 import { isManagerRole } from "../middleware/auth";
 
@@ -301,11 +302,34 @@ export async function getDashboardStatsService(userId: string) {
         .where(eq(tasksTable.status, "IN_REVIEW"))
         .orderBy(desc(tasksTable.updatedAt));
 
+      const inReviewTaskIds = inReviewRows.map((t) => t.id);
+      const attachments = inReviewTaskIds.length > 0
+        ? await db
+            .select({
+              id: fileAttachmentsTable.id,
+              entityId: fileAttachmentsTable.entityId,
+              filename: fileAttachmentsTable.filename,
+              url: fileAttachmentsTable.url,
+              createdAt: fileAttachmentsTable.createdAt,
+            })
+            .from(fileAttachmentsTable)
+            .where(and(
+              inArray(fileAttachmentsTable.entityType, ["task", "tasks"]),
+              inArray(fileAttachmentsTable.entityId, inReviewTaskIds),
+            ))
+        : [];
+      const attMap: Record<string, any[]> = {};
+      for (const a of attachments) {
+        if (!attMap[a.entityId]) attMap[a.entityId] = [];
+        attMap[a.entityId].push(a);
+      }
+
       managerTasksInReview = inReviewRows.map((t) => ({
         ...t,
         dueDate: toIso(t.dueDate),
         startDate: toIso(t.startDate),
         updatedAt: toIso(t.updatedAt),
+        attachments: attMap[t.id] || [],
       }));
     }
 
@@ -649,11 +673,34 @@ export async function getDashboardStatsService(userId: string) {
     .where(eq(tasksTable.status, "IN_REVIEW"))
     .orderBy(desc(tasksTable.updatedAt));
 
+  const adminReviewTaskIds = adminTasksInReviewRows.map((t) => t.id);
+  const adminAttachments = adminReviewTaskIds.length > 0
+    ? await db
+        .select({
+          id: fileAttachmentsTable.id,
+          entityId: fileAttachmentsTable.entityId,
+          filename: fileAttachmentsTable.filename,
+          url: fileAttachmentsTable.url,
+          createdAt: fileAttachmentsTable.createdAt,
+        })
+        .from(fileAttachmentsTable)
+        .where(and(
+          inArray(fileAttachmentsTable.entityType, ["task", "tasks"]),
+          inArray(fileAttachmentsTable.entityId, adminReviewTaskIds),
+        ))
+    : [];
+  const adminAttMap: Record<string, any[]> = {};
+  for (const a of adminAttachments) {
+    if (!adminAttMap[a.entityId]) adminAttMap[a.entityId] = [];
+    adminAttMap[a.entityId].push(a);
+  }
+
   const formattedAdminTasksInReview = adminTasksInReviewRows.map((t) => ({
     ...t,
     dueDate: toIso(t.dueDate),
     startDate: toIso(t.startDate),
     updatedAt: toIso(t.updatedAt),
+    attachments: adminAttMap[t.id] || [],
   }));
 
   return {
