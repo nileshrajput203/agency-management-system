@@ -23,7 +23,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      const adminRoles = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"];
+      const adminRoles = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER", "FINANCE_EXECUTIVE"];
       const userRole = (user as any).systemRole || (user as any).role;
       const isDelegatedAdminMode2 = (user as any).isDelegatedAdmin && (user as any).portalMode === "MODE_2";
       if (adminRoles.includes(userRole) || isDelegatedAdminMode2) {
@@ -51,7 +51,7 @@ export default function LoginPage() {
       onSuccess: (data) => {
         login(data.token, data.user);
         toast.success(`Welcome back, ${data.user.name}!`);
-        const adminRoles = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER"];
+        const adminRoles = ["SUPER_ADMIN", "ADMIN", "MANAGER", "ACCOUNT_MANAGER", "FINANCE_EXECUTIVE"];
         const userRole = (data.user as any).systemRole || (data.user as any).role;
         const isDelegatedAdminMode2 = (data.user as any).isDelegatedAdmin && (data.user as any).portalMode === "MODE_2";
         if (adminRoles.includes(userRole) || isDelegatedAdminMode2) {

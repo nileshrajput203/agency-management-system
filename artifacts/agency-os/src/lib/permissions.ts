@@ -86,8 +86,18 @@ export function getUserModules(allowedModules?: unknown, role?: string): string[
   return DEFAULT_EMPLOYEE_MODULES;
 }
 
-export function hasModuleAccess(allowedModules: unknown, module: string): boolean {
-  const userMods = getUserModules(allowedModules);
+export function hasModuleAccess(userOrAllowedModules: unknown, module: string, roleParam?: string): boolean {
+  let allowedModules = userOrAllowedModules;
+  let role = roleParam;
+
+  if (userOrAllowedModules && typeof userOrAllowedModules === "object" && !Array.isArray(userOrAllowedModules)) {
+    allowedModules = (userOrAllowedModules as any).allowedModules;
+    role = (userOrAllowedModules as any).systemRole || (userOrAllowedModules as any).role || role;
+  }
+
+  if (role === "SUPER_ADMIN") return true;
+
+  const userMods = getUserModules(allowedModules, role);
   if (userMods.includes(module)) return true;
 
   if (module === "finance") {

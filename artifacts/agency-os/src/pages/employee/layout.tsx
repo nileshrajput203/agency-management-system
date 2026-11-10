@@ -114,7 +114,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
       ...group,
       items: group.items.filter(item => {
         if (!item.modules) return true; // no restriction = always visible
-        return item.modules.some(m => hasModuleAccess(user?.allowedModules, m));
+        return item.modules.some(m => hasModuleAccess(user, m));
       }),
     }))
     .filter(group => group.items.length > 0);

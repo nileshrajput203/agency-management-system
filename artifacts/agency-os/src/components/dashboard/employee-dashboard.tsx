@@ -80,9 +80,9 @@ export function EmployeeDashboard({
     refetchInterval: 15_000,
   });
 
-  const canInvoices = hasModuleAccess(user?.allowedModules, "invoices");
-  const canQuotations = hasModuleAccess(user?.allowedModules, "quotations");
-  const canPurchaseOrders = hasModuleAccess(user?.allowedModules, "purchaseOrders");
+  const canInvoices = hasModuleAccess(user, "invoices");
+  const canQuotations = hasModuleAccess(user, "quotations");
+  const canPurchaseOrders = hasModuleAccess(user, "purchaseOrders");
   const hasAnyFinance = canInvoices || canQuotations || canPurchaseOrders;
 
   const { data: finSummary } = useQuery<any>({

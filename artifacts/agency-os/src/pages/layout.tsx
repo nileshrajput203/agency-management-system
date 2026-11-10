@@ -137,8 +137,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       if (isSuperAdmin) return true;
       if (required === null) return true;
-      if (Array.isArray(required)) return required.some(m => hasModuleAccess(user?.allowedModules, m));
-      return hasModuleAccess(user?.allowedModules, required);
+      if (Array.isArray(required)) return required.some(m => hasModuleAccess(user, m));
+      return hasModuleAccess(user, required);
     });
 
     return { ...group, items: filteredItems };

@@ -507,8 +507,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (requiredModule === null) return <>{children}</>;
   if (requiredModule) {
     const hasAccess = Array.isArray(requiredModule)
-      ? requiredModule.some((m) => hasModuleAccess(user.allowedModules, m))
-      : hasModuleAccess(user.allowedModules, requiredModule);
+      ? requiredModule.some((m) => hasModuleAccess(user, m))
+      : hasModuleAccess(user, requiredModule);
     if (hasAccess) return <>{children}</>;
   }
   return <AccessDeniedPage />;
@@ -534,8 +534,8 @@ function EmployeeRoute({ children }: { children: React.ReactNode }) {
   if (requiredModule === null) return <>{children}</>;
   if (requiredModule) {
     const hasAccess = Array.isArray(requiredModule)
-      ? requiredModule.some((m) => hasModuleAccess(user.allowedModules, m))
-      : hasModuleAccess(user.allowedModules, requiredModule);
+      ? requiredModule.some((m) => hasModuleAccess(user, m))
+      : hasModuleAccess(user, requiredModule);
     if (hasAccess) return <>{children}</>;
   }
   return <AccessDeniedPage />;
