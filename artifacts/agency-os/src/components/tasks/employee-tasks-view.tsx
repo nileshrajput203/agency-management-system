@@ -52,9 +52,12 @@ export function EmployeeTasksView() {
   const [employeeEditDialogOpen, setEmployeeEditDialogOpen] = useState(false);
   const [selectedTaskForActionState, setSelectedTaskForAction] = useState<any | null>(null);
   const [employeeApprovedEditDialogOpen, setEmployeeApprovedEditDialogOpen] = useState(false);
+  const [employeeEditStatus, setEmployeeEditStatus] = useState<string>("TODO");
 
   const handleOpenEmployeeApprovedEditDialog = (task: any) => {
     setSelectedTaskForAction(task);
+    const initialStatus = isCompletedTask(task.status) ? "IN_REVIEW" : (task.status || "TODO");
+    setEmployeeEditStatus(initialStatus);
     setEmployeeApprovedEditDialogOpen(true);
   };
 
@@ -62,20 +65,23 @@ export function EmployeeTasksView() {
     e.preventDefault();
     if (!selectedTaskForAction) return;
     const formData = new FormData(e.currentTarget);
-    const description = formData.get("description") as string;
-    const selectedStatus = formData.get("status") as string;
-    const status = isCompletedTask(selectedStatus) ? "IN_REVIEW" : selectedStatus;
+    const description = (formData.get("description") as string) || "";
+    const finalStatus = isCompletedTask(employeeEditStatus) ? "IN_REVIEW" : (employeeEditStatus || "TODO");
 
     updateRequestMutation.mutate({
       id: selectedTaskForAction.id,
       data: {
         description,
-        status,
+        status: finalStatus,
       } as any,
     }, {
       onSuccess: () => {
-        toast.success("Task updated successfully!");
+        toast.success(finalStatus === "IN_REVIEW" ? "Task sent for manager review!" : "Task updated successfully!");
         setEmployeeApprovedEditDialogOpen(false);
+      },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.error || err?.message || "Failed to update task";
+        toast.error(msg);
       }
     });
   };
@@ -405,18 +411,16 @@ export function EmployeeTasksView() {
                             <Edit3 className="h-4 w-4" />
                           </Button>
                           <Select
-                            value={task.status ?? "TODO"}
+                            value={isCompletedTask(task.status) ? "IN_REVIEW" : (task.status ?? "TODO")}
                             onValueChange={(newVal: string) => handleUpdateStatus(task.id, newVal)}
                           >
-                            <SelectTrigger className="w-28 h-8 text-xs font-semibold">
+                            <SelectTrigger className="w-32 h-8 text-xs font-semibold">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {COLUMNS.map((c) => (
-                                <SelectItem key={c.key} value={c.key} className="text-xs">
-                                  {c.key === "DONE" ? "Submit for Review" : c.label}
-                                </SelectItem>
-                              ))}
+                              <SelectItem value="TODO" className="text-xs">To Do</SelectItem>
+                              <SelectItem value="IN_PROGRESS" className="text-xs">In Progress</SelectItem>
+                              <SelectItem value="IN_REVIEW" className="text-xs">Send for Review</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -810,12 +814,18 @@ export function EmployeeTasksView() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Status</Label>
-                <Select name="status" defaultValue={selectedTaskForAction?.status || "TODO"}>
+                <input type="hidden" name="status" value={employeeEditStatus} />
+                <Select value={employeeEditStatus} onValueChange={setEmployeeEditStatus}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {COLUMNS.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
+                    <SelectItem value="TODO">To Do</SelectItem>
+                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                    <SelectItem value="IN_REVIEW">Send for Review</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Completed tasks require manager approval. Select "Send for Review" when finished.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label>Due Date (Locked)</Label>

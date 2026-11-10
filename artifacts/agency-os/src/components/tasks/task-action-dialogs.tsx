@@ -16,6 +16,8 @@ import { useEffect, useState } from "react";
 import type { TaskInput } from "@workspace/api-client-react";
 import { toast } from "sonner";
 import { Layers, Plus, RefreshCw, FolderKanban } from "lucide-react";
+import { useAuth } from "@/App";
+import { isManagerOrAdminRole } from "@/lib/permissions";
 
 interface SubprojectItem {
   id: string;
@@ -76,6 +78,9 @@ export function TaskActionDialogs({
   onConfirmAdminEdit,
   isUpdatePending,
 }: TaskActionDialogsProps) {
+  const { user } = useAuth();
+  const isManager = isManagerOrAdminRole(user);
+
   const { register, handleSubmit, control, setValue, reset } = useForm<any>({
     defaultValues: {
       status: defaultStatus,
@@ -169,7 +174,10 @@ export function TaskActionDialogs({
       setEditProjectId(selectedTaskForAction.projectId || "none");
       setEditSubprojectId(selectedTaskForAction.subprojectId || "none");
       setEditAssigneeId(selectedTaskForAction.assigneeId || "unassigned");
-      setEditStatus(isCompletedTask(selectedTaskForAction.status) ? "DONE" : (selectedTaskForAction.status || "TODO"));
+      const initialStatus = isCompletedTask(selectedTaskForAction.status)
+        ? (isManager ? "DONE" : "IN_REVIEW")
+        : (selectedTaskForAction.status || "TODO");
+      setEditStatus(!isManager && (initialStatus === "DONE" || initialStatus === "COMPLETED") ? "IN_REVIEW" : initialStatus);
       setEditPriority(selectedTaskForAction.priority || "MEDIUM");
     }
   }, [selectedTaskForAction?.id, modifyDialogOpen, adminEditDialogOpen]);
@@ -648,12 +656,31 @@ export function TaskActionDialogs({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Status</Label>
-                <Select value={editStatus} onValueChange={setEditStatus}>
+                <Select
+                  value={editStatus}
+                  onValueChange={(val: string) => {
+                    if (!isManager && (val === "DONE" || val === "COMPLETED")) {
+                      setEditStatus("IN_REVIEW");
+                      toast.info("Completed tasks require manager approval. Selected 'Send for Review'.");
+                    } else {
+                      setEditStatus(val);
+                    }
+                  }}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {COLUMNS.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
+                    {COLUMNS.filter((c) => isManager || c.key !== "DONE").map((c) => (
+                      <SelectItem key={c.key} value={c.key}>
+                        {c.key === "IN_REVIEW" && !isManager ? "Send for Review" : c.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                {!isManager && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Completed tasks require manager approval. Select "Send for Review" when finished.
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>Priority</Label>

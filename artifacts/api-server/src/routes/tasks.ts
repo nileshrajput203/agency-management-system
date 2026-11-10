@@ -22,6 +22,19 @@ const approvedByTable = alias(usersTable, "approved_by_users");
 
 const router = Router();
 
+function checkIsPrivileged(req: any): boolean {
+  const requesterSystemRole = req.userSystemRole;
+  const requesterUserRole = req.userRoleText;
+  const requesterRole = req.userRole || requesterSystemRole;
+  return (
+    canManageTaskWorkspace(requesterSystemRole, req.userConfiguredModules, requesterUserRole) ||
+    isManagerRole(requesterSystemRole) ||
+    isManagerRole(requesterRole) ||
+    isManagerRole(requesterUserRole) ||
+    Boolean(req.userIsDelegatedAdmin)
+  );
+}
+
 export const TaskApprovalStatus = {
   PENDING: "PENDING",
   APPROVED: "APPROVED",
@@ -56,8 +69,7 @@ function sanitizeTask(body: any, isUpdate = false) {
 router.get("/", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const requesterUserRole = (req as any).userRoleText || (req as any).userRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
+  const isPrivileged = checkIsPrivileged(req);
 
   const whereClause = !isPrivileged
     ? or(
@@ -137,7 +149,7 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
   const requesterSystemRole = (req as any).userSystemRole;
   const requesterUserRole = (req as any).userRoleText || (req as any).userRole;
   const requesterRole = (req as any).userRole || requesterSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
+  const isPrivileged = checkIsPrivileged(req);
 
   if (!isPrivileged) {
     if (
@@ -231,8 +243,7 @@ router.post("/", requirePermission("tasks.create"), asyncHandler(async (req, res
 router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
   const requesterSystemRole = (req as any).userSystemRole;
-  const requesterUserRole = (req as any).userRoleText || (req as any).userRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
+  const isPrivileged = checkIsPrivileged(req);
 
   const [row] = await db
     .select({
@@ -278,8 +289,8 @@ router.get("/:id", requirePermission("tasks.view"), asyncHandler(async (req, res
 
   if (!row) throw createError("Not found", 404);
 
-  if (!isPrivileged && !canEmployeeAccessTask(row, requesterId)) {
-    throw createError("Forbidden: You can only view tasks assigned to you", 403);
+  if (!isPrivileged && row.approvalStatus === "PENDING" && !canEmployeeAccessTask(row, requesterId)) {
+    throw createError("Forbidden: You do not have permission to view this pending task request", 403);
   }
 
   const canViewProjects =
@@ -301,7 +312,7 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
   const requesterSystemRole = (req as any).userSystemRole;
   const requesterUserRole = (req as any).userRoleText;
   const requesterRole = (req as any).userRole || requesterSystemRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
+  const isPrivileged = checkIsPrivileged(req);
   const canManageProjects = canManageProjectWorkspace(
     requesterSystemRole,
     (req as any).userConfiguredModules,
@@ -310,14 +321,10 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
 
   if (!isPrivileged) {
     const isPending = task.approvalStatus === "PENDING";
-
-    // Pending requests belong to their requester, even if a legacy row has
-    // no assignee yet. Active work remains limited to the assigned employee or co-assignees.
-    if (!canEmployeeAccessTask(task, requesterId)) {
-      throw createError("Forbidden: You do not have permission to access or modify this task", 403);
-    }
-
-    const isApprovedOrModified = task.approvalStatus === "APPROVED" || task.approvalStatus === "MODIFIED" || !task.approvalStatus;
+    const isApprovedOrModified =
+      task.approvalStatus === "APPROVED" ||
+      task.approvalStatus === "MODIFIED" ||
+      !task.approvalStatus;
 
     if (isPending) {
       if (task.requestedBy !== requesterId) {
@@ -332,17 +339,33 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
         throw createError("Forbidden: Pending requests allow edits to title, description, priority, due date, and enabled project assignment only", 403);
       }
     } else if (isApprovedOrModified) {
-      if (!canEmployeeAccessTask(task, requesterId)) {
-        throw createError("Forbidden: You can only update tasks assigned to you", 403);
-      }
-      // Active task: employees can update status, description, notes, deliverables, and assignment notes
-      const allowedKeys = new Set(["status", "description", "notes", "deliverables", "assignmentNote", "objective", "requirements"]);
-      const updateKeys = Object.keys(sanitized).filter((key) => sanitized[key] !== undefined);
-      if (updateKeys.some((key) => !allowedKeys.has(key))) {
-        throw createError("Forbidden: Active tasks allow status, notes, deliverables, and description updates only", 403);
-      }
+      // Active task: allow employee & team to update status, notes, deliverables, etc.
+      // Rule 1: Done can only be selected by manager. If employee sets status to DONE/COMPLETED, redirect to IN_REVIEW
       if (sanitized.status === "DONE" || sanitized.status === "COMPLETED") {
         sanitized.status = "IN_REVIEW";
+      }
+
+      // Rule 2: If task has no assignee yet, assign to the updating team member
+      if (!task.assigneeId) {
+        sanitized.assigneeId = requesterId;
+      }
+
+      // Rule 3: Strip fields that employees are not allowed to change (e.g. title, priority, project, dates)
+      // rather than throwing a 403 Forbidden error!
+      const employeeAllowedKeys = new Set([
+        "status",
+        "description",
+        "notes",
+        "deliverables",
+        "assignmentNote",
+        "objective",
+        "requirements",
+        "assigneeId",
+      ]);
+      for (const key of Object.keys(sanitized)) {
+        if (!employeeAllowedKeys.has(key)) {
+          delete sanitized[key];
+        }
       }
     } else {
       throw createError("Forbidden: Cannot modify a rejected task request", 403);
@@ -638,9 +661,7 @@ router.delete("/:id", requirePermission("tasks.delete"), asyncHandler(async (req
   if (!task) throw createError("Not found", 404);
 
   const requesterId = (req as any).userId;
-  const requesterSystemRole = (req as any).userSystemRole;
-  const requesterUserRole = (req as any).userRoleText || (req as any).userRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
+  const isPrivileged = checkIsPrivileged(req);
 
   if (!isPrivileged) {
     if (!canEmployeeAccessTask(task, requesterId)) {
@@ -660,9 +681,7 @@ router.delete("/:id", requirePermission("tasks.delete"), asyncHandler(async (req
 
 router.get("/:id/subtasks", requirePermission("tasks.view"), asyncHandler(async (req, res) => {
   const requesterId = (req as any).userId;
-  const requesterSystemRole = (req as any).userSystemRole;
-  const requesterUserRole = (req as any).userRoleText || (req as any).userRole;
-  const isPrivileged = canManageTaskWorkspace(requesterSystemRole, (req as any).userConfiguredModules, requesterUserRole);
+  const isPrivileged = checkIsPrivileged(req);
 
   if (!isPrivileged) {
     const [parentTask] = await db.select().from(tasksTable).where(eq(tasksTable.id, req.params.id as string));

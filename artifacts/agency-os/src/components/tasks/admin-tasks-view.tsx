@@ -21,7 +21,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WriteWithAI } from "@/components/common/WriteWithAI";
-import { canManageModule } from "@/lib/permissions";
+import { canManageModule, isManagerOrAdminRole } from "@/lib/permissions";
 import { useForm, Controller } from "react-hook-form";
 import {
   Plus, Trash2, Calendar, CheckSquare, Clock, AlertCircle, ListTodo, CheckCircle2, Edit3, EyeOff, Eye,
@@ -38,6 +38,7 @@ import { TaskActionDialogs } from "./task-action-dialogs";
 
 export function AdminTasksView() {
   const { user } = useAuth();
+  const isManager = isManagerOrAdminRole(user);
   const qc = useQueryClient();
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -205,7 +206,12 @@ export function AdminTasksView() {
   };
 
   const handleDrop = (taskId: string, newStatus: string) => {
-    updateMutation.mutate({ id: taskId, data: { status: newStatus } as any });
+    let effectiveStatus = newStatus;
+    if (!isManager && (newStatus === "DONE" || newStatus === "COMPLETED")) {
+      effectiveStatus = "IN_REVIEW";
+      toast.info("Task sent for review! Only managers can mark tasks as Done.");
+    }
+    updateMutation.mutate({ id: taskId, data: { status: effectiveStatus } as any });
   };
 
   const handleApproveTask = (taskId: string, requesterId?: string | null) => {
