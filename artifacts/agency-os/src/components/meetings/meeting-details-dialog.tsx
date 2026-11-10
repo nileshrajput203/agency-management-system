@@ -44,7 +44,7 @@ export function MeetingDetailsDialog({
         }
       }}
     >
-      <DialogContent className="max-w-md">
+      <DialogContent className="sm:max-w-lg max-w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto">
         {meeting && (
           <div className="space-y-4">
             {(() => {

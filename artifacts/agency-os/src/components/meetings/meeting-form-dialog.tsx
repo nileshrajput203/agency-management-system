@@ -148,7 +148,7 @@ export function MeetingFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-2xl max-w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {meetingType === "SHOOT" ? (
@@ -165,12 +165,13 @@ export function MeetingFormDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-1">
-          <div className="space-y-1.5">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-1 min-w-0">
+          <div className="space-y-1.5 min-w-0">
             <Label className="text-xs font-semibold">
               {meetingType === "SHOOT" ? "Shoot Title / Campaign Name *" : "Meeting Title *"}
             </Label>
             <Input
+              className="w-full"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               maxLength={meetingType === "SHOOT" ? 194 : 200}
@@ -180,10 +181,10 @@ export function MeetingFormDialog({
           </div>
 
           {canViewTeam && (
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label className="text-xs font-semibold">Schedule Type</Label>
               <Select value={meetingType} onValueChange={(value: string) => setMeetingType(value as "MEETING" | "SHOOT")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="MEETING">Meeting</SelectItem>
                   <SelectItem value="SHOOT">Photo / Video Shoot</SelectItem>
@@ -193,7 +194,7 @@ export function MeetingFormDialog({
           )}
 
           {modalMode === "EDIT" && (
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label className="text-xs font-semibold">Meeting Status</Label>
               <Select value={status} onValueChange={setStatus}>
                 <SelectTrigger className="w-full">
@@ -208,19 +209,21 @@ export function MeetingFormDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+            <div className="space-y-1.5 min-w-0">
               <Label className="text-xs font-semibold">Start Date & Time *</Label>
               <Input
+                className="w-full"
                 type="datetime-local"
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 required
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label className="text-xs font-semibold">End Date & Time *</Label>
               <Input
+                className="w-full"
                 type="datetime-local"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
@@ -229,18 +232,20 @@ export function MeetingFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+            <div className="space-y-1.5 min-w-0">
               <Label className="text-xs font-semibold">Meeting Link (Meet / Zoom)</Label>
               <Input
+                className="w-full"
                 value={meetingLink}
                 onChange={(e) => setMeetingLink(e.target.value)}
                 placeholder="https://meet.google.com/xyz-abc"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 min-w-0">
               <Label className="text-xs font-semibold">Location / Room</Label>
               <Input
+                className="w-full"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Conference Room A / Online"
@@ -300,9 +305,10 @@ export function MeetingFormDialog({
             </div>
           )}
 
-          {canViewTeam && <div className="space-y-1.5">
+          {canViewTeam && <div className="space-y-1.5 min-w-0">
             <Label className="text-xs font-semibold">Description / Agenda</Label>
             <Textarea
+              className="w-full resize-none text-xs"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Outline discussion items, goals, links..."
@@ -311,12 +317,12 @@ export function MeetingFormDialog({
           </div>}
 
           {meetingType === "SHOOT" && (
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3 min-w-0">
               <div className="flex items-center gap-2">
                 <Clapperboard className="h-4 w-4 text-primary" />
                 <h3 className="text-xs font-bold uppercase tracking-wide">Shoot brief</h3>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs font-semibold">Shoot Category *</Label>
                 <Select
                   value={shootDetails.category || "__none__"}
@@ -325,7 +331,7 @@ export function MeetingFormDialog({
                     category: value === "__none__" ? "" : value,
                   }))}
                 >
-                  <SelectTrigger><SelectValue placeholder="Choose a shoot type" /></SelectTrigger>
+                  <SelectTrigger className="w-full"><SelectValue placeholder="Choose a shoot type" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none__">Choose a shoot type</SelectItem>
                     {["Product", "Brand / Campaign", "Portrait / Fashion", "Event", "Food", "Property", "Commercial", "Social Media Video", "Podcast / Interview", "Other"].map((category) => (
@@ -337,38 +343,38 @@ export function MeetingFormDialog({
                   <p className="text-[11px] text-rose-600">Choose a category for this shoot.</p>
                 )}
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs font-semibold">Objective</Label>
-                <Textarea value={shootDetails.objective} onChange={(e) => setShootDetails((d) => ({ ...d, objective: e.target.value }))} rows={2} placeholder="What should this shoot achieve?" />
+                <Textarea className="w-full resize-none text-xs" value={shootDetails.objective} onChange={(e) => setShootDetails((d) => ({ ...d, objective: e.target.value }))} rows={2} placeholder="What should this shoot achieve?" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+                <div className="space-y-1.5 min-w-0">
                   <Label className="text-xs font-semibold">Shot List</Label>
-                  <Textarea value={shootDetails.shotList} onChange={(e) => setShootDetails((d) => ({ ...d, shotList: e.target.value }))} rows={3} placeholder="Scenes, angles, or moments to capture" />
+                  <Textarea className="w-full resize-none text-xs" value={shootDetails.shotList} onChange={(e) => setShootDetails((d) => ({ ...d, shotList: e.target.value }))} rows={3} placeholder="Scenes, angles, or moments to capture" />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 min-w-0">
                   <Label className="text-xs font-semibold">Deliverables</Label>
-                  <Textarea value={shootDetails.deliverables} onChange={(e) => setShootDetails((d) => ({ ...d, deliverables: e.target.value }))} rows={3} placeholder="Formats, quantities, aspect ratios, deadlines" />
+                  <Textarea className="w-full resize-none text-xs" value={shootDetails.deliverables} onChange={(e) => setShootDetails((d) => ({ ...d, deliverables: e.target.value }))} rows={3} placeholder="Formats, quantities, aspect ratios, deadlines" />
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+                <div className="space-y-1.5 min-w-0">
                   <Label className="text-xs font-semibold">Equipment / Props</Label>
-                  <Textarea value={shootDetails.equipment} onChange={(e) => setShootDetails((d) => ({ ...d, equipment: e.target.value }))} rows={2} placeholder="Gear, props, wardrobe, or setup" />
+                  <Textarea className="w-full resize-none text-xs" value={shootDetails.equipment} onChange={(e) => setShootDetails((d) => ({ ...d, equipment: e.target.value }))} rows={2} placeholder="Gear, props, wardrobe, or setup" />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 min-w-0">
                   <Label className="text-xs font-semibold">Reference Link</Label>
-                  <Input type="url" value={shootDetails.referenceLink} onChange={(e) => setShootDetails((d) => ({ ...d, referenceLink: e.target.value }))} placeholder="https://…" />
+                  <Input className="w-full" type="url" value={shootDetails.referenceLink} onChange={(e) => setShootDetails((d) => ({ ...d, referenceLink: e.target.value }))} placeholder="https://…" />
                 </div>
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label className="text-xs font-semibold">Special Instructions</Label>
-                <Textarea value={shootDetails.notes} onChange={(e) => setShootDetails((d) => ({ ...d, notes: e.target.value }))} rows={2} placeholder="Access details, client constraints, safety notes…" />
+                <Textarea className="w-full resize-none text-xs" value={shootDetails.notes} onChange={(e) => setShootDetails((d) => ({ ...d, notes: e.target.value }))} rows={2} placeholder="Access details, client constraints, safety notes…" />
               </div>
             </div>
           )}
 
-          {canViewTeam && <div className="space-y-1.5">
+          {canViewTeam && <div className="space-y-1.5 min-w-0">
             <div className="flex items-center justify-between">
               <Label className="text-xs font-semibold">{meetingType === "SHOOT" ? "Assigned Shoot Crew *" : "Invite Team Members"}</Label>
               <span className="text-[10px] text-muted-foreground font-medium">
