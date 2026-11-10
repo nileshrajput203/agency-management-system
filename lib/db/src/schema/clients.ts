@@ -44,6 +44,11 @@ export const clientsTable = pgTable("clients", {
   portalToken: text("portal_token"),
   gstin: text("gstin"),
   state: text("state"),
+  billingAddress: text("billing_address"),
+  city: text("city"),
+  postalCode: text("postal_code"),
+  panNumber: text("pan_number"),
+  shippingAddress: text("shipping_address"),
   
   // Audit fields
   createdAt: timestamp("created_at").defaultNow().notNull(),

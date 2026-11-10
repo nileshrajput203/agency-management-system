@@ -136,20 +136,43 @@ router.get("/", requirePermission("invoices.view"), asyncHandler(async (req, res
   return res.json(rows);
 }));
 
+const BLINK_BEYOND_DEFAULTS = {
+  businessName: "BLINK BEYOND",
+  businessPhone: "+91 95455 56009",
+  businessEmail: "support@blinkbeyond.co.in",
+  businessAddress: "Ground Floor, Shop No. 07, Ali Chamber Apt., Manor Road, Near Kotak Mahindra Bank, Palghar West",
+  businessCity: "Palghar",
+  businessState: "Maharashtra",
+  businessPostalCode: "401404",
+  companyGstin: "27ABGFB9280J1Z0",
+  businessPan: "ABGFB9280J",
+  bankDetails: "HDFC BANK LIMITED\nA/C No: 50200121903920\nIFSC: HDFC0000663\nBranch: Palghar",
+};
+
 router.post("/", requirePermission("invoices.create"), asyncHandler(async (req, res) => {
   const { id: _id, createdAt: _ts, ...body } = req.body;
   const sanitized = sanitizeInvoice(body, false);
   const isProforma = sanitized.invoiceType === "PROFORMA";
 
+  // Enforce Blink Beyond business details defaults
+  for (const [k, v] of Object.entries(BLINK_BEYOND_DEFAULTS)) {
+    if (!sanitized[k]) {
+      sanitized[k] = v;
+    }
+  }
+
   if (!sanitized.number) {
     const existing = await db.select({ number: invoicesTable.number }).from(invoicesTable);
-    const prefix = isProforma ? "PI-" : "INV-";
     const nums = existing
       .map((r) => r.number)
-      .filter((n): n is string => !!n && n.startsWith(prefix))
-      .map((n) => parseInt(n.replace(prefix, ""), 10))
+      .filter((n): n is string => !!n)
+      .map((n) => {
+        const match = n.match(/\d+/);
+        return match ? parseInt(match[0], 10) : NaN;
+      })
       .filter((n) => !isNaN(n));
-    sanitized.number = `${prefix}${nums.length > 0 ? Math.max(...nums) + 1 : 1001}`;
+    const nextVal = nums.length > 0 ? Math.max(...nums) + 1 : 3;
+    sanitized.number = isProforma ? `PI-${String(nextVal).padStart(4, "0")}` : String(nextVal).padStart(4, "0");
   }
 
   // Calculate default CGST / SGST / IGST if not explicitly provided
@@ -160,6 +183,26 @@ router.post("/", requirePermission("invoices.create"), asyncHandler(async (req, 
     } else {
       if (sanitized.cgstAmount === undefined) sanitized.cgstAmount = Number((tax / 2).toFixed(2));
       if (sanitized.sgstAmount === undefined) sanitized.sgstAmount = Number((tax / 2).toFixed(2));
+    }
+  }
+
+  // Automatically persist client billing info back to clients table
+  if (sanitized.clientId) {
+    const clientUpdates: Record<string, any> = { updatedAt: new Date() };
+    if (body.billingAddress) clientUpdates.billingAddress = body.billingAddress;
+    if (body.clientAddress && !body.billingAddress) clientUpdates.billingAddress = body.clientAddress;
+    if (body.clientCity) clientUpdates.city = body.clientCity;
+    if (body.clientPostalCode) clientUpdates.postalCode = body.clientPostalCode;
+    if (body.clientState) clientUpdates.state = body.clientState;
+    if (body.placeOfSupply && !body.clientState) clientUpdates.state = body.placeOfSupply;
+    if (body.clientGstin) clientUpdates.gstin = body.clientGstin;
+    if (body.clientPan) clientUpdates.panNumber = body.clientPan;
+    if (body.clientPhone) clientUpdates.phone = body.clientPhone;
+    if (body.clientEmail) clientUpdates.email = body.clientEmail;
+    if (body.shippingAddress) clientUpdates.shippingAddress = body.shippingAddress;
+
+    if (Object.keys(clientUpdates).length > 1) {
+      await db.update(clientsTable).set(clientUpdates).where(eq(clientsTable.id, sanitized.clientId));
     }
   }
 
@@ -361,6 +404,26 @@ router.patch("/:id", requirePermission("invoices.edit"), asyncHandler(async (req
   }
   const { id: _id, createdAt: _ts, ...body } = req.body;
   const sanitized = sanitizeInvoice(body, true);
+
+  if (sanitized.clientId) {
+    const clientUpdates: Record<string, any> = { updatedAt: new Date() };
+    if (body.billingAddress) clientUpdates.billingAddress = body.billingAddress;
+    if (body.clientAddress && !body.billingAddress) clientUpdates.billingAddress = body.clientAddress;
+    if (body.clientCity) clientUpdates.city = body.clientCity;
+    if (body.clientPostalCode) clientUpdates.postalCode = body.clientPostalCode;
+    if (body.clientState) clientUpdates.state = body.clientState;
+    if (body.placeOfSupply && !body.clientState) clientUpdates.state = body.placeOfSupply;
+    if (body.clientGstin) clientUpdates.gstin = body.clientGstin;
+    if (body.clientPan) clientUpdates.panNumber = body.clientPan;
+    if (body.clientPhone) clientUpdates.phone = body.clientPhone;
+    if (body.clientEmail) clientUpdates.email = body.clientEmail;
+    if (body.shippingAddress) clientUpdates.shippingAddress = body.shippingAddress;
+
+    if (Object.keys(clientUpdates).length > 1) {
+      await db.update(clientsTable).set(clientUpdates).where(eq(clientsTable.id, sanitized.clientId));
+    }
+  }
+
   const row = await syncParentUpdate(invoiceSyncConfig, req.params.id as string, sanitized, req.body);
   if (!row) throw createError("Not found", 404);
   return res.json(row);

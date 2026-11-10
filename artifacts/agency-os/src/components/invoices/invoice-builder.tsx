@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useAuth } from "@/App";
 import { canManageModule } from "@/lib/permissions";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
-import { useListClients, getListInvoicesQueryKey, getGetFinancialSummaryQueryKey } from "@workspace/api-client-react";
+import { useListClients, getListInvoicesQueryKey, getGetFinancialSummaryQueryKey, getListClientsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -166,9 +166,10 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
       const method = editData ? "PATCH" : "POST";
       const res = await fetch(url, { method, headers: authHeaders(true), body: JSON.stringify(payload) });
       if (!res.ok) throw new Error();
-      toast.success(editData ? "Invoice updated!" : "Invoice created!");
+      toast.success(editData ? "Invoice updated!" : "Invoice created & client profile updated!");
       qc.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
       qc.invalidateQueries({ queryKey: getGetFinancialSummaryQueryKey() });
+      qc.invalidateQueries({ queryKey: getListClientsQueryKey() });
       onBack();
     } catch { toast.error("Failed to save invoice"); }
     finally { setSaving(false); }
@@ -292,7 +293,7 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs">Invoice No *</Label>
-                <Input {...register("invoiceNumber")} placeholder="A00001 (auto if blank)" />
+                <Input {...register("invoiceNumber")} placeholder="0003 (auto if blank)" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Invoice Date *</Label>
@@ -334,76 +335,33 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
           </CardContent>
         </Card>
 
-        {/* Business Logo + Your Details */}
-        <Card>
+        {/* Fixed Issuer Details: BLINK BEYOND (Master Template Format) */}
+        <Card className="border-primary/20 bg-linear-to-r from-primary/5 via-card to-background">
           <CardContent className="p-5">
-            <SectionHead icon={<Building2 className="h-4 w-4" />} title="Your Details" />
-            <div className="flex gap-5 flex-wrap">
-              <div className="flex flex-col items-center gap-2">
-                {watched.logoUrl ? (
-                  <div className="relative w-24 h-24 rounded-lg border border-border overflow-hidden bg-muted flex items-center justify-center">
-                    <CompanyLogo logoUrl={watched.logoUrl} size={90} variant="compact" />
-                    <button
-                      type="button"
-                      className="absolute top-1 right-1 p-0.5 bg-background/80 rounded-full text-muted-foreground hover:text-destructive z-10"
-                      onClick={() => setValue("logoUrl", "")}
-                    ><XIcon className="h-3 w-3" /></button>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-lg shadow-xs">
+                  BB
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-bold text-base tracking-tight text-foreground">BLINK BEYOND</h2>
+                    <span className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      Master Template • MSME Registered
+                    </span>
                   </div>
-                ) : (
-                  <div
-                    className="w-24 h-24 rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
-                    onClick={() => logoRef.current?.click()}
-                  >
-                    {logoUploading
-                      ? <UploadCloud className="h-5 w-5 text-primary animate-bounce" />
-                      : <><ImageIcon className="h-5 w-5 text-muted-foreground" /><span className="text-xs text-muted-foreground text-center">Add Logo</span></>}
-                  </div>
-                )}
-                <span className="text-xs text-muted-foreground">1080×1080 max</span>
-                <input ref={logoRef} type="file" accept="image/*" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadFile(f, setLogoUploading, "logoUrl"); }} />
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    WEBSITE | SOCIAL MEDIA | MARKETING • Digital Marketing Agency
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Ground Floor, Shop No. 07, Ali Chamber Apt., Manor Road, Near Kotak Mahindra Bank, Palghar West, Maharashtra, 401404
+                  </p>
+                </div>
               </div>
-
-              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs">Business Name *</Label>
-                  <Input {...register("businessName")} placeholder="Your Business Name" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Phone</Label>
-                  <div className="flex gap-1.5">
-                    <span className="flex items-center px-2 text-sm bg-muted border border-border rounded-md text-muted-foreground">+91</span>
-                    <Input {...register("businessPhone")} placeholder="Phone number" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">GSTIN</Label>
-                  <Input {...register("businessGstin")} placeholder="22AAAAA0000A1Z5" className="font-mono text-xs" />
-                </div>
-                <div className="space-y-1.5 sm:col-span-2">
-                  <Label className="text-xs">Address</Label>
-                  <Input {...register("businessAddress")} placeholder="Street address" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">City</Label>
-                  <Input {...register("businessCity")} placeholder="City" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">State</Label>
-                  <Input {...register("businessState")} placeholder="State" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Postal Code</Label>
-                  <Input {...register("businessPostalCode")} placeholder="PIN Code" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Email</Label>
-                  <Input {...register("businessEmail")} type="email" placeholder="billing@yourbusiness.com" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">PAN</Label>
-                  <Input {...register("businessPan")} placeholder="AAAAA0000A" className="font-mono text-xs" />
-                </div>
+              <div className="text-right text-xs space-y-1">
+                <div className="font-mono font-semibold text-primary">GSTIN: 27ABGFB9280J1Z0</div>
+                <div className="text-muted-foreground">support@blinkbeyond.co.in • +91 95455 56009</div>
+                <div className="text-muted-foreground font-mono text-[11px]">HDFC Bank A/C: 50200121903920 • IFSC: HDFC0000663</div>
               </div>
             </div>
           </CardContent>
@@ -412,12 +370,21 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
         {/* Client Details */}
         <Card>
           <CardContent className="p-5">
-            <SectionHead icon={<User className="h-4 w-4" />} title="Client's Details" />
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
+              <div className="flex items-center gap-2">
+                <span className="text-primary"><User className="h-4 w-4" /></span>
+                <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Client Selection & Billing Details</h3>
+              </div>
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                ✨ Saved client details auto-load & auto-persist
+              </span>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5 sm:col-span-2">
                 {canViewClients ? (
                   <>
-                    <Label className="text-xs">Client *</Label>
+                    <Label className="text-xs font-semibold">Select Client *</Label>
                     <Controller control={control} name="clientId" render={({ field }) => (
                       <Select
                         value={field.value ?? ""}
@@ -435,7 +402,7 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
                             setValue("clientPan", (selected as any).panNumber || "");
 
                             const cState = ((selected as any).state || "").trim().toLowerCase();
-                            const cGstin = (selected as any).gstin || "";
+                            const cGstin = ((selected as any).gstin || "").trim();
                             const isInterstate = (!cState.includes("maharashtra") && !cState.includes("mh") && !cGstin.startsWith("27") && cState.length > 0);
                             setValue("gstType", isInterstate ? "IGST" : "CGST_SGST");
 
@@ -452,12 +419,12 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
                                 toast.success(`✨ Auto-filled ${selected.companyName} retainer (₹${ret.toLocaleString("en-IN")}) with SAC 998361!`);
                               }
                             } else {
-                              toast.success(`✨ Auto-filled ${selected.companyName} address & GSTIN!`);
+                              toast.success(`✨ Auto-filled ${selected.companyName} billing details!`);
                             }
                           }
                         }}
                       >
-                        <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                        <SelectTrigger className="font-medium text-sm h-10"><SelectValue placeholder="Choose a client from directory…" /></SelectTrigger>
                         <SelectContent>
                           {(clients ?? []).map(c => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}
                         </SelectContent>
@@ -470,98 +437,175 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
                   </p>
                 )}
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Phone</Label>
-                <div className="flex gap-1.5">
-                  <span className="flex items-center px-2 text-sm bg-muted border border-border rounded-md text-muted-foreground">+91</span>
-                  <Input {...register("clientPhone")} placeholder="Phone number" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">GSTIN</Label>
-                <Input {...register("clientGstin")} placeholder="Client GSTIN" className="font-mono text-xs" />
-              </div>
+
               <div className="space-y-1.5 sm:col-span-2">
                 <Label className="text-xs">Billing Address</Label>
-                <Input {...register("clientAddress")} placeholder="Street address" />
+                <Input {...register("clientAddress")} placeholder="Street address / Office premises" />
               </div>
+
               <div className="space-y-1.5">
                 <Label className="text-xs">City</Label>
-                <Input {...register("clientCity")} placeholder="City" />
+                <Input {...register("clientCity")} placeholder="e.g. Mumbai, Palghar, Pune" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">State</Label>
-                <Input {...register("clientState")} placeholder="State" />
+                <Label className="text-xs">State / Place of Supply</Label>
+                <Input
+                  {...register("clientState")}
+                  placeholder="Maharashtra"
+                  onChange={(e) => {
+                    const st = e.target.value.trim().toLowerCase();
+                    const gstin = (watched.clientGstin || "").trim();
+                    const isInter = (!st.includes("maharashtra") && !st.includes("mh") && !gstin.startsWith("27") && st.length > 0);
+                    setValue("gstType", isInter ? "IGST" : "CGST_SGST");
+                  }}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Postal Code (PIN)</Label>
+                <Input {...register("clientPostalCode")} placeholder="e.g. 400001" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Postal Code</Label>
-                <Input {...register("clientPostalCode")} placeholder="PIN Code" />
+                <Label className="text-xs">Client GSTIN</Label>
+                <Input
+                  {...register("clientGstin")}
+                  placeholder="27AHQPB7460C1ZE"
+                  className="font-mono text-xs"
+                  onChange={(e) => {
+                    const gstin = e.target.value.trim();
+                    const st = (watched.clientState || "").trim().toLowerCase();
+                    const isInter = (!gstin.startsWith("27") && !st.includes("maharashtra") && !st.includes("mh") && gstin.length >= 2);
+                    setValue("gstType", isInter ? "IGST" : "CGST_SGST");
+                  }}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Client Phone</Label>
+                <Input {...register("clientPhone")} placeholder="+91 Phone number" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Email</Label>
-                <Input {...register("clientEmail")} type="email" placeholder="client@company.com" />
+                <Label className="text-xs">Client Email</Label>
+                <Input {...register("clientEmail")} type="email" placeholder="billing@client.com" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">PAN</Label>
-                <Input {...register("clientPan")} placeholder="AAAAA0000A" className="font-mono text-xs" />
+                <Label className="text-xs">PAN (Optional)</Label>
+                <Input {...register("clientPan")} placeholder="Client PAN" className="font-mono text-xs" />
+              </div>
+              <div className="space-y-1.5 flex flex-col justify-end">
+                <div className="p-2.5 rounded-lg bg-muted/40 border border-border text-[11px] text-muted-foreground flex items-center justify-between">
+                  <span>Tax Mode:</span>
+                  <span className="font-semibold text-foreground">
+                    {watched.gstType === "IGST" ? "Inter-State (IGST 18%)" : "Intra-State (CGST 9% + SGST 9%)"}
+                  </span>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* Line Items */}
+        {/* Line Items: Description, HSN/SAC & Amount (Automated Tax & Totals) */}
         <Card>
           <CardContent className="p-5">
-            <SectionHead icon={<IndianRupee className="h-4 w-4" />} title="Line Items" />
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-border">
+              <div className="flex items-center gap-2">
+                <span className="text-primary"><IndianRupee className="h-4 w-4" /></span>
+                <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Line Items (Services)</h3>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                Default SAC: <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-foreground font-semibold">998361</code> • GST: <code className="font-mono bg-muted px-1.5 py-0.5 rounded text-foreground font-semibold">18%</code> (Automated)
+              </span>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 pr-2 text-xs text-muted-foreground font-semibold w-6">#</th>
-                    <th className="text-left py-2 pr-2 text-xs text-muted-foreground font-semibold">Item</th>
-                    <th className="text-left py-2 pr-2 text-xs text-muted-foreground font-semibold w-24">HSN/SAC</th>
-                    <th className="text-left py-2 pr-2 text-xs text-muted-foreground font-semibold w-20">GST %</th>
-                    <th className="text-left py-2 pr-2 text-xs text-muted-foreground font-semibold w-16">Qty</th>
-                    <th className="text-left py-2 pr-2 text-xs text-muted-foreground font-semibold w-24">Rate</th>
-                    <th className="text-right py-2 pr-2 text-xs text-muted-foreground font-semibold w-24">Amount</th>
-                    {isIGST
-                      ? <th className="text-right py-2 pr-2 text-xs text-muted-foreground font-semibold w-24">IGST</th>
-                      : <>
-                          <th className="text-right py-2 pr-2 text-xs text-muted-foreground font-semibold w-24">CGST</th>
-                          <th className="text-right py-2 pr-2 text-xs text-muted-foreground font-semibold w-24">SGST</th>
-                        </>}
-                    <th className="text-right py-2 pr-2 text-xs text-muted-foreground font-semibold w-28">Total</th>
+                  <tr className="border-b border-border text-xs text-muted-foreground font-semibold">
+                    <th className="text-left py-2 pr-2 w-8">#</th>
+                    <th className="text-left py-2 pr-2 min-w-[240px]">Description *</th>
+                    <th className="text-left py-2 pr-2 w-32">HSN / SAC *</th>
+                    <th className="text-right py-2 pr-2 w-36">Amount (₹) *</th>
+                    {isIGST ? (
+                      <th className="text-right py-2 pr-2 w-28">IGST (18%)</th>
+                    ) : (
+                      <>
+                        <th className="text-right py-2 pr-2 w-24">CGST (9%)</th>
+                        <th className="text-right py-2 pr-2 w-24">SGST (9%)</th>
+                      </>
+                    )}
+                    <th className="text-right py-2 pr-2 w-32">Total (₹)</th>
                     <th className="w-8" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {fields.map((field, idx) => {
-                    const qty = Number(watched.lineItems?.[idx]?.qty ?? 0);
-                    const rate = Number(watched.lineItems?.[idx]?.unitPrice ?? 0);
-                    const gst = Number(watched.lineItems?.[idx]?.taxPercent ?? 0);
-                    const amount = qty * rate;
-                    const taxTotal = amount * gst / 100;
-                    const half = taxTotal / 2;
+                    const it = watched.lineItems?.[idx];
+                    const amount = Number(it?.unitPrice ?? 0) * Number(it?.qty ?? 1);
+                    const gstRate = Number(it?.taxPercent ?? 18);
+                    const taxTotal = (amount * gstRate) / 100;
+                    const halfTax = taxTotal / 2;
+                    const lineTotal = amount + taxTotal;
+
                     return (
-                      <tr key={field.id} className="align-top">
-                        <td className="py-2 pr-2 text-muted-foreground text-xs pt-3">{idx + 1}</td>
-                        <td className="py-2 pr-2"><Input {...register(`lineItems.${idx}.description`)} placeholder="Item description" className="text-xs h-8 min-w-[140px]" /></td>
-                        <td className="py-2 pr-2"><Input {...register(`lineItems.${idx}.hsnSac`)} placeholder="998314" className="text-xs h-8 font-mono" /></td>
-                        <td className="py-2 pr-2"><Input {...register(`lineItems.${idx}.taxPercent`)} type="number" placeholder="18" className="text-xs h-8" /></td>
-                        <td className="py-2 pr-2"><Input {...register(`lineItems.${idx}.qty`)} type="number" placeholder="1" className="text-xs h-8" /></td>
-                        <td className="py-2 pr-2"><Input {...register(`lineItems.${idx}.unitPrice`)} type="number" placeholder="0.00" className="text-xs h-8" /></td>
-                        <td className="py-2 pr-2 text-right text-xs pt-3 font-mono">{s}{amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        {isIGST
-                          ? <td className="py-2 pr-2 text-right text-xs pt-3 font-mono text-blue-600">{s}{taxTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          : <>
-                              <td className="py-2 pr-2 text-right text-xs pt-3 font-mono text-emerald-600">{s}{half.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="py-2 pr-2 text-right text-xs pt-3 font-mono text-emerald-600">{s}{half.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            </>}
-                        <td className="py-2 pr-2 text-right text-xs pt-3 font-bold font-mono">{s}{(amount + taxTotal).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="py-2">
-                          <button type="button" className="text-muted-foreground hover:text-destructive p-1 mt-0.5" onClick={() => remove(idx)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                      <tr key={field.id} className="align-middle">
+                        <td className="py-2.5 pr-2 text-muted-foreground text-xs font-semibold">{idx + 1}</td>
+                        <td className="py-2.5 pr-2">
+                          <Input
+                            {...register(`lineItems.${idx}.description`)}
+                            placeholder="e.g. Digital Marketing & Social Media Management Services"
+                            className="text-xs h-9 min-w-[220px]"
+                          />
+                        </td>
+                        <td className="py-2.5 pr-2">
+                          <Input
+                            {...register(`lineItems.${idx}.hsnSac`)}
+                            placeholder="998361"
+                            defaultValue="998361"
+                            className="text-xs h-9 font-mono"
+                          />
+                        </td>
+                        <td className="py-2.5 pr-2">
+                          <Input
+                            type="number"
+                            step="any"
+                            placeholder="0.00"
+                            value={it?.unitPrice != null ? it.unitPrice : ""}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setValue(`lineItems.${idx}.qty`, 1);
+                              setValue(`lineItems.${idx}.unitPrice`, val);
+                              setValue(`lineItems.${idx}.taxPercent`, 18);
+                            }}
+                            className="text-xs h-9 font-mono text-right font-medium"
+                          />
+                        </td>
+                        {isIGST ? (
+                          <td className="py-2.5 pr-2 text-right text-xs font-mono text-blue-600 font-medium">
+                            {s}{taxTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        ) : (
+                          <>
+                            <td className="py-2.5 pr-2 text-right text-xs font-mono text-emerald-600 font-medium">
+                              {s}{halfTax.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="py-2.5 pr-2 text-right text-xs font-mono text-emerald-600 font-medium">
+                              {s}{halfTax.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          </>
+                        )}
+                        <td className="py-2.5 pr-2 text-right text-xs font-bold font-mono">
+                          {s}{lineTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5">
+                          {fields.length > 1 && (
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-destructive p-1 rounded transition-colors"
+                              onClick={() => remove(idx)}
+                              title="Remove item"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -569,86 +613,102 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
                 </tbody>
               </table>
             </div>
-            <Button type="button" variant="outline" size="sm" className="mt-3 gap-1 text-xs"
-              onClick={() => append({ description: "", hsnSac: "", taxPercent: 18, qty: 1, unitPrice: 0 })}>
-              <Plus className="h-3 w-3" /> Add New Line
-            </Button>
 
-            <div className="mt-5 flex justify-end">
-              <div className="w-full max-w-xs space-y-1.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount</span>
-                  <span className="font-mono">{s}{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+            <div className="mt-4 flex items-center justify-between flex-wrap gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs font-medium"
+                onClick={() =>
+                  append({
+                    description: "",
+                    hsnSac: "998361",
+                    taxPercent: 18,
+                    qty: 1,
+                    unitPrice: 0,
+                  })
+                }
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Another Service Item
+              </Button>
+
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground shrink-0">Discount (Optional):</Label>
+                <Input {...register("discount")} type="number" placeholder="0" className="w-24 text-xs h-8" />
+                <Controller
+                  control={control}
+                  name="discountType"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="FIXED">Fixed ({s})</SelectItem>
+                        <SelectItem value="PERCENT">Percent (%)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Financial Totals Breakdown matching 14_Invoice_Format.xlsx */}
+            <div className="mt-6 pt-4 border-t border-border flex justify-end">
+              <div className="w-full max-w-sm space-y-2 text-sm bg-muted/20 p-4 rounded-xl border border-border">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground">Taxable Amount (Subtotal)</span>
+                  <span className="font-mono font-medium">{s}{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
-                {isIGST
-                  ? <div className="flex justify-between text-blue-600">
-                      <span>IGST</span>
-                      <span className="font-mono">{s}{totalTax.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+
+                {isIGST ? (
+                  <div className="flex justify-between items-center text-xs text-blue-600">
+                    <span>Integrated Tax (IGST 18%)</span>
+                    <span className="font-mono font-medium">{s}{totalTax.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center text-xs text-emerald-600">
+                      <span>Central Tax (CGST 9%)</span>
+                      <span className="font-mono font-medium">{s}{(totalTax / 2).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
-                  : <>
-                      <div className="flex justify-between text-emerald-600">
-                        <span>CGST</span>
-                        <span className="font-mono">{s}{(totalTax / 2).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                      </div>
-                      <div className="flex justify-between text-emerald-600">
-                        <span>SGST</span>
-                        <span className="font-mono">{s}{(totalTax / 2).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    </>}
+                    <div className="flex justify-between items-center text-xs text-emerald-600">
+                      <span>State Tax (SGST 9%)</span>
+                      <span className="font-mono font-medium">{s}{(totalTax / 2).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </>
+                )}
+
                 {discountAmt > 0 && (
-                  <div className="flex justify-between text-destructive">
+                  <div className="flex justify-between items-center text-xs text-destructive">
                     <span>Discount</span>
-                    <span className="font-mono">- {s}{discountAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    <span className="font-mono">- {s}{discountAmt.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold border-t border-border pt-2 text-base">
-                  <span>Total ({watched.currency})</span>
-                  <span className="font-mono">{s}{grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                </div>
-                {grandTotal > 0 && (
-                  <div className="text-xs text-muted-foreground italic pt-1 border-t border-dashed border-border">
-                    {amountToWords(grandTotal, watched.currency)}
-                  </div>
-                )}
-              </div>
-            </div>
 
-            <div className="mt-4 flex items-center gap-3">
-              <Label className="text-xs shrink-0">Discount</Label>
-              <Input {...register("discount")} type="number" placeholder="0" className="w-28 text-xs h-8" />
-              <Controller control={control} name="discountType" render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="FIXED">Fixed ({s})</SelectItem>
-                    <SelectItem value="PERCENT">Percent (%)</SelectItem>
-                  </SelectContent>
-                </Select>
-              )} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bank Details */}
-        <Card>
-          <CardContent className="p-5">
-            <SectionHead icon={<Banknote className="h-4 w-4" />} title="Bank Details" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Bank Name</Label>
-                <Input {...register("bankName")} placeholder="State Bank of India" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Account Name</Label>
-                <Input {...register("bankAccountName")} placeholder="Account holder name" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Account Number</Label>
-                <Input {...register("bankAccount")} placeholder="1234567890" className="font-mono" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">IFSC Code</Label>
-                <Input {...register("bankIfsc")} placeholder="SBIN0001234" className="font-mono" />
+                {(() => {
+                  const gross = Math.round(grandTotal);
+                  const roundOff = Number((gross - grandTotal).toFixed(2));
+                  return (
+                    <>
+                      {roundOff !== 0 && (
+                        <div className="flex justify-between items-center text-xs text-muted-foreground">
+                          <span>Round Off</span>
+                          <span className="font-mono">{roundOff > 0 ? `+${roundOff}` : roundOff}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center font-bold border-t border-border pt-2 text-base">
+                        <span className="text-foreground">Gross Amount (INR)</span>
+                        <span className="font-mono text-primary text-lg">{s}{gross.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      {gross > 0 && (
+                        <div className="text-xs text-muted-foreground italic pt-2 border-t border-dashed border-border/70">
+                          <span className="font-semibold text-foreground/80 not-italic">In Words: </span>
+                          {amountToWords(gross, watched.currency)}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </CardContent>

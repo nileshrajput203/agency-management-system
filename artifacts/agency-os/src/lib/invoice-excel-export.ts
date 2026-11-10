@@ -97,241 +97,264 @@ export function buildExactInvoiceGrid(inv: InvoiceExportData): string[][] {
   const createEmptyRow = () => new Array(20).fill("");
   const grid: string[][] = [];
 
-  // Rows 1-2: empty
+  // Rows 1-2 (Index 0-1): empty
   grid.push(createEmptyRow());
   grid.push(createEmptyRow());
 
-  // Row 3: Original & Duplicate headers
+  // Row 3 (Index 2): Top Agency Header
   const r3 = createEmptyRow();
-  r3[7] = "Original for Recipient";
-  r3[17] = "Duplicate for Transporter  ";
+  r3[1] = "►►  BLINK BEYOND";
+  r3[6] = "+91 95455 56009";
+  r3[11] = "►►  BLINK BEYOND";
+  r3[16] = "+91 95455 56009";
   grid.push(r3);
 
-  // Row 4: BLINK BEYOND
+  // Row 4 (Index 3): Tagline & Email
   const r4 = createEmptyRow();
-  r4[1] = "BLINK BEYOND";
-  r4[11] = "BLINK BEYOND";
+  r4[1] = "WEBSITE  |  SOCIAL MEDIA  |  MARKETING";
+  r4[6] = "support@blinkbeyond.co.in";
+  r4[11] = "WEBSITE  |  SOCIAL MEDIA  |  MARKETING";
+  r4[16] = "support@blinkbeyond.co.in";
   grid.push(r4);
 
-  // Row 5: Digital Marketing Agency
+  // Row 5 (Index 4): HO & Website
   const r5 = createEmptyRow();
-  r5[1] = "Digital Marketing Agency";
-  r5[11] = "Digital Marketing Agency";
+  r5[1] = "HO – Palghar, Maharashtra";
+  r5[6] = "www.blinkbeyond.co.in";
+  r5[11] = "HO – Palghar, Maharashtra";
+  r5[16] = "www.blinkbeyond.co.in";
   grid.push(r5);
 
-  // Row 6: empty
-  grid.push(createEmptyRow());
+  // Row 6 (Index 5): Original & Duplicate indicators
+  const r6 = createEmptyRow();
+  r6[7] = "Original for Recipient";
+  r6[17] = "Duplicate for Supplier  ";
+  grid.push(r6);
 
-  // Row 7: Address
-  const agencyAddr = "Ground Gloor, Shop No. 07, Ali Chamber Apt., Manor Road, Kotak Mahindra Bank, Palghar West, Palghar, Palghar, Maharashtra, 401404";
+  // Row 7 (Index 6): BLINK BEYOND
   const r7 = createEmptyRow();
-  r7[1] = agencyAddr;
-  r7[11] = agencyAddr;
+  r7[1] = "BLINK BEYOND";
+  r7[11] = "BLINK BEYOND";
   grid.push(r7);
 
-  // Row 8: Agency GSTIN
+  // Row 8 (Index 7): Digital Marketing Agency
   const r8 = createEmptyRow();
-  r8[1] = "GSTIN/UIN: 27ABGFB9280J1Z0";
-  r8[11] = "GSTIN/UIN: 27ABGFB9280J1Z0";
+  r8[1] = "Digital Marketing Agency";
+  r8[11] = "Digital Marketing Agency";
   grid.push(r8);
 
-  // Row 9: Document Type
-  const r9 = createEmptyRow();
-  r9[1] = docType;
-  r9[11] = docType;
-  grid.push(r9);
-
-  // Row 10: Invoice Number
-  const r10 = createEmptyRow();
-  r10[1] = `Invoice No:- ${invNumber}`;
-  r10[11] = `Invoice No:- ${invNumber}`;
-  grid.push(r10);
-
-  // Row 11: Date
-  const r11 = createEmptyRow();
-  r11[1] = "Date:";
-  r11[2] = invDate;
-  r11[11] = "Date:";
-  r11[12] = invDate;
-  grid.push(r11);
-
-  // Row 12: Bill To & Ship To
-  const r12 = createEmptyRow();
-  r12[1] = "Bill To,";
-  r12[5] = "Ship To,";
-  r12[11] = "Bill To,";
-  r12[15] = "Ship To,";
-  grid.push(r12);
-
-  // Row 13: Client Name
-  const r13 = createEmptyRow();
-  r13[1] = clientName;
-  r13[5] = clientName;
-  r13[11] = clientName;
-  r13[15] = clientName;
-  grid.push(r13);
-
-  // Row 14: Client Address
-  const r14 = createEmptyRow();
-  r14[1] = clientAddr;
-  r14[5] = clientAddr;
-  r14[11] = clientAddr;
-  r14[15] = clientAddr;
-  grid.push(r14);
-
-  // Row 15: Place of Supply
-  const r15 = createEmptyRow();
-  r15[1] = `Place of Supply:- ${placeOfSupply}`;
-  r15[11] = `Place of Supply:- ${placeOfSupply}`;
-  grid.push(r15);
-
-  // Row 16: Client GSTIN
-  const r16 = createEmptyRow();
-  r16[1] = `GSTIN/UIN: ${clientGstin}`;
-  r16[11] = `GSTIN/UIN: ${clientGstin}`;
-  grid.push(r16);
-
-  // Row 17: empty
+  // Row 9 (Index 8): empty spacer
   grid.push(createEmptyRow());
 
-  // Row 18: Items Header
+  // Row 10 (Index 9): Address
+  const agencyAddr = "Ground Floor, Shop No. 07, Ali Chamber Apt., Manor Road, Near Kotak Mahindra Bank, Palghar West, Palghar, Maharashtra, 401404";
+  const r10 = createEmptyRow();
+  r10[1] = agencyAddr;
+  r10[11] = agencyAddr;
+  grid.push(r10);
+
+  // Row 11 (Index 10): Agency GSTIN
+  const r11 = createEmptyRow();
+  r11[1] = "GSTIN/UIN: 27ABGFB9280J1Z0";
+  r11[11] = "GSTIN/UIN: 27ABGFB9280J1Z0";
+  grid.push(r11);
+
+  // Row 12 (Index 11): Document Type
+  const r12 = createEmptyRow();
+  r12[1] = docType;
+  r12[11] = docType;
+  grid.push(r12);
+
+  // Row 13 (Index 12): Invoice Number
+  const r13 = createEmptyRow();
+  r13[1] = `Invoice No:- ${invNumber}`;
+  r13[11] = `Invoice No:- ${invNumber}`;
+  grid.push(r13);
+
+  // Row 14 (Index 13): Date
+  const r14 = createEmptyRow();
+  r14[1] = "Date:";
+  r14[2] = invDate;
+  r14[11] = "Date:";
+  r14[12] = invDate;
+  grid.push(r14);
+
+  // Row 15 (Index 14): Bill To & Ship To labels
+  const r15 = createEmptyRow();
+  r15[1] = "Bill To,";
+  r15[5] = "Ship To,";
+  r15[11] = "Bill To,";
+  r15[15] = "Ship To,";
+  grid.push(r15);
+
+  // Row 16 (Index 15): Client Name
+  const r16 = createEmptyRow();
+  r16[1] = clientName;
+  r16[5] = clientName;
+  r16[11] = clientName;
+  r16[15] = clientName;
+  grid.push(r16);
+
+  // Row 17 (Index 16): Client Address
+  const r17 = createEmptyRow();
+  r17[1] = clientAddr;
+  r17[5] = clientAddr;
+  r17[11] = clientAddr;
+  r17[15] = clientAddr;
+  grid.push(r17);
+
+  // Row 18 (Index 17): Place of Supply
   const r18 = createEmptyRow();
-  r18[2] = "Description";
-  r18[5] = "HSN/SAC";
-  r18[7] = "Tax Rate";
-  r18[8] = "Amount";
-  r18[9] = "Amount";
-  r18[12] = "Description";
-  r18[14] = "HSN/SAC";
-  r18[15] = "HSN/SAC";
-  r18[17] = "Tax Rate";
-  r18[18] = "Amount";
-  r18[19] = "Amount";
+  r18[1] = `Place of Supply:- ${placeOfSupply}`;
+  r18[11] = `Place of Supply:- ${placeOfSupply}`;
   grid.push(r18);
 
-  // Items rows
-  items.forEach((item, idx) => {
+  // Row 19 (Index 18): Client GSTIN
+  const r19 = createEmptyRow();
+  r19[1] = `GSTIN/UIN: ${clientGstin}`;
+  r19[11] = `GSTIN/UIN: ${clientGstin}`;
+  grid.push(r19);
+
+  // Row 20 (Index 19): empty spacer
+  grid.push(createEmptyRow());
+
+  // Row 21 (Index 20): Items Header
+  const r21 = createEmptyRow();
+  r21[1] = "S.No";
+  r21[2] = "Description";
+  r21[5] = "HSN/SAC";
+  r21[7] = "Tax Rate";
+  r21[8] = "Amount";
+  r21[9] = "Amount";
+  r21[11] = "S.No";
+  r21[12] = "Description";
+  r21[14] = "HSN/SAC";
+  r21[15] = "HSN/SAC";
+  r21[17] = "Tax Rate";
+  r21[18] = "Amount";
+  r21[19] = "Amount";
+  grid.push(r21);
+
+  // Rows 22..39 (Index 21..38 = 18 item slots)
+  for (let i = 0; i < 18; i++) {
     const rItem = createEmptyRow();
-    const itAmt = Number(item.qty || 1) * Number(item.unitPrice || 0);
-    const sac = item.hsnSac || "998361";
-    const rate = String(item.taxPercent || 18);
-    const desc = item.description || "";
+    if (i < items.length) {
+      const item = items[i];
+      const itAmt = Number(item.amount != null ? item.amount : Number(item.qty || 1) * Number(item.unitPrice || 0));
+      const sac = item.hsnSac || "998361";
+      const rate = String(item.taxPercent || 18);
+      const desc = item.description || "";
 
-    rItem[1] = String(idx + 1);
-    rItem[2] = desc;
-    rItem[5] = sac;
-    rItem[7] = rate;
-    rItem[8] = String(itAmt);
-    rItem[9] = String(itAmt);
+      rItem[1] = String(i + 1);
+      rItem[2] = desc;
+      rItem[5] = sac;
+      rItem[7] = rate;
+      rItem[8] = String(itAmt);
+      rItem[9] = String(itAmt);
 
-    rItem[11] = String(idx + 1);
-    rItem[12] = desc;
-    rItem[14] = sac;
-    rItem[15] = sac;
-    rItem[17] = rate;
-    rItem[18] = String(itAmt);
-    rItem[19] = String(itAmt);
-
+      rItem[11] = String(i + 1);
+      rItem[12] = desc;
+      rItem[14] = sac;
+      rItem[15] = sac;
+      rItem[17] = rate;
+      rItem[18] = String(itAmt);
+      rItem[19] = String(itAmt);
+    }
     grid.push(rItem);
-  });
+  }
 
-  // Empty filler rows (matching template height)
-  const totalItemRows = items.length;
-  const fillerCount = Math.max(1, 19 - totalItemRows);
-  for (let i = 0; i < fillerCount; i++) {
+  // Row 40 (Index 39): empty spacer
+  grid.push(createEmptyRow());
+
+  // Row 41 (Index 40): Bank Details & Taxable
+  const r41 = createEmptyRow();
+  r41[2] = "Bank Details";
+  r41[7] = "Taxable";
+  r41[9] = String(subtotal);
+  r41[12] = "Bank Details";
+  r41[17] = "Taxable";
+  r41[19] = String(subtotal);
+  grid.push(r41);
+
+  // Row 42 (Index 41): Banking Name & CGST
+  const r42 = createEmptyRow();
+  r42[1] = "Bank Name: HDFC BANK LIMITED";
+  r42[7] = "CGST";
+  r42[9] = cgst;
+  r42[11] = "Bank Name: HDFC BANK LIMITED";
+  r42[17] = "CGST";
+  r42[19] = cgst;
+  grid.push(r42);
+
+  // Row 43 (Index 42): Account No & SGST
+  const r43 = createEmptyRow();
+  r43[1] = "Account No:- 50200121903920";
+  r43[7] = "SGST";
+  r43[9] = sgst;
+  r43[11] = "Account No:- 50200121903920";
+  r43[17] = "SGST";
+  r43[19] = sgst;
+  grid.push(r43);
+
+  // Row 44 (Index 43): IFSC Code & IGST
+  const r44 = createEmptyRow();
+  r44[1] = "IFSC Code:- HDFC0000663";
+  r44[7] = "IGST";
+  r44[9] = igst;
+  r44[11] = "IFSC Code:- HDFC0000663";
+  r44[17] = "IGST";
+  r44[19] = igst;
+  grid.push(r44);
+
+  // Row 45 (Index 44): Round Off
+  const r45 = createEmptyRow();
+  r45[7] = "Round Off.";
+  r45[9] = String(roundOff);
+  r45[17] = "Round Off.";
+  r45[19] = String(roundOff);
+  grid.push(r45);
+
+  // Row 46 (Index 45): Gross Amount
+  const r46 = createEmptyRow();
+  r46[7] = "Gross Amount";
+  r46[9] = String(grossAmount);
+  r46[17] = "Gross Amount";
+  r46[19] = String(grossAmount);
+  grid.push(r46);
+
+  // Row 47 (Index 46): Amount in Words
+  const r47 = createEmptyRow();
+  r47[1] = "Amount in Words:-";
+  r47[3] = words;
+  r47[11] = "Amount in Words:-";
+  r47[13] = words;
+  grid.push(r47);
+
+  // Rows 48..51: 4 empty spacer rows
+  for (let i = 0; i < 4; i++) {
     grid.push(createEmptyRow());
   }
 
-  // Bank Details & Taxable
-  const rBank = createEmptyRow();
-  rBank[2] = "Bank Details";
-  rBank[7] = "Taxable";
-  rBank[9] = String(subtotal);
-  rBank[12] = "Bank Details";
-  rBank[17] = "Taxable";
-  rBank[19] = String(subtotal);
-  grid.push(rBank);
-
-  // Banking Name & CGST
-  const rCgst = createEmptyRow();
-  rCgst[1] = "Banking Name: HDFC BANK LIMITED";
-  rCgst[7] = "CGST";
-  rCgst[9] = cgst;
-  rCgst[11] = "Banking Name: HDFC BANK LIMITED";
-  rCgst[17] = "CGST";
-  rCgst[19] = cgst;
-  grid.push(rCgst);
-
-  // Account No & SGST
-  const rSgst = createEmptyRow();
-  rSgst[1] = "Account No:- 50200121903920";
-  rSgst[7] = "SGST";
-  rSgst[9] = sgst;
-  rSgst[11] = "Account No:- 50200121903920";
-  rSgst[17] = "SGST";
-  rSgst[19] = sgst;
-  grid.push(rSgst);
-
-  // IFSC Code & IGST
-  const rIgst = createEmptyRow();
-  rIgst[1] = "IFSC Code:- HDFC0000663";
-  rIgst[7] = "IGST";
-  rIgst[9] = igst;
-  rIgst[11] = "IFSC Code:- HDFC0000663";
-  rIgst[17] = "IGST";
-  rIgst[19] = igst;
-  grid.push(rIgst);
-
-  // Round Off
-  const rRound = createEmptyRow();
-  rRound[7] = "Round Off.";
-  rRound[9] = String(roundOff);
-  rRound[17] = "Round Off.";
-  rRound[19] = String(roundOff);
-  grid.push(rRound);
-
-  // Gross Amount
-  const rGross = createEmptyRow();
-  rGross[7] = "Gross Amount";
-  rGross[9] = String(grossAmount);
-  rGross[17] = "Gross Amount";
-  rGross[19] = String(grossAmount);
-  grid.push(rGross);
-
-  // Amount in Words
-  const rWords = createEmptyRow();
-  rWords[1] = "Amount in Words:-";
-  rWords[3] = words;
-  rWords[11] = "Amount in Words:-";
-  rWords[13] = words;
-  grid.push(rWords);
-
-  // 6 empty spacer rows
-  for (let i = 0; i < 6; i++) {
-    grid.push(createEmptyRow());
-  }
-
-  // Thank you for choosing us
+  // Row 52: Thank you for choosing us
   const rThank = createEmptyRow();
   rThank[1] = "Thank you for choosing us.";
   rThank[11] = "Thank you for choosing us.";
   grid.push(rThank);
 
-  // 1 empty row
-  grid.push(createEmptyRow());
-
-  // Authorised Signatory
+  // Row 53: Authorised Signatory
   const rSign = createEmptyRow();
   rSign[5] = "Authorised Signatory";
   rSign[15] = "Authorised Signatory";
   grid.push(rSign);
 
-  // Declaration
+  // Row 54: Declaration
   const declaration = "We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.";
   const rDecl = createEmptyRow();
   rDecl[1] = declaration;
   rDecl[11] = declaration;
   grid.push(rDecl);
+
+  return grid;
 
   return grid;
 }
@@ -431,40 +454,40 @@ export async function populateExactTemplate(inv: InvoiceExportData): Promise<Exc
   const roundOff = Number((grossAmount - (subtotal + taxAmount)).toFixed(2));
   const words = amountToWords(grossAmount, "INR");
 
-  // Invoice Number
-  ws.getCell("B10").value = `Invoice No:- ${invNumber}`;
-  ws.getCell("L10").value = { formula: "B10", result: `Invoice No:- ${invNumber}` };
+  // Invoice Number (Row 13 in master template)
+  ws.getCell("B13").value = `Invoice No:- ${invNumber}`;
+  ws.getCell("L13").value = { formula: "B13", result: `Invoice No:- ${invNumber}` };
 
-  // Date
-  ws.getCell("C11").value = invDate;
-  ws.getCell("M11").value = invDate;
+  // Date (Row 14)
+  ws.getCell("C14").value = invDate;
+  ws.getCell("M14").value = { formula: "C14", result: invDate };
 
-  // Bill To / Ship To
-  ws.getCell("B13").value = clientName;
-  ws.getCell("L13").value = { formula: "B13", result: clientName };
-  ws.getCell("F13").value = { formula: "B13", result: clientName };
-  ws.getCell("P13").value = { formula: "L13", result: clientName };
+  // Bill To / Ship To (Rows 16 & 17)
+  ws.getCell("B16").value = clientName;
+  ws.getCell("F16").value = { formula: "B16", result: clientName };
+  ws.getCell("L16").value = { formula: "B16", result: clientName };
+  ws.getCell("P16").value = { formula: "L16", result: clientName };
 
-  ws.getCell("B14").value = clientAddr;
-  ws.getCell("L14").value = { formula: "B14", result: clientAddr };
-  ws.getCell("F14").value = { formula: "B14", result: clientAddr };
-  ws.getCell("P14").value = { formula: "L14", result: clientAddr };
+  ws.getCell("B17").value = clientAddr;
+  ws.getCell("F17").value = { formula: "B17", result: clientAddr };
+  ws.getCell("L17").value = { formula: "B17", result: clientAddr };
+  ws.getCell("P17").value = { formula: "L17", result: clientAddr };
 
-  // Place of Supply & GSTIN
-  ws.getCell("B15").value = `Place of Supply:- ${placeOfSupply}`;
-  ws.getCell("L15").value = { formula: "B15", result: `Place of Supply:- ${placeOfSupply}` };
+  // Place of Supply (Row 18) & GSTIN (Row 19)
+  ws.getCell("B18").value = `Place of Supply:- ${placeOfSupply}`;
+  ws.getCell("L18").value = { formula: "B18", result: `Place of Supply:- ${placeOfSupply}` };
 
-  ws.getCell("B16").value = `GSTIN/UIN: ${clientGstin}`;
-  ws.getCell("L16").value = { formula: "B16", result: `GSTIN/UIN: ${clientGstin}` };
+  ws.getCell("B19").value = `GSTIN/UIN: ${clientGstin}`;
+  ws.getCell("L19").value = { formula: "B19", result: `GSTIN/UIN: ${clientGstin}` };
 
-  // Items table (Rows 19 to 36 = 18 available slots)
+  // Items table (Rows 22 to 39 = 18 available slots)
   for (let i = 0; i < 18; i++) {
-    const rowNum = 19 + i;
+    const rowNum = 22 + i;
     if (i < items.length) {
       const it = items[i];
       const itAmt = Number(it.amount != null ? it.amount : Number(it.qty || 1) * Number(it.unitPrice || 0));
-      const itTax = it.taxPercent != null ? it.taxPercent : taxRate;
-      const itHsn = it.hsnSac || "998361";
+      const itTax = it.taxPercent != null ? Number(it.taxPercent) : Number(taxRate);
+      const itHsn = it.hsnSac ? (isNaN(Number(it.hsnSac)) ? it.hsnSac : Number(it.hsnSac)) : 998361;
       const itDesc = it.description || "";
 
       ws.getCell(`B${rowNum}`).value = i + 1;
@@ -493,39 +516,52 @@ export async function populateExactTemplate(inv: InvoiceExportData): Promise<Exc
     }
   }
 
-  // Taxable
-  ws.getCell("J38").value = { formula: "SUM(I19:J36)", result: subtotal };
-  ws.getCell("T38").value = { formula: "SUM(S19:T36)", result: subtotal };
+  // Intra-state / Inter-state flag in cell W3
+  ws.getCell("W3").value = {
+    formula: 'IF(ISNUMBER(SEARCH("Maharashtra",$B$18)),1,0)',
+    result: isIGST ? 0 : 1,
+  };
 
-  // Taxes
+  // Row 41: Taxable Amount
+  ws.getCell("J41").value = { formula: "SUM(I22:J39)", result: subtotal };
+  ws.getCell("T41").value = { formula: "J41", result: subtotal };
+
+  // Rows 42..44: CGST, SGST, IGST
   if (isIGST) {
-    ws.getCell("J39").value = 0;
-    ws.getCell("T39").value = { formula: "J39", result: 0 };
-    ws.getCell("J40").value = 0;
-    ws.getCell("T40").value = { formula: "J40", result: 0 };
-    ws.getCell("J41").value = { formula: "J38*18%", result: taxAmount };
-    ws.getCell("T41").value = { formula: "J41", result: taxAmount };
-    ws.getCell("J43").value = { formula: "J38+J41+J42", result: grossAmount };
-    ws.getCell("T43").value = { formula: "J43", result: grossAmount };
+    ws.getCell("J42").value = { formula: "IF($W$3=1,ROUND($W$13/2,2),0)", result: 0 };
+    ws.getCell("T42").value = { formula: "J42", result: 0 };
+    ws.getCell("J43").value = { formula: "J42", result: 0 };
+    ws.getCell("T43").value = { formula: "J43", result: 0 };
+    ws.getCell("J44").value = { formula: "IF($W$3=1,0,ROUND($W$13,2))", result: taxAmount };
+    ws.getCell("T44").value = { formula: "J44", result: taxAmount };
   } else {
-    const halfTax = taxAmount / 2;
-    ws.getCell("J39").value = { formula: "J38*9%", result: halfTax };
-    ws.getCell("T39").value = { formula: "J39", result: halfTax };
-    ws.getCell("J40").value = { formula: "J39", result: halfTax };
-    ws.getCell("T40").value = { formula: "J40", result: halfTax };
-    ws.getCell("J41").value = null;
-    ws.getCell("T41").value = null;
-    ws.getCell("J43").value = { formula: "J38+J39+J40+J42", result: grossAmount };
-    ws.getCell("T43").value = { formula: "J43", result: grossAmount };
+    const halfTax = Number((taxAmount / 2).toFixed(2));
+    ws.getCell("J42").value = { formula: "IF($W$3=1,ROUND($W$13/2,2),0)", result: halfTax };
+    ws.getCell("T42").value = { formula: "J42", result: halfTax };
+    ws.getCell("J43").value = { formula: "J42", result: halfTax };
+    ws.getCell("T43").value = { formula: "J43", result: halfTax };
+    ws.getCell("J44").value = { formula: "IF($W$3=1,0,ROUND($W$13,2))", result: 0 };
+    ws.getCell("T44").value = { formula: "J44", result: 0 };
   }
 
-  // Round off
-  ws.getCell("J42").value = roundOff;
-  ws.getCell("T42").value = { formula: "J42", result: roundOff };
+  // Row 45: Round Off
+  ws.getCell("J45").value = roundOff;
+  ws.getCell("T45").value = { formula: "J45", result: roundOff };
 
-  // Amount in Words
-  ws.getCell("D44").value = words;
-  ws.getCell("N44").value = words;
+  // Row 46: Gross Amount
+  ws.getCell("J46").value = { formula: "J41+J42+J43+J44+J45", result: grossAmount };
+  ws.getCell("T46").value = { formula: "J46", result: grossAmount };
+
+  // Row 47: Amount in Words
+  const currentD47Formula = (ws.getCell("D47").value as any)?.formula;
+  if (currentD47Formula) {
+    ws.getCell("D47").value = { formula: currentD47Formula, result: words };
+  } else {
+    ws.getCell("D47").value = words;
+  }
+  ws.getCell("N47").value = { formula: "D47", result: words };
+
+  return wb;
 
   return wb;
 }
