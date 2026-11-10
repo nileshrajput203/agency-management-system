@@ -17,7 +17,7 @@ import {
   IndianRupee, Building2, User, FileText, Banknote, Download, Sheet, Sparkles,
 } from "lucide-react";
 import { openPrintWindow, buildInvoiceHtml, type InvoiceData } from "@/lib/pdf-print";
-import { exportInvoiceToExcel, exportInvoiceToCsv } from "@/lib/invoice-excel-export";
+import { exportInvoiceToExcel, exportInvoiceToCsv, exportInvoiceToPdf } from "@/lib/invoice-excel-export";
 import { CompanyLogo } from "@/components/common/CompanyLogo";
 import {
   sym, amountToWords, authHeaders, LineItem, BuilderForm,
@@ -265,8 +265,8 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
             variant="outline"
             size="sm"
             className="gap-1.5 text-xs text-indigo-700 dark:text-indigo-400 border-indigo-500/30 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
-            title="Download / Print Master Invoice PDF"
-            onClick={() => {
+            title="Download Master Invoice PDF"
+            onClick={async () => {
               const activeClient = (clients ?? []).find(c => c.id === watched.clientId);
               const fullData: any = {
                 ...watched,
@@ -283,7 +283,13 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
                 taxAmount: totalTax,
                 total: grandTotal,
               };
-              openPrintWindow(buildInvoiceHtml(fullData), `Invoice-${watched.invoiceNumber || (editData as any)?.number || "draft"}`);
+              try {
+                toast.info("Generating PDF Invoice...");
+                await exportInvoiceToPdf(fullData);
+                toast.success("Downloaded Master Invoice PDF (.pdf)!");
+              } catch (err: any) {
+                toast.error(err?.message || "Failed to download PDF invoice");
+              }
             }}
           >
             <Download className="h-3.5 w-3.5" /> PDF

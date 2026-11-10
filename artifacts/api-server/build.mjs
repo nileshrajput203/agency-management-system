@@ -123,10 +123,21 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   });
 
   const indexPath = path.resolve(distDir, "index.mjs");
-  const { readFile, writeFile } = await import("node:fs/promises");
+  const { readFile, writeFile, cp } = await import("node:fs/promises");
+  const fs = await import("node:fs");
   let code = await readFile(indexPath, "utf8");
   code = code.replace(/const outputDir = [^;]+;/g, "const outputDir = __dirname;");
   await writeFile(indexPath, code, "utf8");
+
+  // Copy helper scripts and templates to dist
+  const pySrc = path.resolve(artifactDir, "src/lib/generate_pdf.py");
+  if (fs.existsSync(pySrc)) {
+    await cp(pySrc, path.resolve(distDir, "generate_pdf.py"));
+  }
+  const templatesSrc = path.resolve(artifactDir, "templates");
+  if (fs.existsSync(templatesSrc)) {
+    await cp(templatesSrc, path.resolve(distDir, "templates"), { recursive: true });
+  }
 }
 
 buildAll().catch((err) => {

@@ -15,6 +15,7 @@ import { syncParentInsert, syncParentUpdate } from "../lib/dbSync";
 import { sanitizeAndValidate, validateLineItems, isValidUUID } from "../lib/validation";
 import { requirePermission } from "../middleware/auth";
 import { generateInvoiceMasterExcel } from "../lib/invoiceMasterExcel";
+import { generateInvoiceMasterPdf } from "../lib/invoiceMasterPdf";
 
 const router = Router();
 
@@ -636,6 +637,78 @@ router.get("/:id/excel", requirePermission("invoices.view"), asyncHandler(async 
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.setHeader("Content-Length", excelBuffer.length);
   return res.send(excelBuffer);
+}));
+
+// POST /api/invoices/export-pdf
+router.post("/export-pdf", requirePermission("invoices.view"), asyncHandler(async (req, res) => {
+  const inv = req.body;
+  if (!inv) throw createError("Missing invoice data", 400);
+
+  const pdfBuffer = await generateInvoiceMasterPdf(inv);
+  const invNumber = inv.number || inv.invoiceNumber || "0003";
+  const clientName = (inv.clientName || "Client").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const filename = `Invoice_${invNumber}_${clientName}.pdf`;
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Content-Length", pdfBuffer.length);
+  return res.send(pdfBuffer);
+}));
+
+// GET /api/invoices/:id/pdf
+router.get("/:id/pdf", requirePermission("invoices.view"), asyncHandler(async (req, res) => {
+  const invoiceId = req.params.id as string;
+  if (!isValidUUID(invoiceId)) throw createError("Invalid invoice ID format", 400);
+
+  const [row] = await db
+    .select({
+      id: invoicesTable.id,
+      number: invoicesTable.number,
+      invoiceType: invoicesTable.invoiceType,
+      clientId: invoicesTable.clientId,
+      clientName: clientsTable.companyName,
+      status: invoicesTable.status,
+      paymentStatus: invoicesTable.paymentStatus,
+      invoiceDate: invoicesTable.invoiceDate,
+      dueDate: invoicesTable.dueDate,
+      currency: invoicesTable.currency,
+      subtotal: invoicesTable.subtotal,
+      taxAmount: invoicesTable.taxAmount,
+      cgstAmount: invoicesTable.cgstAmount,
+      sgstAmount: invoicesTable.sgstAmount,
+      igstAmount: invoicesTable.igstAmount,
+      discount: invoicesTable.discount,
+      total: invoicesTable.total,
+      lineItems: invoicesTable.lineItems,
+      notes: invoicesTable.notes,
+      termsAndConditions: invoicesTable.termsAndConditions,
+      companyGstin: invoicesTable.companyGstin,
+      clientGstin: sql<string>`COALESCE(${invoicesTable.clientGstin}, ${clientsTable.gstin})`,
+      billingAddress: sql<string>`COALESCE(${invoicesTable.billingAddress}, ${clientsTable.billingAddress})`,
+      shippingAddress: invoicesTable.shippingAddress,
+      clientPhone: sql<string>`COALESCE(${invoicesTable.clientPhone}, ${clientsTable.phone})`,
+      clientEmail: sql<string>`COALESCE(${invoicesTable.clientEmail}, ${clientsTable.email})`,
+      clientPan: sql<string>`COALESCE(${invoicesTable.clientPan}, ${clientsTable.panNumber})`,
+      clientCity: sql<string>`COALESCE(${invoicesTable.clientCity}, ${clientsTable.city})`,
+      clientPostalCode: sql<string>`COALESCE(${invoicesTable.clientPostalCode}, ${clientsTable.postalCode})`,
+      clientState: sql<string>`COALESCE(${invoicesTable.clientState}, ${clientsTable.state})`,
+      gstType: invoicesTable.gstType,
+    })
+    .from(invoicesTable)
+    .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+    .where(and(eq(invoicesTable.id, invoiceId), isNull(invoicesTable.deletedAt)));
+
+  if (!row) throw createError("Invoice not found", 404);
+
+  const pdfBuffer = await generateInvoiceMasterPdf(row);
+  const invNumber = row.number || "0003";
+  const clientName = (row.clientName || "Client").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const filename = `Invoice_${invNumber}_${clientName}.pdf`;
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.setHeader("Content-Length", pdfBuffer.length);
+  return res.send(pdfBuffer);
 }));
 
 export default router;

@@ -585,10 +585,13 @@ export function buildInvoiceHtml(inv: InvoiceData): string {
           <strong>Amount in Words:-</strong> ${esc(words)}
         </div>
 
+        <div class="stamp-box">
+          <img src="${INVOICE_STAMP_BASE64}" class="stamp-img" alt="Certified Seal" />
+        </div>
+
         <div class="footer-box">
           <div class="thankyou-text">Thank you for choosing us.</div>
-          <div class="stamp-container">
-            <img src="${INVOICE_STAMP_BASE64}" class="stamp-img" alt="Certified Seal" />
+          <div class="sig-container">
             <div class="sig-line"></div>
             <div class="sig-label">Authorized Signatory</div>
           </div>
@@ -822,30 +825,35 @@ export function buildInvoiceHtml(inv: InvoiceData): string {
       background: #fbfbfd;
       min-height: 14px;
     }
+    .stamp-box {
+      text-align: center;
+      margin-top: auto;
+      padding-top: 10px;
+      margin-bottom: 5px;
+    }
+    .stamp-img {
+      height: 64px;
+      width: 64px;
+      object-fit: contain;
+      display: inline-block;
+    }
     .footer-box {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
-      padding: 3px 4px 1px 4px;
-      margin-top: auto;
+      padding: 3px 6px 1px 6px;
     }
     .thankyou-text {
       font-family: Georgia, serif;
       font-style: italic;
-      font-size: 7pt;
+      font-size: 7.5pt;
       font-weight: bold;
       color: #1a1a54;
+      padding-bottom: 2px;
     }
-    .stamp-container {
+    .sig-container {
       text-align: center;
       width: 120px;
-    }
-    .stamp-img {
-      height: 38px;
-      width: 38px;
-      object-fit: contain;
-      display: inline-block;
-      margin-bottom: 1px;
     }
     .sig-line {
       border-top: 1px solid #1a1a54;
@@ -853,7 +861,7 @@ export function buildInvoiceHtml(inv: InvoiceData): string {
       width: 100%;
     }
     .sig-label {
-      font-size: 6pt;
+      font-size: 6.2pt;
       font-weight: 800;
       color: #1a1a54;
     }

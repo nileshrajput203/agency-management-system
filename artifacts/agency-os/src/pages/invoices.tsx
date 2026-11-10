@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { Plus, Trash2, Receipt, Download, RefreshCw, Clock, CheckCircle, AlertTriangle, ArrowRight, FileCheck, Landmark, Sheet } from "lucide-react";
 import { format } from "date-fns";
 import { openPrintWindow, buildInvoiceHtml, type InvoiceData } from "@/lib/pdf-print";
-import { exportInvoiceToExcel, exportInvoiceToCsv } from "@/lib/invoice-excel-export";
+import { exportInvoiceToExcel, exportInvoiceToCsv, exportInvoiceToPdf } from "@/lib/invoice-excel-export";
 import { InvoiceBuilder } from "@/components/invoices/invoice-builder";
 import { STATUS_CONFIG, sym, authHeaders } from "@/components/invoices/invoice-helpers";
 
@@ -450,13 +450,16 @@ export default function InvoicesPage() {
                           <Sheet className="h-3.5 w-3.5" />
                         </Button>
                         <Button
-                          size="icon" variant="ghost" className="h-7 w-7"
-                          title="Download PDF"
-                          onClick={() => {
-                            openPrintWindow(
-                              buildInvoiceHtml(inv as unknown as InvoiceData),
-                              `Invoice-${inv.number ?? "draft"}`
-                            );
+                          size="icon" variant="ghost" className="h-7 w-7 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+                          title="Download Master PDF (.pdf)"
+                          onClick={async () => {
+                            try {
+                              toast.info("Generating PDF Invoice...");
+                              await exportInvoiceToPdf(inv as any);
+                              toast.success("PDF Invoice downloaded!");
+                            } catch (err: any) {
+                              toast.error(err?.message || "Failed to download PDF invoice");
+                            }
                           }}
                         >
                           <Download className="h-3.5 w-3.5" />
