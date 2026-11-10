@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/App";
 import { canManageModule } from "@/lib/permissions";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
@@ -219,7 +219,7 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
             size="sm"
             className="gap-1.5 text-xs text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
             onClick={() => {
-              const activeClient = (clients ?? []).find(c => c.id === watched.clientId);
+              const activeClient: any = (clients ?? []).find(c => c.id === watched.clientId);
               exportInvoiceToExcel({
                 ...watched,
                 number: watched.invoiceNumber || (editData as any)?.number || undefined,
@@ -246,7 +246,7 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
             size="sm"
             className="gap-1.5 text-xs text-blue-700 dark:text-blue-400 border-blue-500/30 hover:bg-blue-50 dark:hover:bg-blue-950/30"
             onClick={() => {
-              const activeClient = (clients ?? []).find(c => c.id === watched.clientId);
+              const activeClient: any = (clients ?? []).find(c => c.id === watched.clientId);
               exportInvoiceToCsv({
                 ...watched,
                 number: watched.invoiceNumber || (editData as any)?.number || undefined,
@@ -267,7 +267,7 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
             className="gap-1.5 text-xs text-indigo-700 dark:text-indigo-400 border-indigo-500/30 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
             title="Download Master Invoice PDF"
             onClick={async () => {
-              const activeClient = (clients ?? []).find(c => c.id === watched.clientId);
+              const activeClient: any = (clients ?? []).find(c => c.id === watched.clientId);
               const fullData: any = {
                 ...watched,
                 number: watched.invoiceNumber || (editData as any)?.number || "0003",

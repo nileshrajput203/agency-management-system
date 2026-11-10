@@ -83,15 +83,16 @@ router.get("/", requirePermission("clients.view"), asyncHandler(async (req, res)
   const userAllowedModules = (req as any).userAllowedModules ?? [];
   const userViewAllClients = (req as any).userViewAllClients;
   const role = (req as any).userSystemRole || (req as any).userRole;
+  const configuredModules = (req as any).userConfiguredModules ?? [];
   const isManager = isManagerRole(role) || Boolean((req as any).userIsDelegatedAdmin);
   const hasClientModuleAccess = canManageClientSection(req) || isManager;
   const hasFinanceModuleAccess =
-    canManageModuleSection(role, "finance", req.userConfiguredModules) ||
-    hasConfiguredModule(req.userConfiguredModules, "invoices") ||
-    hasConfiguredModule(req.userConfiguredModules, "quotations") ||
-    hasConfiguredModule(req.userConfiguredModules, "purchaseOrders") ||
-    hasConfiguredModule(req.userConfiguredModules, "purchase_orders") ||
-    hasConfiguredModule(req.userConfiguredModules, "finance");
+    canManageModuleSection(role, "finance", configuredModules) ||
+    hasConfiguredModule(configuredModules, "invoices") ||
+    hasConfiguredModule(configuredModules, "quotations") ||
+    hasConfiguredModule(configuredModules, "purchaseOrders") ||
+    hasConfiguredModule(configuredModules, "purchase_orders") ||
+    hasConfiguredModule(configuredModules, "finance");
   const canViewAllClients = hasClientModuleAccess || hasFinanceModuleAccess || Boolean(userViewAllClients) || isManager;
 
   const conditions = [];
