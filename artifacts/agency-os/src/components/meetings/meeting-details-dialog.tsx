@@ -4,7 +4,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Video, Copy, MapPin, Building2, FolderKanban, User, Edit3,
+  Video, Copy, MapPin, Building2, FolderKanban, User, Edit3, Check, Camera,
 } from "lucide-react";
 import {
   getMeetingDisplayTitle,
@@ -13,6 +13,7 @@ import {
   formatTimeOnly,
   isShootMeeting,
   parseMeetingDescription,
+  parseEquipmentString,
 } from "./meeting-helpers";
 
 interface MeetingDetailsDialogProps {
@@ -82,12 +83,48 @@ export function MeetingDetailsDialog({
                     ["Deliverables", shootDetails.deliverables],
                     ["Equipment / Props", shootDetails.equipment],
                     ["Special instructions", shootDetails.notes],
-                  ].filter(([, value]) => value).map(([label, value]) => (
-                    <div key={label} className="space-y-0.5">
-                      <span className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</span>
-                      <p className="whitespace-pre-wrap leading-relaxed">{value}</p>
-                    </div>
-                  ))}
+                  ].filter(([, value]) => value).map(([label, value]) => {
+                    if (label === "Equipment / Props") {
+                      const { selectedItems, customItems, notes } = parseEquipmentString(value);
+                      const allGear = [...selectedItems, ...customItems];
+                      if (allGear.length > 0) {
+                        return (
+                          <div key={label} className="space-y-1.5 pt-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-semibold uppercase text-violet-800 dark:text-violet-300 flex items-center gap-1">
+                                <Camera className="h-3 w-3" /> Equipment Checklist
+                              </span>
+                              <Badge variant="outline" className="text-[10px] bg-violet-100/50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                                {allGear.length} packed
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-2 bg-background/80 rounded-md border border-violet-200/60 dark:border-violet-900/50">
+                              {allGear.map((item) => (
+                                <div key={item} className="flex items-center gap-1.5 text-xs text-foreground/90">
+                                  <div className="h-3.5 w-3.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                    <Check className="h-2.5 w-2.5 stroke-[3]" />
+                                  </div>
+                                  <span className="truncate">{item}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {notes && (
+                              <p className="text-[11px] text-muted-foreground italic pl-1">
+                                Notes: {notes}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      }
+                    }
+
+                    return (
+                      <div key={label} className="space-y-0.5">
+                        <span className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</span>
+                        <p className="whitespace-pre-wrap leading-relaxed">{value}</p>
+                      </div>
+                    );
+                  })}
                   {shootDetails.referenceLink && (
                     <a
                       href={shootDetails.referenceLink}

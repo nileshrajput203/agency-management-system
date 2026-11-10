@@ -10,9 +10,17 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { CalendarDays, Clapperboard } from "lucide-react";
+import { CalendarDays, Clapperboard, Camera, Check, Plus, Trash2, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isShootMeeting, MeetingItem, parseMeetingDescription, ShootDetails } from "./meeting-helpers";
+import {
+  isShootMeeting,
+  MeetingItem,
+  parseMeetingDescription,
+  ShootDetails,
+  STANDARD_SHOOT_EQUIPMENT,
+  parseEquipmentString,
+  serializeEquipmentString,
+} from "./meeting-helpers";
 
 const EMPTY_SHOOT_DETAILS: ShootDetails = {
   category: "",
@@ -75,6 +83,64 @@ export function MeetingFormDialog({
   const [shootDetails, setShootDetails] = useState<ShootDetails>(EMPTY_SHOOT_DETAILS);
   const [submitting, setSubmitting] = useState(false);
 
+  // Equipment checklist state
+  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
+  const [customEquipment, setCustomEquipment] = useState<string[]>([]);
+  const [equipmentNotes, setEquipmentNotes] = useState("");
+  const [customEquipInput, setCustomEquipInput] = useState("");
+
+  const updateEquipmentDetails = (
+    nextSelected: string[],
+    nextCustom: string[],
+    nextNotes: string
+  ) => {
+    setSelectedEquipment(nextSelected);
+    setCustomEquipment(nextCustom);
+    setEquipmentNotes(nextNotes);
+    setShootDetails((curr) => ({
+      ...curr,
+      equipment: serializeEquipmentString(nextSelected, nextCustom, nextNotes),
+    }));
+  };
+
+  const toggleStandardEquipment = (item: string) => {
+    const next = selectedEquipment.includes(item)
+      ? selectedEquipment.filter((x) => x !== item)
+      : [...selectedEquipment, item];
+    updateEquipmentDetails(next, customEquipment, equipmentNotes);
+  };
+
+  const handleSelectAllEquipment = () => {
+    updateEquipmentDetails([...STANDARD_SHOOT_EQUIPMENT], customEquipment, equipmentNotes);
+  };
+
+  const handleClearAllEquipment = () => {
+    updateEquipmentDetails([], [], equipmentNotes);
+  };
+
+  const handleResetStandardKit = () => {
+    updateEquipmentDetails([...STANDARD_SHOOT_EQUIPMENT], [], "");
+  };
+
+  const handleAddCustomEquipment = () => {
+    const trimmed = customEquipInput.trim();
+    if (!trimmed) return;
+    if (!customEquipment.includes(trimmed) && !selectedEquipment.includes(trimmed)) {
+      const nextCustom = [...customEquipment, trimmed];
+      updateEquipmentDetails(selectedEquipment, nextCustom, equipmentNotes);
+    }
+    setCustomEquipInput("");
+  };
+
+  const removeCustomEquipment = (item: string) => {
+    const nextCustom = customEquipment.filter((x) => x !== item);
+    updateEquipmentDetails(selectedEquipment, nextCustom, equipmentNotes);
+  };
+
+  const handleEquipmentNotesChange = (notes: string) => {
+    updateEquipmentDetails(selectedEquipment, customEquipment, notes);
+  };
+
   useEffect(() => {
     if (modalMode === "EDIT" && meetingToEdit) {
       const parsedDescription = parseMeetingDescription(meetingToEdit.description);
@@ -89,7 +155,13 @@ export function MeetingFormDialog({
       setProjectId(meetingToEdit.projectId ?? "");
       setStatus(meetingToEdit.status ?? "SCHEDULED");
       setMeetingType(isShoot ? "SHOOT" : "MEETING");
-      setShootDetails(parsedDescription.shootDetails ?? EMPTY_SHOOT_DETAILS);
+      const details = parsedDescription.shootDetails ?? EMPTY_SHOOT_DETAILS;
+      setShootDetails(details);
+      const parsedEquip = parseEquipmentString(details.equipment);
+      setSelectedEquipment(parsedEquip.selectedItems);
+      setCustomEquipment(parsedEquip.customItems);
+      setEquipmentNotes(parsedEquip.notes);
+      setCustomEquipInput("");
       setSelectedUserIds((meetingToEdit.attendees ?? [])
         .map((attendee) => attendee.userId ?? attendee.id)
         .filter((id) => !isShoot || id !== meetingToEdit.organizerId));
@@ -111,7 +183,15 @@ export function MeetingFormDialog({
       setStatus("SCHEDULED");
       setSelectedUserIds([]);
       setMeetingType(initialMeetingType ?? "MEETING");
-      setShootDetails(EMPTY_SHOOT_DETAILS);
+      const standardList = [...STANDARD_SHOOT_EQUIPMENT];
+      setSelectedEquipment(standardList);
+      setCustomEquipment([]);
+      setEquipmentNotes("");
+      setCustomEquipInput("");
+      setShootDetails({
+        ...EMPTY_SHOOT_DETAILS,
+        equipment: serializeEquipmentString(standardList, [], ""),
+      });
     }
   }, [modalMode, meetingToEdit, open, initialMeetingType]);
 
@@ -357,19 +437,160 @@ export function MeetingFormDialog({
                   <Textarea className="w-full resize-none text-xs" value={shootDetails.deliverables} onChange={(e) => setShootDetails((d) => ({ ...d, deliverables: e.target.value }))} rows={3} placeholder="Formats, quantities, aspect ratios, deadlines" />
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
-                <div className="space-y-1.5 min-w-0">
-                  <Label className="text-xs font-semibold">Equipment / Props</Label>
-                  <Textarea className="w-full resize-none text-xs" value={shootDetails.equipment} onChange={(e) => setShootDetails((d) => ({ ...d, equipment: e.target.value }))} rows={2} placeholder="Gear, props, wardrobe, or setup" />
+              {/* Equipment Checklist */}
+              <div className="space-y-2.5 rounded-lg border border-border/80 bg-background/90 p-3.5 min-w-0">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Camera className="h-4 w-4 text-violet-600 dark:text-violet-400 shrink-0" />
+                    <Label className="text-xs font-bold uppercase tracking-wider text-foreground">
+                      Equipment & Gear Checklist
+                    </Label>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-medium">
+                      {selectedEquipment.length + customEquipment.length} packed
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                      onClick={handleSelectAllEquipment}
+                    >
+                      Select All
+                    </Button>
+                    <span className="text-muted-foreground/40">|</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                      onClick={handleClearAllEquipment}
+                    >
+                      Clear All
+                    </Button>
+                    <span className="text-muted-foreground/40">|</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] text-violet-600 hover:text-violet-700 dark:text-violet-400"
+                      onClick={handleResetStandardKit}
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Reset Kit
+                    </Button>
+                  </div>
                 </div>
+
+                {/* 20 Standard Equipment items in a clean responsive grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1.5 max-h-56 overflow-y-auto pr-1">
+                  {STANDARD_SHOOT_EQUIPMENT.map((item) => {
+                    const isChecked = selectedEquipment.includes(item);
+                    return (
+                      <button
+                        type="button"
+                        key={item}
+                        onClick={() => toggleStandardEquipment(item)}
+                        className={cn(
+                          "flex items-center gap-2 text-left px-2.5 py-1.5 rounded-md border text-xs transition-colors select-none",
+                          isChecked
+                            ? "bg-violet-500/10 border-violet-500/40 text-violet-950 dark:text-violet-200 font-medium"
+                            : "bg-muted/30 border-border/60 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "flex items-center justify-center h-4 w-4 rounded shrink-0 transition-colors",
+                            isChecked
+                              ? "bg-violet-600 text-white"
+                              : "border border-muted-foreground/40"
+                          )}
+                        >
+                          {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                        </div>
+                        <span className="truncate">{item}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom Gear Items */}
+                {customEquipment.length > 0 && (
+                  <div className="pt-2 border-t border-border/50 space-y-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Additional Gear ({customEquipment.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {customEquipment.map((item) => (
+                        <Badge
+                          key={item}
+                          variant="secondary"
+                          className="pl-2 pr-1 py-1 text-xs flex items-center gap-1.5 bg-violet-100 text-violet-800 dark:bg-violet-950/40 dark:text-violet-300 border border-violet-300 dark:border-violet-800"
+                        >
+                          <Check className="h-3 w-3 text-violet-600" />
+                          <span>{item}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeCustomEquipment(item)}
+                            className="hover:bg-violet-200 dark:hover:bg-violet-900 rounded-full p-0.5 ml-0.5 text-muted-foreground hover:text-foreground"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Custom Item Input */}
+                <div className="flex items-center gap-2 pt-1">
+                  <Input
+                    className="h-8 text-xs flex-1"
+                    placeholder="Add custom gear (e.g. Drone, Smoke Machine, Backdrop...)"
+                    value={customEquipInput}
+                    onChange={(e) => setCustomEquipInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddCustomEquipment();
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs shrink-0"
+                    onClick={handleAddCustomEquipment}
+                    disabled={!customEquipInput.trim()}
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Add Gear
+                  </Button>
+                </div>
+
+                {/* Optional Equipment Notes */}
+                <div className="pt-1">
+                  <Textarea
+                    className="w-full resize-none text-xs"
+                    rows={2}
+                    placeholder="Extra gear notes (e.g. 4 extra batteries charged, client providing props, return gear by 8 PM)..."
+                    value={equipmentNotes}
+                    onChange={(e) => handleEquipmentNotesChange(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
                 <div className="space-y-1.5 min-w-0">
                   <Label className="text-xs font-semibold">Reference Link</Label>
                   <Input className="w-full" type="url" value={shootDetails.referenceLink} onChange={(e) => setShootDetails((d) => ({ ...d, referenceLink: e.target.value }))} placeholder="https://…" />
                 </div>
-              </div>
-              <div className="space-y-1.5 min-w-0">
-                <Label className="text-xs font-semibold">Special Instructions</Label>
-                <Textarea className="w-full resize-none text-xs" value={shootDetails.notes} onChange={(e) => setShootDetails((d) => ({ ...d, notes: e.target.value }))} rows={2} placeholder="Access details, client constraints, safety notes…" />
+                <div className="space-y-1.5 min-w-0">
+                  <Label className="text-xs font-semibold">Special Instructions</Label>
+                  <Textarea className="w-full resize-none text-xs" value={shootDetails.notes} onChange={(e) => setShootDetails((d) => ({ ...d, notes: e.target.value }))} rows={2} placeholder="Access details, client constraints, safety notes…" />
+                </div>
               </div>
             </div>
           )}

@@ -10,6 +10,88 @@ export interface ShootDetails {
   notes: string;
 }
 
+export const STANDARD_SHOOT_EQUIPMENT = [
+  "Camera Reflectors",
+  "3 Tripods",
+  "2 Light Stands",
+  "Camera Gimbal",
+  "Phone Gimbal",
+  "Small Gimbal",
+  "Light Extension",
+  "Softbox",
+  "Charger",
+  "Memory Card",
+  "Camera Battery",
+  "Torch",
+  "Lens",
+  "Big Lens No. 1",
+  "Small Lens No. 2",
+  "DJI Mic",
+  "ND Filters",
+  "Magic Arm",
+  "Mobile Holder",
+  "Chest Cam",
+] as const;
+
+export function parseEquipmentString(raw?: string): {
+  selectedItems: string[];
+  customItems: string[];
+  notes: string;
+} {
+  if (!raw || !raw.trim()) {
+    return { selectedItems: [], customItems: [], notes: "" };
+  }
+
+  let itemsPart = raw;
+  let notes = "";
+  const notesMarkerIndex = raw.search(/(?:\r?\n|^|\s)Notes:\s*/i);
+  if (notesMarkerIndex >= 0) {
+    itemsPart = raw.slice(0, notesMarkerIndex).trim();
+    notes = raw.slice(notesMarkerIndex).replace(/^(?:\r?\n|^|\s)Notes:\s*/i, "").trim();
+  }
+
+  const tokens = itemsPart
+    .split(/[,;\n•\r]+/)
+    .map((t) => t.replace(/^[-*•\s]+/, "").trim())
+    .filter(Boolean);
+
+  const selectedItems: string[] = [];
+  const customItems: string[] = [];
+
+  const standardLowerMap = new Map<string, string>();
+  for (const std of STANDARD_SHOOT_EQUIPMENT) {
+    standardLowerMap.set(std.toLowerCase(), std);
+  }
+
+  for (const token of tokens) {
+    const matched = standardLowerMap.get(token.toLowerCase());
+    if (matched) {
+      if (!selectedItems.includes(matched)) {
+        selectedItems.push(matched);
+      }
+    } else {
+      if (!customItems.includes(token)) {
+        customItems.push(token);
+      }
+    }
+  }
+
+  return { selectedItems, customItems, notes };
+}
+
+export function serializeEquipmentString(
+  selectedItems: string[],
+  customItems: string[] = [],
+  notes = ""
+): string {
+  const allItems = [...selectedItems, ...customItems].filter(Boolean);
+  const itemsText = allItems.join(", ");
+  const cleanNotes = notes.trim();
+  if (!cleanNotes) return itemsText;
+  if (!itemsText) return `Notes: ${cleanNotes}`;
+  return `${itemsText}\nNotes: ${cleanNotes}`;
+}
+
 const SHOOT_MARKER = "[[AGENCYOS_SHOOT_V1]]";
 const SHOOT_TITLE_PREFIX = "[SHOOT] ";
 
