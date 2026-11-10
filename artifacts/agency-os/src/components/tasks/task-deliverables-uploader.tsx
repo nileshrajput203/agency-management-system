@@ -28,6 +28,16 @@ interface TaskDeliverablesUploaderProps {
   readOnly?: boolean;
 }
 
+export const isImage = (filename?: string, url?: string): boolean => {
+  const str = (filename || url || "").toLowerCase();
+  return /\.(png|jpe?g|webp|gif|svg|bmp|avif)$/.test(str) || str.startsWith("data:image");
+};
+
+export const isVideo = (filename?: string, url?: string): boolean => {
+  const str = (filename || url || "").toLowerCase();
+  return /\.(mp4|webm|mov|mkv|ogg)$/.test(str);
+};
+
 export function TaskDeliverablesUploader({
   taskId,
   initialAttachments = [],

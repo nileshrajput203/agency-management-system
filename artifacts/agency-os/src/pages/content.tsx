@@ -23,7 +23,9 @@ import {
   Plus, ChevronLeft, ChevronRight, Calendar, Trash2, Link2,
   Share2, Copy, Check, FileText, CheckCircle2, Clock, AlertTriangle, RotateCcw, Building2,
   Download, FileX, Sheet, Printer, Film, Zap, User, UserPlus, UserCheck,
+  LayoutGrid, Image as ImageIcon, Play, Eye,
 } from "lucide-react";
+import { MediaLightbox, isMediaImage, isMediaVideo } from "@/components/ui/media-lightbox";
 import { format, addMonths, subMonths, getDaysInMonth, startOfMonth, getDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
@@ -77,16 +79,24 @@ export default function ContentPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [activeClientId, setActiveClientId] = useState<string>("");
   const [shareClientId, setShareClientId] = useState("");
-  const [view, setView] = useState<"studio" | "list" | "calendar">(() => {
+  const [view, setView] = useState<"studio" | "list" | "calendar" | "grid">(() => {
     if (typeof window !== "undefined") {
       const saved = sessionStorage.getItem("agencyos_content_view");
-      if (saved === "list" || saved === "calendar") return saved;
+      if (saved === "list" || saved === "calendar" || saved === "grid") return saved;
       if (saved === "studio" && isManagerOrAdmin) return "studio";
     }
     return isManagerOrAdmin ? "studio" : "calendar";
   });
 
-  // Strict rule: Employees with content calendar access CANNOT access Studio; only Calendar and List
+  const [lightboxState, setLightboxState] = useState<{
+    open: boolean;
+    items: Array<{ id?: string; url: string; filename?: string; title?: string }>;
+    title?: string;
+    subtitle?: string;
+    post?: any;
+  }>({ open: false, items: [] });
+
+  // Strict rule: Employees with content calendar access CANNOT access Studio; only Calendar, Grid, and List
   useEffect(() => {
     if (!user) return;
     if (!isManagerOrAdmin && view === "studio") {
@@ -97,7 +107,7 @@ export default function ContentPage() {
     }
   }, [isManagerOrAdmin, view, user]);
 
-  const handleSetView = (newView: "studio" | "list" | "calendar") => {
+  const handleSetView = (newView: "studio" | "list" | "calendar" | "grid") => {
     if (newView === "studio" && !isManagerOrAdmin) {
       toast.error("Studio and content approvals are restricted to managers and administrators.");
       return;
@@ -457,13 +467,19 @@ export default function ContentPage() {
                 <Film className="h-3.5 w-3.5" /> Studio
               </button>
               <button
-                onClick={() => handleSetView("list")}
-                className="px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >List</button>
-              <button
                 onClick={() => handleSetView("calendar")}
                 className="px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
               >Calendar</button>
+              <button
+                onClick={() => handleSetView("grid")}
+                className="px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <LayoutGrid className="h-3 w-3" /> Grid
+              </button>
+              <button
+                onClick={() => handleSetView("list")}
+                className="px-2.5 py-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >List</button>
             </div>
             <Button
               variant="outline"
@@ -503,6 +519,12 @@ export default function ContentPage() {
                 onClick={() => handleSetView("calendar")}
                 className={cn("px-2.5 py-1 rounded-md text-xs font-medium transition-colors", view === "calendar" ? "bg-card shadow-xs text-foreground font-semibold" : "text-muted-foreground hover:text-foreground")}
               >Calendar</button>
+              <button
+                onClick={() => handleSetView("grid")}
+                className={cn("px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1", view === "grid" ? "bg-card shadow-xs text-foreground font-semibold" : "text-muted-foreground hover:text-foreground")}
+              >
+                <LayoutGrid className="h-3 w-3" /> Grid Preview
+              </button>
               <button
                 onClick={() => handleSetView("list")}
                 className={cn("px-2.5 py-1 rounded-md text-xs font-medium transition-colors", view === "list" ? "bg-card shadow-xs text-foreground font-semibold" : "text-muted-foreground hover:text-foreground")}
@@ -725,6 +747,186 @@ export default function ContentPage() {
             })
           )}
         </div>
+      ) : view === "grid" ? (
+        /* Visual Feed / Media Grid Preview */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2 p-3 bg-muted/30 border border-border/60 rounded-xl">
+            <div className="flex items-center gap-2">
+              <LayoutGrid className="h-4 w-4 text-primary" />
+              <span className="text-xs font-bold text-foreground">Visual Grid Preview</span>
+              <Badge variant="outline" className="text-[10px] px-2 py-0">
+                {filteredPosts.length} {filteredPosts.length === 1 ? "Post" : "Posts"}
+              </Badge>
+            </div>
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Eye className="h-3.5 w-3.5 text-primary" />
+              <span>Click any tile to inspect artwork in full resolution</span>
+            </div>
+          </div>
+
+          {filteredPosts.length === 0 ? (
+            <div className="text-center py-16 text-muted-foreground bg-card border border-dashed rounded-2xl">
+              <ImageIcon className="h-12 w-12 mx-auto mb-3 opacity-30 text-primary" />
+              <p className="font-semibold text-base">{searchQuery ? "No matching posts" : "No content scheduled"}</p>
+              <p className="text-sm mt-1 text-muted-foreground max-w-sm mx-auto">
+                {searchQuery
+                  ? `No posts match "${searchQuery}"`
+                  : activeClientId
+                  ? `No posts with visual assets found for ${activeClient?.companyName}. Click "Add Post" to start scheduling.`
+                  : `Click "Add Post" to schedule and attach artwork to your content calendar.`}
+              </p>
+              <Button onClick={() => openCreate()} size="sm" className="mt-4 gap-1.5 text-xs font-semibold">
+                <Plus className="h-3.5 w-3.5" /> Add Post & Upload Artwork
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+              {filteredPosts.map((post) => {
+                const sc = STATUS_CONFIG[post.status ?? "IDEA"] ?? STATUS_CONFIG.IDEA;
+                const pFileUrl = getPostAttachmentUrl(post);
+                const hasImage = pFileUrl ? isMediaImage(pFileUrl) : false;
+                const hasVideo = pFileUrl ? isMediaVideo(pFileUrl) : false;
+                const isRevision = isNeedsRevision((post as any).needsRevision) || (post as any).approvalStatus === "NEEDS_CHANGES";
+                const postClient = (clients ?? []).find((c: any) => c.id === post.clientId);
+
+                return (
+                  <div
+                    key={post.id}
+                    onClick={() => {
+                      if (pFileUrl) {
+                        setLightboxState({
+                          open: true,
+                          items: [{
+                            url: pFileUrl,
+                            title: post.title || post.caption || "Content Deliverable",
+                            filename: post.title || "artwork",
+                          }],
+                          title: post.title || post.caption?.slice(0, 30) || "Content Artwork",
+                          subtitle: `${postClient?.companyName || "Client"} • ${post.platform || "Instagram"} • ${sc.label}`,
+                          post,
+                        });
+                      } else {
+                        openEdit(post as PostRecord);
+                      }
+                    }}
+                    className="group relative aspect-square rounded-2xl overflow-hidden bg-card border border-border/80 hover:border-primary transition-all duration-200 shadow-2xs hover:shadow-lg cursor-pointer flex flex-col justify-between"
+                  >
+                    {/* Media Background */}
+                    {hasImage ? (
+                      <img
+                        src={pFileUrl!}
+                        alt={post.title || "Artwork"}
+                        className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    ) : hasVideo ? (
+                      <div className="absolute inset-0 bg-slate-950 flex items-center justify-center">
+                        <video src={pFileUrl!} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                          <div className="h-10 w-10 rounded-full bg-black/60 backdrop-blur-xs flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+                            <Play className="h-5 w-5 fill-white ml-0.5" />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Non-media fallback card */
+                      <div className="absolute inset-0 p-3.5 flex flex-col justify-between bg-gradient-to-br from-primary/5 via-card to-muted/40 select-none">
+                        <div className="flex items-center justify-between">
+                          <div className="p-1.5 rounded-lg bg-background/80 shadow-2xs border border-border/60">
+                            {PLATFORM_ICON[post.platform ?? "INSTAGRAM"]}
+                          </div>
+                          <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">
+                            {post.contentType || "Post"}
+                          </span>
+                        </div>
+                        <div className="my-auto px-1 text-center">
+                          <p className="text-xs font-semibold text-foreground line-clamp-3 leading-snug">
+                            {post.title || post.caption || "Draft Idea"}
+                          </p>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground flex items-center justify-between pt-2 border-t border-border/40">
+                          <span>{post.scheduledAt ? format(new Date(post.scheduledAt), "dd MMM") : "Draft"}</span>
+                          <span className="text-primary font-medium group-hover:underline">Edit ➔</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Floating Permanent Header Badges */}
+                    <div className="relative z-10 p-2.5 flex items-center justify-between gap-1 pointer-events-none">
+                      <span className="inline-flex items-center gap-1 bg-black/60 backdrop-blur-md text-white px-2 py-0.5 rounded-full text-[10px] font-semibold border border-white/10 shadow-xs">
+                        {PLATFORM_ICON[post.platform ?? "INSTAGRAM"]}
+                        <span className="capitalize">{post.contentType || "Post"}</span>
+                      </span>
+
+                      {isRevision ? (
+                        <Badge className="text-[9px] px-1.5 py-0 bg-amber-500 text-white font-bold border-0 shadow-sm">
+                          Revisions
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className={cn("text-[9px] px-1.5 py-0 font-bold border-0 shadow-sm backdrop-blur-md", sc.className)}>
+                          {sc.label}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Hover Dark Overlay with Quick Actions & Details */}
+                    <div className="absolute inset-0 z-20 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-between text-white">
+                      <div className="flex items-center justify-between gap-1">
+                        {postClient && (
+                          <span className="text-[10px] font-semibold bg-black/50 px-2 py-0.5 rounded-md truncate max-w-[120px]">
+                            {postClient.companyName}
+                          </span>
+                        )}
+                        {pFileUrl && (
+                          <button
+                            type="button"
+                            title="Download artwork"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              triggerFileDownload(pFileUrl, post.title || "artwork");
+                            }}
+                            className="h-6 w-6 rounded-full bg-white/20 hover:bg-white text-white hover:text-black flex items-center justify-center transition-colors ml-auto"
+                          >
+                            <Download className="h-3 w-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <p className="font-bold text-xs leading-tight line-clamp-2">
+                          {post.title || post.caption?.slice(0, 40) || "Untitled Post"}
+                        </p>
+                        {post.scheduledAt && (
+                          <p className="text-[10px] text-white/80 flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-primary" />
+                            {format(new Date(post.scheduledAt), "EEE, dd MMM yyyy")}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-1.5 pt-1">
+                          {pFileUrl && (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-primary/90 text-primary-foreground font-semibold px-2 py-0.5 rounded shadow-xs">
+                              <Eye className="h-2.5 w-2.5" /> Full Zoom
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(post as PostRecord);
+                            }}
+                            className="text-[10px] text-white/90 underline hover:text-white ml-auto font-medium"
+                          >
+                            Edit Post
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       ) : (
         /* Calendar Grid */
         <div className="rounded-xl border border-border overflow-hidden">
@@ -787,6 +989,25 @@ export default function ContentPage() {
                           onClick={(e) => { e.stopPropagation(); openEdit(p); }}
                         >
                           {isRevision ? <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" /> : PLATFORM_ICON[p.platform ?? "INSTAGRAM"]}
+                          {pFileUrl && isMediaImage(pFileUrl) && (
+                            <img
+                              src={pFileUrl}
+                              alt="thumb"
+                              className="h-3.5 w-3.5 rounded object-cover border border-primary/40 shrink-0 hover:scale-125 transition-transform shadow-2xs"
+                              loading="lazy"
+                              title="Click to view artwork"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setLightboxState({
+                                  open: true,
+                                  items: [{ url: pFileUrl, title: p.title || p.caption || "Post Media", filename: p.title || "artwork" }],
+                                  title: p.title || "Content Artwork",
+                                  subtitle: `${p.platform || "Instagram"} • ${p.contentType || "Post"}`,
+                                  post: p,
+                                });
+                              }}
+                            />
+                          )}
                           <span className="truncate flex-1">{p.title ?? p.caption?.slice(0, 20) ?? p.contentType}</span>
 
                           {/* Quick Assign Dropdown directly on Calendar chip */}
@@ -943,15 +1164,34 @@ export default function ContentPage() {
                         : "bg-card border-border/80 hover:border-primary/50"
                     )}
                   >
-                    {/* Left: Platform Icon + Title + Client + Caption preview */}
+                    {/* Left: Artwork Thumbnail / Platform Icon + Title + Client + Caption preview */}
                     <div className="flex items-start gap-3 min-w-0 flex-1">
-                      <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 shrink-0 text-primary mt-0.5">
-                        {isRevision ? (
-                          <AlertTriangle className="h-4 w-4 text-amber-600" />
-                        ) : (
-                          PLATFORM_ICON[post.platform ?? "INSTAGRAM"]
-                        )}
-                      </div>
+                      {pFileUrl && isMediaImage(pFileUrl) ? (
+                        <div
+                          className="h-12 w-12 rounded-lg overflow-hidden border border-border/70 shrink-0 bg-muted/40 cursor-pointer hover:border-primary transition-all group/item-thumb shadow-2xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLightboxState({
+                              open: true,
+                              items: [{ url: pFileUrl, title: post.title || post.caption || "Post Media", filename: post.title || "artwork" }],
+                              title: post.title || "Content Artwork",
+                              subtitle: `${postClient?.companyName || ""} • ${post.platform || "Instagram"}`,
+                              post,
+                            });
+                          }}
+                          title="Click to inspect artwork"
+                        >
+                          <img src={pFileUrl} alt="Artwork" className="w-full h-full object-cover group-hover/item-thumb:scale-105 transition-transform" />
+                        </div>
+                      ) : (
+                        <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 shrink-0 text-primary mt-0.5">
+                          {isRevision ? (
+                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          ) : (
+                            PLATFORM_ICON[post.platform ?? "INSTAGRAM"]
+                          )}
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors truncate">
@@ -1065,6 +1305,15 @@ export default function ContentPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Deliverable Artwork Lightbox Preview */}
+      <MediaLightbox
+        open={lightboxState.open}
+        onOpenChange={(open) => setLightboxState((prev) => ({ ...prev, open }))}
+        items={lightboxState.items}
+        title={lightboxState.title}
+        subtitle={lightboxState.subtitle}
+      />
     </div>
   );
 }

@@ -23,8 +23,9 @@ import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import {
   Plus, Trash2, Calendar, CheckSquare, CheckCircle2, Edit3, FileText, EyeOff, Eye,
-  Play, Send, Clock, ArrowRight, Undo2, ExternalLink, Image as ImageIcon, Paperclip
+  Play, Send, Clock, ArrowRight, Undo2, ExternalLink, Image as ImageIcon, Paperclip, Video as VideoIcon
 } from "lucide-react";
+import { MediaLightbox, isMediaImage, isMediaVideo } from "@/components/ui/media-lightbox";
 import { TaskDeliverablesUploader } from "./task-deliverables-uploader";
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -55,6 +56,12 @@ export function EmployeeTasksView() {
   const [employeeApprovedEditDialogOpen, setEmployeeApprovedEditDialogOpen] = useState(false);
   const [employeeEditStatus, setEmployeeEditStatus] = useState<string>("TODO");
   const [employeeDeliverables, setEmployeeDeliverables] = useState<string>("");
+  const [lightboxState, setLightboxState] = useState<{
+    open: boolean;
+    items: Array<{ id?: string; url: string; filename?: string }>;
+    title?: string;
+    subtitle?: string;
+  }>({ open: false, items: [] });
 
   const handleOpenEmployeeApprovedEditDialog = (task: any) => {
     setSelectedTaskForAction(task);
@@ -464,36 +471,102 @@ export function EmployeeTasksView() {
                       </div>
 
                       {/* Uploaded Artwork / Attachments Preview */}
-                      {(task as any).attachments && (task as any).attachments.length > 0 && (
-                        <div className="space-y-1.5 p-2 rounded-lg bg-primary/5 border border-primary/15">
-                          <span className="text-[11px] font-bold text-foreground flex items-center gap-1">
-                            🎨 Attached Work ({(task as any).attachments.length}):
-                          </span>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {(task as any).attachments.map((att: any) => {
-                              const isImg = /\.(png|jpe?g|webp|gif|svg)$/i.test(att.filename || att.url || "");
-                              return (
-                                <a
-                                  key={att.id}
-                                  href={att.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-md bg-background border border-border/60 hover:border-primary font-medium text-foreground transition-all"
-                                  title={`View ${att.filename}`}
-                                >
-                                  {isImg ? (
-                                    <ImageIcon className="h-3.5 w-3.5 text-primary" />
-                                  ) : (
-                                    <FileText className="h-3.5 w-3.5 text-primary" />
-                                  )}
-                                  <span className="max-w-[120px] truncate">{att.filename}</span>
-                                  <ExternalLink className="h-2.5 w-2.5 opacity-60" />
-                                </a>
-                              );
-                            })}
+                      {(task as any).attachments && (task as any).attachments.length > 0 && (() => {
+                        const attList = (task as any).attachments as Array<{ id: string; filename: string; url: string }>;
+                        const firstMedia = attList.find((a) => isMediaImage(a.filename || a.url) || isMediaVideo(a.filename || a.url));
+                        const isImg = firstMedia ? isMediaImage(firstMedia.filename || firstMedia.url) : false;
+
+                        return (
+                          <div className="space-y-1.5 p-2 rounded-lg bg-primary/5 border border-primary/15">
+                            <span className="text-[11px] font-bold text-foreground flex items-center justify-between">
+                              <span className="flex items-center gap-1">🎨 Attached Work ({attList.length}):</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setLightboxState({
+                                    open: true,
+                                    items: attList,
+                                    title: task.title,
+                                    subtitle: `${task.projectName || "Task"} • Deliverables`,
+                                  })
+                                }
+                                className="text-[10px] text-primary hover:underline font-semibold"
+                              >
+                                View All
+                              </button>
+                            </span>
+
+                            {firstMedia && (
+                              <div
+                                className="relative w-full aspect-video max-h-36 rounded-md overflow-hidden bg-muted/40 border border-border/70 group/thumb cursor-pointer hover:border-primary/80 transition-all shadow-2xs my-1"
+                                onClick={() =>
+                                  setLightboxState({
+                                    open: true,
+                                    items: attList,
+                                    title: task.title,
+                                    subtitle: `${task.projectName || "Task"} • Deliverables`,
+                                  })
+                                }
+                              >
+                                {isImg ? (
+                                  <img
+                                    src={firstMedia.url}
+                                    alt={firstMedia.filename}
+                                    className="w-full h-full object-cover transition-transform group-hover/thumb:scale-105"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white gap-1">
+                                    <VideoIcon className="h-6 w-6 text-primary" />
+                                    <span className="text-[10px] font-semibold">Video Deliverable</span>
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white">
+                                  <Eye className="h-4 w-4" />
+                                  <span className="text-[10px] font-bold">Inspect</span>
+                                </div>
+                                <div className="absolute bottom-1 left-1 bg-black/75 backdrop-blur-xs text-white text-[9px] font-medium px-1.5 py-0.5 rounded flex items-center gap-1 max-w-[70%] truncate">
+                                  {isImg ? <ImageIcon className="h-2.5 w-2.5 shrink-0" /> : <VideoIcon className="h-2.5 w-2.5 shrink-0" />}
+                                  <span className="truncate">{firstMedia.filename}</span>
+                                </div>
+                                {attList.length > 1 && (
+                                  <span className="absolute bottom-1 right-1 bg-primary text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
+                                    +{attList.length - 1} more
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {attList.map((att: any) => {
+                                const attIsImg = isMediaImage(att.filename || att.url);
+                                return (
+                                  <button
+                                    key={att.id}
+                                    type="button"
+                                    onClick={() =>
+                                      setLightboxState({
+                                        open: true,
+                                        items: attList,
+                                        title: task.title,
+                                        subtitle: att.filename,
+                                      })
+                                    }
+                                    className="flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded bg-background border border-border/60 hover:border-primary font-medium text-foreground transition-all"
+                                  >
+                                    {attIsImg ? (
+                                      <ImageIcon className="h-3 w-3 text-primary" />
+                                    ) : (
+                                      <FileText className="h-3 w-3 text-primary" />
+                                    )}
+                                    <span className="max-w-[100px] truncate">{att.filename}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Design / Deliverable Link */}
                       {task.deliverables && (
@@ -949,6 +1022,15 @@ export function EmployeeTasksView() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Deliverable Artwork Lightbox Preview */}
+      <MediaLightbox
+        open={lightboxState.open}
+        onOpenChange={(open) => setLightboxState((prev) => ({ ...prev, open }))}
+        items={lightboxState.items}
+        title={lightboxState.title}
+        subtitle={lightboxState.subtitle}
+      />
     </div>
   );
 }

@@ -26,8 +26,9 @@ import { useForm, Controller } from "react-hook-form";
 import {
   Plus, Trash2, Calendar, CheckSquare, Clock, AlertCircle, ListTodo, CheckCircle2, Edit3, EyeOff, Eye,
   Users, ChevronDown, ChevronUp, Bell, User, Filter, AlertTriangle, ArrowRight, Check,
-  Paperclip, ExternalLink, RotateCcw, FileText, Image as ImageIcon
+  Paperclip, ExternalLink, RotateCcw, FileText, Image as ImageIcon, Video as VideoIcon
 } from "lucide-react";
+import { MediaLightbox, isMediaImage, isMediaVideo } from "@/components/ui/media-lightbox";
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { cn, formatDateOnly } from "@/lib/utils";
 import { SearchBar } from "@/components/common/SearchBar";
@@ -52,6 +53,13 @@ export function AdminTasksView() {
   const [teamTaskFilter, setTeamTaskFilter] = useState<"TODAY" | "PENDING" | "OVERDUE" | "MEMBERS">("TODAY");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [isNotifyingManagers, setIsNotifyingManagers] = useState(false);
+  const [lightboxState, setLightboxState] = useState<{
+    open: boolean;
+    items: Array<{ id?: string; url: string; filename?: string }>;
+    title?: string;
+    subtitle?: string;
+    task?: any;
+  }>({ open: false, items: [] });
 
   const handleNotifyManagersOfToday = async () => {
     setIsNotifyingManagers(true);
@@ -672,27 +680,103 @@ export function AdminTasksView() {
                             )}
 
                             {/* Deliverables / External Design Link / Attached Artwork */}
-                            {((task.deliverables && (task.deliverables.startsWith("http://") || task.deliverables.startsWith("https://"))) || ((task as any).attachments && (task as any).attachments.length > 0)) && (
+                            {task.deliverables && (task.deliverables.startsWith("http://") || task.deliverables.startsWith("https://")) && (
                               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                                {task.deliverables && (task.deliverables.startsWith("http://") || task.deliverables.startsWith("https://")) && (
-                                  <a
-                                    href={task.deliverables}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                                    title={task.deliverables}
-                                  >
-                                    <ExternalLink className="h-2.5 w-2.5" /> Design Link
-                                  </a>
-                                )}
-                                {(task as any).attachments && (task as any).attachments.length > 0 && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                                    <Paperclip className="h-2.5 w-2.5" /> {(task as any).attachments.length} file{(task as any).attachments.length === 1 ? "" : "s"}
-                                  </span>
-                                )}
+                                <a
+                                  href={task.deliverables}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                                  title={task.deliverables}
+                                >
+                                  <ExternalLink className="h-2.5 w-2.5" /> Design Link
+                                </a>
                               </div>
                             )}
+
+                            {/* Visual Deliverable Artwork Thumbnail on Card */}
+                            {(task as any).attachments && (task as any).attachments.length > 0 && (() => {
+                              const attList = (task as any).attachments as Array<{ id: string; filename: string; url: string }>;
+                              const firstMedia = attList.find((a) => isMediaImage(a.filename || a.url) || isMediaVideo(a.filename || a.url));
+                              const isImg = firstMedia ? isMediaImage(firstMedia.filename || firstMedia.url) : false;
+
+                              if (firstMedia) {
+                                return (
+                                  <div
+                                    className="relative w-full aspect-video rounded-md overflow-hidden bg-muted/40 border border-border/70 group/thumb cursor-pointer hover:border-primary/80 transition-all shadow-2xs my-1"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setLightboxState({
+                                        open: true,
+                                        items: attList,
+                                        title: task.title,
+                                        subtitle: `${task.projectName || "Task"} • ${task.assigneeName || "Deliverable"}`,
+                                        task,
+                                      });
+                                    }}
+                                    title="Click to preview artwork in full resolution"
+                                  >
+                                    {isImg ? (
+                                      <img
+                                        src={firstMedia.url}
+                                        alt={firstMedia.filename || task.title}
+                                        className="w-full h-full object-cover transition-transform group-hover/thumb:scale-105"
+                                        loading="lazy"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white gap-1">
+                                        <VideoIcon className="h-5 w-5 text-primary" />
+                                        <span className="text-[10px] font-semibold">Video Deliverable</span>
+                                      </div>
+                                    )}
+
+                                    {/* Hover overlay with zoom icon */}
+                                    <div className="absolute inset-0 bg-black/45 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white">
+                                      <Eye className="h-3.5 w-3.5" />
+                                      <span className="text-[10px] font-bold">Inspect Work</span>
+                                    </div>
+
+                                    {/* Filename pill */}
+                                    <div className="absolute bottom-1 left-1 bg-black/75 backdrop-blur-xs text-white text-[9px] font-medium px-1.5 py-0.5 rounded flex items-center gap-1 max-w-[70%] truncate">
+                                      {isImg ? <ImageIcon className="h-2.5 w-2.5 shrink-0" /> : <VideoIcon className="h-2.5 w-2.5 shrink-0" />}
+                                      <span className="truncate">{firstMedia.filename}</span>
+                                    </div>
+
+                                    {attList.length > 1 && (
+                                      <span className="absolute bottom-1 right-1 bg-primary text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs">
+                                        +{attList.length - 1} more
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div
+                                  className="flex items-center justify-between gap-1.5 p-1.5 my-1 rounded-md bg-muted/50 border border-border/60 hover:border-primary/40 cursor-pointer text-[10px] transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setLightboxState({
+                                      open: true,
+                                      items: attList,
+                                      title: task.title,
+                                      subtitle: `${task.projectName || "Task"} • Document`,
+                                      task,
+                                    });
+                                  }}
+                                  title="Click to view file"
+                                >
+                                  <div className="flex items-center gap-1 min-w-0">
+                                    <FileText className="h-3 w-3 text-primary shrink-0" />
+                                    <span className="truncate max-w-[120px] font-medium">{attList[0].filename}</span>
+                                  </div>
+                                  <span className="text-[9px] text-muted-foreground font-semibold">
+                                    {attList.length > 1 ? `+${attList.length - 1} more` : "View"}
+                                  </span>
+                                </div>
+                              );
+                            })()}
 
                             <div className="flex items-center justify-between pt-1 border-t border-border/40">
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -1360,6 +1444,36 @@ export function AdminTasksView() {
         setAdminEditDialogOpen={setAdminEditDialogOpen}
         onConfirmAdminEdit={handleConfirmAdminEdit}
         isUpdatePending={updateMutation.isPending}
+      />
+
+      {/* Deliverable Artwork Lightbox Preview */}
+      <MediaLightbox
+        open={lightboxState.open}
+        onOpenChange={(open) => setLightboxState((prev) => ({ ...prev, open }))}
+        items={lightboxState.items}
+        title={lightboxState.title}
+        subtitle={lightboxState.subtitle}
+        canApprove={lightboxState.task?.status === "IN_REVIEW"}
+        onApprove={
+          lightboxState.task
+            ? () => {
+                updateMutation.mutate(
+                  { id: lightboxState.task.id, data: { status: "DONE", approvalStatus: "APPROVED" } as any },
+                  { onSuccess: () => toast.success("Task approved and marked as Done!") }
+                );
+              }
+            : undefined
+        }
+        onRequestRevisions={
+          lightboxState.task
+            ? () => {
+                updateMutation.mutate(
+                  { id: lightboxState.task.id, data: { status: "IN_PROGRESS" } as any },
+                  { onSuccess: () => toast.success("Task sent back to In Progress for revisions.") }
+                );
+              }
+            : undefined
+        }
       />
     </div>
   );

@@ -453,17 +453,68 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
   // Bi-directional Auto-Sync with Content Studio
   try {
     const [linkedPost] = await db
-      .select({ id: contentPostsTable.id, status: contentPostsTable.status })
+      .select({
+        id: contentPostsTable.id,
+        status: contentPostsTable.status,
+        mediaUrls: contentPostsTable.mediaUrls,
+        coverImageUrl: contentPostsTable.coverImageUrl,
+      })
       .from(contentPostsTable)
       .where(eq(contentPostsTable.linkedTaskId, row.id));
 
     if (linkedPost) {
+      // Query task attachments to sync deliverables & preview artworks
+      const taskAttachments = await db
+        .select({
+          url: fileAttachmentsTable.url,
+          filename: fileAttachmentsTable.filename,
+        })
+        .from(fileAttachmentsTable)
+        .where(
+          and(
+            inArray(fileAttachmentsTable.entityType, ["task", "tasks"]),
+            eq(fileAttachmentsTable.entityId, row.id)
+          )
+        );
+
+      const attachedUrls = taskAttachments.map((a) => a.url).filter(Boolean);
+      const postUpdates: any = {};
+
       if (row.status === "IN_REVIEW" && linkedPost.status !== "IN_REVIEW") {
-        await db.update(contentPostsTable).set({ status: "IN_REVIEW" }).where(eq(contentPostsTable.id, linkedPost.id));
-      } else if ((row.status === "DONE" || row.status === "COMPLETED") && linkedPost.status !== "ADMIN_APPROVED" && linkedPost.status !== "PUBLISHED") {
-        await db.update(contentPostsTable).set({ status: "ADMIN_APPROVED" }).where(eq(contentPostsTable.id, linkedPost.id));
+        postUpdates.status = "IN_REVIEW";
+      } else if (
+        (row.status === "DONE" || row.status === "COMPLETED" || row.approvalStatus === "APPROVED") &&
+        linkedPost.status !== "ADMIN_APPROVED" &&
+        linkedPost.status !== "PUBLISHED"
+      ) {
+        postUpdates.status = "ADMIN_APPROVED";
+        postUpdates.approvalStatus = "APPROVED";
+        postUpdates.approvedAt = new Date();
+        postUpdates.approvedBy = row.approvedBy || requesterId;
       } else if (row.status === "IN_PROGRESS" && linkedPost.status === "IN_REVIEW") {
-        await db.update(contentPostsTable).set({ status: "PRODUCTION" }).where(eq(contentPostsTable.id, linkedPost.id));
+        postUpdates.status = "PRODUCTION";
+        postUpdates.needsRevision = "true";
+      }
+
+      if (attachedUrls.length > 0) {
+        const existingMedia = Array.isArray(linkedPost.mediaUrls) ? linkedPost.mediaUrls : [];
+        const mergedMedia = Array.from(new Set([...existingMedia, ...attachedUrls]));
+        postUpdates.mediaUrls = mergedMedia;
+        postUpdates.mediaFiles = mergedMedia;
+        if (!linkedPost.coverImageUrl && attachedUrls[0]) {
+          postUpdates.coverImageUrl = attachedUrls[0];
+        }
+      }
+
+      if (row.deliverables && (row.deliverables.startsWith("http://") || row.deliverables.startsWith("https://"))) {
+        postUpdates.assetsLink = row.deliverables;
+      }
+
+      if (Object.keys(postUpdates).length > 0) {
+        await db
+          .update(contentPostsTable)
+          .set(postUpdates)
+          .where(eq(contentPostsTable.id, linkedPost.id));
       }
     }
   } catch (syncPostErr) {

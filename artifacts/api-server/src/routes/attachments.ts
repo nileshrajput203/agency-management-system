@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { tasksTable, fileAttachmentsTable } from "@workspace/db/schema";
+import { tasksTable, fileAttachmentsTable, contentPostsTable } from "@workspace/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { asyncHandler } from "../lib/asyncHandler";
 import { createError } from "../middleware/errorHandler";
@@ -159,6 +159,36 @@ router.post("/", requirePermission("attachments.upload"), asyncHandler(async (re
     url: sanitized.url,
     uploadedBy,
   }).returning();
+
+  // If attached to a task, sync deliverable artwork directly to linked content studio post
+  if (sanitized.entityType === "task") {
+    try {
+      const [linkedPost] = await db
+        .select({
+          id: contentPostsTable.id,
+          mediaUrls: contentPostsTable.mediaUrls,
+          coverImageUrl: contentPostsTable.coverImageUrl,
+        })
+        .from(contentPostsTable)
+        .where(eq(contentPostsTable.linkedTaskId, sanitized.entityId));
+
+      if (linkedPost) {
+        const existingMedia = Array.isArray(linkedPost.mediaUrls) ? linkedPost.mediaUrls : [];
+        const merged = Array.from(new Set([...existingMedia, sanitized.url]));
+        await db
+          .update(contentPostsTable)
+          .set({
+            mediaUrls: merged,
+            mediaFiles: merged,
+            ...(!linkedPost.coverImageUrl ? { coverImageUrl: sanitized.url } : {}),
+          })
+          .where(eq(contentPostsTable.id, linkedPost.id));
+      }
+    } catch (syncErr) {
+      // Non-fatal sync
+    }
+  }
+
   return res.status(201).json(row);
 }));
 
