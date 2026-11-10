@@ -1,5 +1,5 @@
-import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/App";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,10 +8,12 @@ import { Progress } from "@/components/ui/progress";
 import {
   CheckSquare, Clock, FileText, Umbrella, ArrowRight, RefreshCw,
   AlertTriangle, CheckCircle2, Timer, CalendarClock, Activity,
-  FolderOpen, TrendingUp,
+  FolderOpen, TrendingUp, Play, Send, Check, Undo2
 } from "lucide-react";
 import { format, isPast, isToday, isTomorrow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { isManagerOrAdminRole } from "@/lib/permissions";
 
 export function EmployeeDashboard({
   stats,
@@ -31,7 +33,9 @@ export function EmployeeDashboard({
   allWeekPosts?: any[];
   PLATFORM_DOT?: Record<string, string>;
 }) {
-  const { token } = useAuth();
+  const { user, token } = useAuth();
+  const qc = useQueryClient();
+  const [actingTaskId, setActingTaskId] = useState<string | null>(null);
 
   const authHeader = (): Record<string, string> => {
     const t = token || localStorage.getItem("agency_token") || "";
@@ -97,6 +101,87 @@ export function EmployeeDashboard({
   const approvedLeaves = leaveRequests.filter((l: any) => l.status === "APPROVED").length;
 
   const unreadCount = notifData?.unreadCount ?? 0;
+
+  const isManager = isManagerOrAdminRole(user) || Boolean(safeStats.isManager);
+  const tasksInReview = safeStats.tasksInReview || [];
+
+  const handleUpdateTaskStatus = async (taskId: string, newStatus: string) => {
+    try {
+      setActingTaskId(taskId);
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update task");
+
+      if (newStatus === "IN_REVIEW") {
+        toast.success("Task sent for review! Your manager will review and approve it.");
+      } else if (newStatus === "IN_PROGRESS") {
+        toast.success("Task moved to In Progress!");
+      } else {
+        toast.success("Task updated successfully!");
+      }
+      refetchStats();
+      qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update task");
+    } finally {
+      setActingTaskId(null);
+    }
+  };
+
+  const handleApproveTask = async (taskId: string) => {
+    try {
+      setActingTaskId(taskId);
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify({ status: "DONE", approvalStatus: "APPROVED" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to approve task");
+
+      toast.success("Task approved and marked as Done!");
+      refetchStats();
+      qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to approve task");
+    } finally {
+      setActingTaskId(null);
+    }
+  };
+
+  const handleRequestChanges = async (taskId: string) => {
+    try {
+      setActingTaskId(taskId);
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify({ status: "IN_PROGRESS" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to request changes");
+
+      toast.success("Task sent back to In Progress for revisions.");
+      refetchStats();
+      qc.invalidateQueries({ queryKey: ["/api/tasks"] });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send task back");
+    } finally {
+      setActingTaskId(null);
+    }
+  };
 
   // Task breakdown
   const totalTasks     = myTasks.length;
@@ -295,6 +380,97 @@ export function EmployeeDashboard({
         </Card>
       </div>
 
+      {/* ── Manager Section: Tasks Sent for Review ── */}
+      {isManager && tasksInReview.length > 0 && (
+        <Card className="bg-card border-amber-500/40 shadow-xs overflow-hidden">
+          <CardHeader className="pb-3 bg-amber-500/5 border-b border-amber-500/20 flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <Clock className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+                  Tasks Sent for Review
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs font-bold">
+                    {tasksInReview.length} awaiting approval
+                  </Badge>
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Team members have finished these tasks and submitted them for manager approval.
+                </p>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/tasks")}>
+              All Tasks <ArrowRight className="h-3 w-3" />
+            </Button>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {tasksInReview.map((task: any) => {
+                const isActing = actingTaskId === task.id;
+                return (
+                  <div
+                    key={task.id}
+                    className="p-3.5 rounded-lg border border-border/80 bg-muted/15 hover:bg-muted/30 transition-all space-y-3 flex flex-col justify-between"
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold text-primary truncate flex items-center gap-1">
+                          👤 {task.assigneeName || "Team Member"}
+                        </span>
+                        {task.priority && (
+                          <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 uppercase font-bold", PRIORITY_COLOR[task.priority] ?? "")}>
+                            {task.priority}
+                          </Badge>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-bold text-foreground leading-snug line-clamp-2">
+                        {task.title}
+                      </h4>
+                      {task.projectName && (
+                        <p className="text-[11px] text-muted-foreground">📁 {task.projectName}</p>
+                      )}
+                      {task.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 bg-background/60 p-2 rounded border border-border/40">
+                          {task.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-muted-foreground">
+                        {task.dueDate ? `Due ${format(new Date(task.dueDate), "dd MMM")}` : "No due date"}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isActing}
+                          className="h-7 text-xs px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20 font-semibold"
+                          onClick={() => handleRequestChanges(task.id)}
+                          title="Request changes / Send back to In Progress"
+                        >
+                          <Undo2 className="h-3 w-3 mr-1" /> Revise
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={isActing}
+                          className="h-7 text-xs px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                          onClick={() => handleApproveTask(task.id)}
+                          title="Approve task & mark as Done"
+                        >
+                          <Check className="h-3 w-3 mr-1" /> Approve
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Row 2: Upcoming Tasks + Task Progress ── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
@@ -317,32 +493,69 @@ export function EmployeeDashboard({
               </div>
             ) : (
               <div className="space-y-2">
-                {upcomingTasks.map((task: any) => (
-                  <div
-                    key={task.id}
-                    onClick={() => navigate("/employee/tasks")}
-                    className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/10 hover:bg-muted/25 transition-all cursor-pointer group"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                        {task.title}
-                      </p>
-                      {task.projectName && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">📁 {task.projectName}</p>
-                      )}
+                {upcomingTasks.map((task: any) => {
+                  const isActing = actingTaskId === task.id;
+                  return (
+                    <div
+                      key={task.id}
+                      onClick={() => navigate("/employee/tasks")}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/10 hover:bg-muted/25 transition-all cursor-pointer group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                          {task.title}
+                        </p>
+                        {task.projectName && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">📁 {task.projectName}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        {task.status === "TODO" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={isActing}
+                            className="h-6 text-[10px] px-2 gap-1 border-blue-500/40 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 font-semibold"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateTaskStatus(task.id, "IN_PROGRESS");
+                            }}
+                            title="Start working on this task"
+                          >
+                            <Play className="h-2.5 w-2.5 fill-current text-blue-600" /> Start
+                          </Button>
+                        )}
+                        {task.status === "IN_PROGRESS" && (
+                          <Button
+                            size="sm"
+                            disabled={isActing}
+                            className="h-6 text-[10px] px-2 gap-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateTaskStatus(task.id, "IN_REVIEW");
+                            }}
+                            title="Send task for manager review"
+                          >
+                            <Send className="h-2.5 w-2.5" /> Send for Review
+                          </Button>
+                        )}
+                        {task.status === "IN_REVIEW" && (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 text-[10px] px-1.5 py-0.5 font-semibold gap-1">
+                            <Clock className="h-2.5 w-2.5" /> In Review
+                          </Badge>
+                        )}
+                        {task.priority && task.priority !== "NORMAL" && (
+                          <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 uppercase font-bold", PRIORITY_COLOR[task.priority] ?? "")}>
+                            {task.priority}
+                          </Badge>
+                        )}
+                        <span className={cn("text-[10px] font-semibold whitespace-nowrap", dueLabelClass(task.dueDate))}>
+                          {dueLabelText(task.dueDate)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {task.priority && task.priority !== "NORMAL" && (
-                        <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 uppercase font-bold", PRIORITY_COLOR[task.priority] ?? "")}>
-                          {task.priority}
-                        </Badge>
-                      )}
-                      <span className={cn("text-[10px] font-semibold whitespace-nowrap", dueLabelClass(task.dueDate))}>
-                        {dueLabelText(task.dueDate)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

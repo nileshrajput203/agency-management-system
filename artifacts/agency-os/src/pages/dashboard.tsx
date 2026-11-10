@@ -1,18 +1,20 @@
 import { useState } from "react";
-import { useGetDashboardStats, useListContentPosts } from "@workspace/api-client-react";
-import { useQuery } from "@tanstack/react-query";
+import { useGetDashboardStats, useListContentPosts, getListTasksQueryKey } from "@workspace/api-client-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/App";
 import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IndianRupee, Landmark, FileCheck, ShoppingBag, RefreshCw } from "lucide-react";
 import { startOfWeek, endOfWeek, addDays, format } from "date-fns";
+import { toast } from "sonner";
 
 import { StatCard, PLATFORM_DOT } from "@/components/dashboard/dashboard-components";
 import { EmployeeDashboard } from "@/components/dashboard/employee-dashboard";
 import {
   DashboardSkeleton,
   BusinessSummaryCards,
+  TasksInReviewAdminSection,
   RevenueAndOperationsSection,
   PipelineAndHealthSection,
   MonthOverviewAndInsightsSection,
@@ -26,6 +28,61 @@ export default function DashboardPage() {
   const { user, token } = useAuth();
   const [, navigate] = useLocation();
   const [chartRange, setChartRange] = useState<string>("6m");
+  const qc = useQueryClient();
+  const [actingTaskId, setActingTaskId] = useState<string | null>(null);
+
+  const authHeader = (): Record<string, string> => {
+    const t = token || localStorage.getItem("agency_token") || "";
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  };
+
+  const handleApproveTask = async (taskId: string) => {
+    try {
+      setActingTaskId(taskId);
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify({ status: "DONE", approvalStatus: "APPROVED" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to approve task");
+
+      toast.success("Task approved and marked as Done!");
+      refetchStats();
+      qc.invalidateQueries({ queryKey: getListTasksQueryKey() });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to approve task");
+    } finally {
+      setActingTaskId(null);
+    }
+  };
+
+  const handleRequestChanges = async (taskId: string) => {
+    try {
+      setActingTaskId(taskId);
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader(),
+        },
+        body: JSON.stringify({ status: "IN_PROGRESS" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to request changes");
+
+      toast.success("Task sent back to In Progress for revisions.");
+      refetchStats();
+      qc.invalidateQueries({ queryKey: getListTasksQueryKey() });
+    } catch (err: any) {
+      toast.error(err.message || "Failed to send task back");
+    } finally {
+      setActingTaskId(null);
+    }
+  };
 
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useGetDashboardStats({
     query: {
@@ -159,6 +216,15 @@ export default function DashboardPage() {
           icon={<ShoppingBag className="h-5 w-5 text-violet-500" />}
         />
       </div>
+
+      {/* ── Tasks Sent for Review (Prominent manager/admin review queue) ── */}
+      <TasksInReviewAdminSection
+        stats={stats}
+        navigate={navigate}
+        onApproveTask={handleApproveTask}
+        onRequestChanges={handleRequestChanges}
+        actingTaskId={actingTaskId}
+      />
 
       {/* ── Second Row: Business Summary ── */}
       <BusinessSummaryCards stats={stats} />

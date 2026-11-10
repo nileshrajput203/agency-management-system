@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users, Briefcase, CheckCircle2, BarChart3, Layers, TrendingUp, ArrowRight,
-  FolderOpen, Calendar, Sparkles, Plus, Clock, Flame
+  FolderOpen, Calendar, Sparkles, Plus, Clock, Flame, Check, Undo2
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -119,14 +119,20 @@ export function BusinessSummaryCards({ stats }: { stats: any }) {
             </span>
             <span className="text-sm text-muted-foreground">due today</span>
           </div>
-          <div className="mt-3.5 pt-3.5 border-t border-border/60 grid grid-cols-5 gap-1 text-[10px] text-center">
+          <div className="mt-3.5 pt-3.5 border-t border-border/60 grid grid-cols-6 gap-1 text-[10px] text-center">
             <div>
               <p className="text-muted-foreground truncate">Pending</p>
               <p className="text-sm font-bold mt-0.5">{stats.businessSummary?.tasks?.pending ?? 0}</p>
             </div>
             <div>
               <p className="text-muted-foreground truncate">In Progress</p>
-              <p className="text-sm font-bold text-amber-500 mt-0.5">{stats.businessSummary?.tasks?.inProgress ?? 0}</p>
+              <p className="text-sm font-bold text-blue-500 mt-0.5">{stats.businessSummary?.tasks?.inProgress ?? 0}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground truncate">In Review</p>
+              <p className={cn("text-sm font-bold mt-0.5", ((stats.businessSummary?.tasks?.inReview ?? stats.tasksInReview?.length ?? 0) > 0 ? "text-amber-500 font-extrabold" : "text-muted-foreground"))}>
+                {stats.businessSummary?.tasks?.inReview ?? stats.tasksInReview?.length ?? 0}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground truncate">Completed</p>
@@ -146,6 +152,118 @@ export function BusinessSummaryCards({ stats }: { stats: any }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export function TasksInReviewAdminSection({
+  stats,
+  navigate,
+  onApproveTask,
+  onRequestChanges,
+  actingTaskId,
+}: {
+  stats: any;
+  navigate: (path: string) => void;
+  onApproveTask: (taskId: string) => void;
+  onRequestChanges: (taskId: string) => void;
+  actingTaskId?: string | null;
+}) {
+  const tasksInReview = stats?.tasksInReview || [];
+  if (tasksInReview.length === 0) return null;
+
+  return (
+    <Card className="bg-card border-amber-500/40 shadow-xs overflow-hidden">
+      <CardHeader className="pb-3 bg-amber-500/5 border-b border-amber-500/20 flex flex-row items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+            <Clock className="h-4 w-4" />
+          </div>
+          <div>
+            <CardTitle className="text-base font-bold flex items-center gap-2 text-foreground">
+              Tasks Sent for Review
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30 text-xs font-bold">
+                {tasksInReview.length} awaiting approval
+              </Badge>
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Team members have completed these tasks and submitted them for manager/admin approval.
+            </p>
+          </div>
+        </div>
+        <Button variant="ghost" size="sm" className="text-xs h-7 gap-1" onClick={() => navigate("/tasks")}>
+          Kanban Board <ArrowRight className="h-3 w-3" />
+        </Button>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {tasksInReview.map((task: any) => {
+            const isActing = actingTaskId === task.id;
+            return (
+              <div
+                key={task.id}
+                className="p-3.5 rounded-lg border border-border/80 bg-muted/15 hover:bg-muted/30 transition-all space-y-3 flex flex-col justify-between"
+              >
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-primary truncate flex items-center gap-1">
+                      👤 {task.assigneeName || "Team Member"}
+                    </span>
+                    {task.priority && (
+                      <Badge variant="outline" className={cn(
+                        "text-[9px] px-1.5 py-0 uppercase font-bold",
+                        task.priority === "HIGH" || task.priority === "URGENT"
+                          ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                          : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                      )}>
+                        {task.priority}
+                      </Badge>
+                    )}
+                  </div>
+                  <h4 className="text-sm font-bold text-foreground leading-snug line-clamp-2">
+                    {task.title}
+                  </h4>
+                  {task.projectName && (
+                    <p className="text-[11px] text-muted-foreground">📁 {task.projectName}</p>
+                  )}
+                  {task.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2 bg-background/60 p-2 rounded border border-border/40">
+                      {task.description}
+                    </p>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-muted-foreground">
+                    {task.dueDate ? `Due ${format(new Date(task.dueDate), "dd MMM")}` : "No due date"}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isActing}
+                      className="h-7 text-xs px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20 font-semibold"
+                      onClick={() => onRequestChanges(task.id)}
+                      title="Request revisions / Send back to In Progress"
+                    >
+                      <Undo2 className="h-3 w-3 mr-1" /> Revise
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={isActing}
+                      className="h-7 text-xs px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                      onClick={() => onApproveTask(task.id)}
+                      title="Approve task & mark as Done"
+                    >
+                      <Check className="h-3 w-3 mr-1" /> Approve
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -533,6 +533,22 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
           actionUrl: "/tasks",
         }, requesterId);
 
+        // Notify assignee if approved/completed by manager/admin
+        if (row.assigneeId && row.assigneeId !== requesterId) {
+          await NotificationService.createNotification({
+            userId: row.assigneeId,
+            title: "✅ Task Approved & Completed",
+            message: `Your task "${row.title}" has been approved by ${empName} and marked as completed`,
+            type: "TASK",
+            priority: "HIGH",
+            referenceId: row.id,
+            referenceType: "TASK",
+            createdBy: requesterId,
+            action: "View Task",
+            actionUrl: "/tasks",
+          });
+        }
+
         if (task.createdBy && task.createdBy !== requesterId) {
           await NotificationService.createNotification({
             userId: task.createdBy,
@@ -540,6 +556,22 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
             message: `${empName} completed task "${row.title}"`,
             type: "TASK",
             priority: "MEDIUM",
+            referenceId: row.id,
+            referenceType: "TASK",
+            createdBy: requesterId,
+            action: "View Task",
+            actionUrl: "/tasks",
+          });
+        }
+      } else if (sanitized.status === "IN_PROGRESS" && task.status === "IN_REVIEW") {
+        // Manager requested changes / sent back to In Progress
+        if (row.assigneeId && row.assigneeId !== requesterId) {
+          await NotificationService.createNotification({
+            userId: row.assigneeId,
+            title: "🔄 Changes Requested on Task",
+            message: `${empName} requested changes on your task "${row.title}". Please review and update.`,
+            type: "TASK",
+            priority: "HIGH",
             referenceId: row.id,
             referenceType: "TASK",
             createdBy: requesterId,

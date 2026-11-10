@@ -667,6 +667,22 @@ export function AdminTasksView() {
                                     Modified
                                   </Badge>
                                 )}
+                                {task.status === "IN_REVIEW" && (
+                                  <Button
+                                    size="sm"
+                                    className="h-5 text-[10px] px-2 py-0 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1 shadow-xs"
+                                    title="Approve task & mark as Done"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateMutation.mutate(
+                                        { id: task.id, data: { status: "DONE", approvalStatus: "APPROVED" } as any },
+                                        { onSuccess: () => toast.success("Task approved and marked as Done!") }
+                                      );
+                                    }}
+                                  >
+                                    <CheckCircle2 className="h-2.5 w-2.5" /> Approve
+                                  </Button>
+                                )}
                               </div>
                               <div className="flex flex-col items-end gap-0.5">
                                 {task.dueDate && (

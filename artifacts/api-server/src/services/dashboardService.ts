@@ -3,8 +3,9 @@ import {
   clientsTable, projectsTable, leadsTable, tasksTable, invoicesTable,
   quotationsTable, purchaseOrdersTable, leaveRequestsTable, usersTable,
 } from "@workspace/db/schema";
-import { eq, gte, sql, and, or } from "drizzle-orm";
+import { eq, gte, sql, and, or, desc } from "drizzle-orm";
 import { getEffectiveModules } from "../middleware/moduleAccess";
+import { isManagerRole } from "../middleware/auth";
 
 function toIso(val: any): string | null {
   if (!val) return null;
@@ -19,6 +20,7 @@ export async function getDashboardStatsService(userId: string) {
   const [user] = await db
     .select({
       name: usersTable.name,
+      role: usersTable.role,
       systemRole: usersTable.systemRole,
       allowedModules: usersTable.allowedModules,
     })
@@ -272,8 +274,45 @@ export async function getDashboardStatsService(userId: string) {
       };
     });
 
+    const isManager = isManagerRole(user?.systemRole) || isManagerRole((user as any)?.role);
+    let managerTasksInReview: any[] = [];
+    if (isManager) {
+      const inReviewRows = await db
+        .select({
+          id: tasksTable.id,
+          title: tasksTable.title,
+          status: tasksTable.status,
+          priority: tasksTable.priority,
+          dueDate: tasksTable.dueDate,
+          startDate: tasksTable.startDate,
+          projectId: tasksTable.projectId,
+          projectName: projectsTable.name,
+          assigneeId: tasksTable.assigneeId,
+          assigneeName: usersTable.name,
+          description: tasksTable.description,
+          deliverables: tasksTable.deliverables,
+          notes: tasksTable.notes,
+          assignmentNote: tasksTable.assignmentNote,
+          updatedAt: tasksTable.updatedAt,
+        })
+        .from(tasksTable)
+        .leftJoin(usersTable, eq(tasksTable.assigneeId, usersTable.id))
+        .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
+        .where(eq(tasksTable.status, "IN_REVIEW"))
+        .orderBy(desc(tasksTable.updatedAt));
+
+      managerTasksInReview = inReviewRows.map((t) => ({
+        ...t,
+        dueDate: toIso(t.dueDate),
+        startDate: toIso(t.startDate),
+        updatedAt: toIso(t.updatedAt),
+      }));
+    }
+
     return {
       isEmployee: true,
+      isManager,
+      tasksInReview: managerTasksInReview,
       employeeSummary: {
         totalAssignedTasks,
         tasksDueToday: tasksDueTodayCount,
@@ -281,10 +320,11 @@ export async function getDashboardStatsService(userId: string) {
         projectsAssignedToMe: projectsAssignedToMeCount,
         pendingTaskRequests: pendingTaskRequestsCount,
         approvedRequests: approvedRequestsCount,
-          approvedTasks: approvedTasksCount,
-          runningTasks: runningTasksCount,
-          completedTasks: completedTasksCount,
+        approvedTasks: approvedTasksCount,
+        runningTasks: runningTasksCount,
+        completedTasks: completedTasksCount,
         rejectedRequests: rejectedRequestsCount,
+        tasksInReview: managerTasksInReview.length,
       },
       assignedProjects: myProjectsWithCompletion,
       myTasks: formattedMyTasks,
@@ -585,8 +625,40 @@ export async function getDashboardStatsService(userId: string) {
     quickInsights.push("Revenue is currently tracking lower than last month's performance.");
   }
 
+  const adminTasksInReviewRows = await db
+    .select({
+      id: tasksTable.id,
+      title: tasksTable.title,
+      status: tasksTable.status,
+      priority: tasksTable.priority,
+      dueDate: tasksTable.dueDate,
+      startDate: tasksTable.startDate,
+      projectId: tasksTable.projectId,
+      projectName: projectsTable.name,
+      assigneeId: tasksTable.assigneeId,
+      assigneeName: usersTable.name,
+      description: tasksTable.description,
+      deliverables: tasksTable.deliverables,
+      notes: tasksTable.notes,
+      assignmentNote: tasksTable.assignmentNote,
+      updatedAt: tasksTable.updatedAt,
+    })
+    .from(tasksTable)
+    .leftJoin(usersTable, eq(tasksTable.assigneeId, usersTable.id))
+    .leftJoin(projectsTable, eq(tasksTable.projectId, projectsTable.id))
+    .where(eq(tasksTable.status, "IN_REVIEW"))
+    .orderBy(desc(tasksTable.updatedAt));
+
+  const formattedAdminTasksInReview = adminTasksInReviewRows.map((t) => ({
+    ...t,
+    dueDate: toIso(t.dueDate),
+    startDate: toIso(t.startDate),
+    updatedAt: toIso(t.updatedAt),
+  }));
+
   return {
     isEmployee: false,
+    tasksInReview: formattedAdminTasksInReview,
     revenueCollected: {
       currentMonth: monthlyRevenue,
       totalCollected: totalCollected,
@@ -623,6 +695,7 @@ export async function getDashboardStatsService(userId: string) {
         total: totalTasks,
         pending: pendingTasks,
         inProgress: inProgressTasks,
+        inReview: formattedAdminTasksInReview.length,
         completed: completedTasks,
         overdue: overdueTasks,
         dueToday: tasksDueToday,

@@ -22,7 +22,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import {
-  Plus, Trash2, Calendar, CheckSquare, CheckCircle2, Edit3, FileText, EyeOff, Eye
+  Plus, Trash2, Calendar, CheckSquare, CheckCircle2, Edit3, FileText, EyeOff, Eye,
+  Play, Send, Clock, ArrowRight
 } from "lucide-react";
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -153,9 +154,13 @@ export function EmployeeTasksView() {
       data: { status: requestedStatus } as any,
     }, {
       onSuccess: () => {
-        toast.success(requestedStatus === "IN_REVIEW" && isCompletedTask(newStatus)
-          ? "Task submitted for manager review"
-          : "Task status updated");
+        if (requestedStatus === "IN_REVIEW") {
+          toast.success("Task sent for review! Your manager will review and approve it.");
+        } else if (requestedStatus === "IN_PROGRESS") {
+          toast.success("Task moved to In Progress!");
+        } else {
+          toast.success("Task status updated");
+        }
       }
     });
   };
@@ -361,14 +366,41 @@ export function EmployeeTasksView() {
                           <h3 className="text-base font-semibold leading-snug pt-1 text-foreground">{task.title}</h3>
                         </div>
 
-                        {/* Interactive Status Selector & Edit Button */}
-                        <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Interactive Status Selector & Quick Action Buttons */}
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                          {task.status === "TODO" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs gap-1 border-blue-500/40 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 font-semibold"
+                              onClick={() => handleUpdateStatus(task.id, "IN_PROGRESS")}
+                              title="Start working on this task"
+                            >
+                              <Play className="h-3 w-3 fill-current text-blue-600" /> Start
+                            </Button>
+                          )}
+                          {task.status === "IN_PROGRESS" && (
+                            <Button
+                              size="sm"
+                              className="h-8 text-xs gap-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-xs"
+                              onClick={() => handleUpdateStatus(task.id, "IN_REVIEW")}
+                              title="Send task for manager review"
+                            >
+                              <Send className="h-3 w-3" /> Send for Review
+                            </Button>
+                          )}
+                          {task.status === "IN_REVIEW" && (
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 text-[11px] px-2 py-1 font-semibold gap-1">
+                              <Clock className="h-3 w-3" /> In Review
+                            </Badge>
+                          )}
                           <Button
                             size="icon"
                             variant="ghost"
                             className="h-8 w-8 text-muted-foreground hover:text-foreground"
                             onClick={() => handleOpenEmployeeApprovedEditDialog(task)}
                             data-testid={`employee-edit-btn-${task.id}`}
+                            title="Edit notes & progress details"
                           >
                             <Edit3 className="h-4 w-4" />
                           </Button>
@@ -376,7 +408,7 @@ export function EmployeeTasksView() {
                             value={task.status ?? "TODO"}
                             onValueChange={(newVal: string) => handleUpdateStatus(task.id, newVal)}
                           >
-                            <SelectTrigger className="w-32 h-8 text-xs font-semibold">
+                            <SelectTrigger className="w-28 h-8 text-xs font-semibold">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>

@@ -8,6 +8,14 @@ export interface TaskOwnerFields {
 export function canEmployeeAccessTask(task: TaskOwnerFields, userId: string): boolean {
   if (task.assigneeId === userId) return true;
   if (task.approvalStatus === "PENDING" && task.requestedBy === userId) return true;
-  if (Array.isArray(task.coAssignees) && task.coAssignees.includes(userId)) return true;
+  let co: unknown = task.coAssignees;
+  if (typeof co === "string") {
+    try {
+      co = JSON.parse(co);
+    } catch {
+      // not JSON, keep as is
+    }
+  }
+  if (Array.isArray(co) && co.includes(userId)) return true;
   return false;
 }
