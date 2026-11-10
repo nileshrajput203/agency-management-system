@@ -205,16 +205,18 @@ export function buildShareUrl(shareToken: string) {
 export function getPostDateKey(scheduledAt: string | Date | null | undefined): string | null {
   if (!scheduledAt) return null;
   if (typeof scheduledAt === "string") {
-    const datePart = scheduledAt.split("T")[0];
-    if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
-      return datePart;
+    const trimmed = scheduledAt.trim();
+    // Fast match for YYYY-MM-DD prefix (e.g. "2026-11-10", "2026-11-10T...", "2026-11-10 ...")
+    const match = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) {
+      return match[1];
     }
   }
   const d = new Date(scheduledAt);
   if (isNaN(d.getTime())) return null;
-  const year = d.getUTCFullYear();
-  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 

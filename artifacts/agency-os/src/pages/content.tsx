@@ -379,7 +379,12 @@ export default function ContentPage() {
     }
   });
 
-  const selectedDayPosts = selectedDayViewDate ? (postsByDay[selectedDayViewDate] ?? []) : [];
+  const selectedDayPosts = selectedDayViewDate
+    ? (posts ?? [])
+        .filter((p) => getPostDateKey(p.scheduledAt) === selectedDayViewDate)
+        .slice()
+        .sort((a, b) => (a.scheduledAt ?? "").localeCompare(b.scheduledAt ?? ""))
+    : [];
   const formattedSelectedDate = selectedDayViewDate
     ? format(new Date(selectedDayViewDate + "T00:00:00"), "EEEE, dd MMMM yyyy")
     : "";
@@ -943,134 +948,177 @@ export default function ContentPage() {
               const day = i + 1;
               const dateStr = format(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day), "yyyy-MM-dd");
               const dayPosts = postsByDay[dateStr] ?? [];
+              const hasPosts = dayPosts.length > 0;
               return (
                 <div
                   key={day}
-                  className="min-h-28 border-b border-r border-border p-1.5 cursor-pointer hover:bg-primary/5 transition-colors group"
-                  onClick={() => openCreate(dateStr)}
+                  className={cn(
+                    "min-h-28 border-b border-r border-border p-1.5 cursor-pointer transition-colors group relative flex flex-col justify-between",
+                    hasPosts ? "hover:bg-primary/5" : "hover:bg-muted/30"
+                  )}
+                  onClick={() => {
+                    if (hasPosts) {
+                      setSelectedDayViewDate(dateStr);
+                    } else {
+                      openCreate(dateStr);
+                    }
+                  }}
+                  title={hasPosts ? `Click date to view all ${dayPosts.length} posts for this day` : "Click to schedule post"}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-1.5">
-                      <p className={cn("text-xs font-semibold", dayPosts.length > 0 ? "text-foreground font-bold" : "text-muted-foreground")}>{day}</p>
-                      {dayPosts.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          title={`View all ${dayPosts.length} posts for this day`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (hasPosts) {
+                              setSelectedDayViewDate(dateStr);
+                            } else {
+                              openCreate(dateStr);
+                            }
+                          }}
+                          className={cn(
+                            "text-xs font-bold px-1 py-0.5 rounded hover:bg-primary/20 hover:text-primary transition-colors cursor-pointer",
+                            hasPosts ? "text-foreground font-extrabold" : "text-muted-foreground"
+                          )}
+                          title={hasPosts ? `View all ${dayPosts.length} posts for ${dateStr}` : "Schedule new post"}
+                        >
+                          {day}
+                        </button>
+                        {hasPosts && (
+                          <button
+                            type="button"
+                            title={`View all ${dayPosts.length} posts for this day`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDayViewDate(dateStr);
+                            }}
+                            className="text-[9px] px-1.5 py-0 rounded-full font-bold bg-primary/15 hover:bg-primary text-primary hover:text-primary-foreground transition-colors cursor-pointer shadow-2xs"
+                          >
+                            {dayPosts.length}
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        title="Schedule new post for this day"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openCreate(dateStr);
+                        }}
+                        className="h-4 w-4 rounded flex items-center justify-center hover:bg-primary/20 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <div className="space-y-0.5">
+                      {dayPosts.slice(0, 3).map((p) => {
+                        const isRevision = isNeedsRevision((p as any).needsRevision) || (p as any).approvalStatus === "NEEDS_CHANGES";
+                        const pFileUrl = getPostAttachmentUrl(p);
+                        const postAssigneeId = (p as any).assigneeId;
+                        const assignedUser = (users ?? []).find((u: any) => u.id === postAssigneeId);
+                        const assigneeInitials = assignedUser?.name
+                          ? assignedUser.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
+                          : "";
+                        return (
+                          <div
+                            key={p.id}
+                            className={cn(
+                              "flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 truncate cursor-pointer transition-colors border group/item",
+                              isRevision
+                                ? "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200 font-semibold"
+                                : "bg-primary/10 border-primary/20 hover:bg-primary/20"
+                            )}
+                            onClick={(e) => { e.stopPropagation(); openEdit(p); }}
+                          >
+                            {isRevision ? <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" /> : PLATFORM_ICON[p.platform ?? "INSTAGRAM"]}
+                            {pFileUrl && isMediaImage(pFileUrl) && (
+                              <img
+                                src={pFileUrl}
+                                alt="thumb"
+                                className="h-3.5 w-3.5 rounded object-cover border border-primary/40 shrink-0 hover:scale-125 transition-transform shadow-2xs"
+                                loading="lazy"
+                                title="Click to view artwork"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLightboxState({
+                                    open: true,
+                                    items: [{ url: pFileUrl, title: p.title || p.caption || "Post Media", filename: p.title || "artwork" }],
+                                    title: p.title || "Content Artwork",
+                                    subtitle: `${p.platform || "Instagram"} • ${p.contentType || "Post"}`,
+                                    post: p,
+                                  });
+                                }}
+                              />
+                            )}
+                            <span className="truncate flex-1">{p.title ?? p.caption?.slice(0, 20) ?? p.contentType}</span>
+
+                            {/* Quick Assign Dropdown directly on Calendar chip */}
+                            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                              <Select
+                                value={(p as any).assigneeId || "none"}
+                                onValueChange={(val) => handleQuickAssign(p.id, val)}
+                              >
+                                <SelectTrigger
+                                  title={assignedUser ? `Assigned to: ${assignedUser.name} (Click to reassign)` : "Click to assign task directly"}
+                                  className={cn(
+                                    "h-4 text-[9px] px-1 py-0 rounded border-0 shadow-none font-bold gap-0.5 max-w-[28px] focus:ring-0",
+                                    assignedUser
+                                      ? "bg-primary/20 text-primary hover:bg-primary/30"
+                                      : "bg-muted/70 text-muted-foreground hover:bg-muted opacity-60 group-hover/item:opacity-100"
+                                  )}
+                                >
+                                  {assigneeInitials ? (
+                                    <span className="uppercase text-[9px] font-extrabold">{assigneeInitials}</span>
+                                  ) : (
+                                    <UserPlus className="h-2.5 w-2.5" />
+                                  )}
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">-- Unassigned --</SelectItem>
+                                  {(users ?? []).map((u: any) => (
+                                    <SelectItem key={u.id} value={u.id}>
+                                      {u.name} ({u.systemRole || u.role || "Team"})
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {pFileUrl && (
+                              <button
+                                type="button"
+                                title="Download attached file"
+                                className="p-0.5 text-primary hover:text-primary-foreground hover:bg-primary/30 rounded shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  triggerFileDownload(pFileUrl, p.title || "content-media");
+                                }}
+                              >
+                                <Download className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {dayPosts.length > 3 && (
+                        <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setSelectedDayViewDate(dateStr);
                           }}
-                          className="text-[9px] px-1.5 py-0 rounded-full font-bold bg-primary/15 hover:bg-primary text-primary hover:text-primary-foreground transition-colors cursor-pointer"
+                          className="w-full text-left flex items-center justify-between text-[10px] font-bold text-primary hover:text-primary-foreground hover:bg-primary bg-primary/15 border border-primary/30 px-2 py-1 rounded-md transition-all cursor-pointer group/more shadow-2xs mt-1"
+                          title={`Click to view all ${dayPosts.length} posts for this day`}
                         >
-                          {dayPosts.length}
+                          <span>+{dayPosts.length - 3} more</span>
+                          <span className="text-[9px] font-bold underline group-hover/more:text-primary-foreground">
+                            View all ({dayPosts.length})
+                          </span>
                         </button>
                       )}
                     </div>
-                    <Plus className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                  <div className="space-y-0.5">
-                    {dayPosts.slice(0, 3).map((p) => {
-                      const isRevision = isNeedsRevision((p as any).needsRevision) || (p as any).approvalStatus === "NEEDS_CHANGES";
-                      const pFileUrl = getPostAttachmentUrl(p);
-                      const postAssigneeId = (p as any).assigneeId;
-                      const assignedUser = (users ?? []).find((u: any) => u.id === postAssigneeId);
-                      const assigneeInitials = assignedUser?.name
-                        ? assignedUser.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()
-                        : "";
-                      return (
-                        <div
-                          key={p.id}
-                          className={cn(
-                            "flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 truncate cursor-pointer transition-colors border group/item",
-                            isRevision
-                              ? "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200 font-semibold"
-                              : "bg-primary/10 border-primary/20 hover:bg-primary/20"
-                          )}
-                          onClick={(e) => { e.stopPropagation(); openEdit(p); }}
-                        >
-                          {isRevision ? <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" /> : PLATFORM_ICON[p.platform ?? "INSTAGRAM"]}
-                          {pFileUrl && isMediaImage(pFileUrl) && (
-                            <img
-                              src={pFileUrl}
-                              alt="thumb"
-                              className="h-3.5 w-3.5 rounded object-cover border border-primary/40 shrink-0 hover:scale-125 transition-transform shadow-2xs"
-                              loading="lazy"
-                              title="Click to view artwork"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setLightboxState({
-                                  open: true,
-                                  items: [{ url: pFileUrl, title: p.title || p.caption || "Post Media", filename: p.title || "artwork" }],
-                                  title: p.title || "Content Artwork",
-                                  subtitle: `${p.platform || "Instagram"} • ${p.contentType || "Post"}`,
-                                  post: p,
-                                });
-                              }}
-                            />
-                          )}
-                          <span className="truncate flex-1">{p.title ?? p.caption?.slice(0, 20) ?? p.contentType}</span>
-
-                          {/* Quick Assign Dropdown directly on Calendar chip */}
-                          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                            <Select
-                              value={(p as any).assigneeId || "none"}
-                              onValueChange={(val) => handleQuickAssign(p.id, val)}
-                            >
-                              <SelectTrigger
-                                title={assignedUser ? `Assigned to: ${assignedUser.name} (Click to reassign)` : "Click to assign task directly"}
-                                className={cn(
-                                  "h-4 text-[9px] px-1 py-0 rounded border-0 shadow-none font-bold gap-0.5 max-w-[28px] focus:ring-0",
-                                  assignedUser
-                                    ? "bg-primary/20 text-primary hover:bg-primary/30"
-                                    : "bg-muted/70 text-muted-foreground hover:bg-muted opacity-60 group-hover/item:opacity-100"
-                                )}
-                              >
-                                {assigneeInitials ? (
-                                  <span className="uppercase text-[9px] font-extrabold">{assigneeInitials}</span>
-                                ) : (
-                                  <UserPlus className="h-2.5 w-2.5" />
-                                )}
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">-- Unassigned --</SelectItem>
-                                {(users ?? []).map((u: any) => (
-                                  <SelectItem key={u.id} value={u.id}>
-                                    {u.name} ({u.systemRole || u.role || "Team"})
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {pFileUrl && (
-                            <button
-                              type="button"
-                              title="Download attached file"
-                              className="p-0.5 text-primary hover:text-primary-foreground hover:bg-primary/30 rounded shrink-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                triggerFileDownload(pFileUrl, p.title || "content-media");
-                              }}
-                            >
-                              <Download className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {dayPosts.length > 3 && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedDayViewDate(dateStr);
-                        }}
-                        className="w-full text-left flex items-center justify-between text-[10px] font-semibold text-primary hover:text-primary-foreground hover:bg-primary bg-primary/10 border border-primary/25 px-1.5 py-0.5 rounded transition-all cursor-pointer group/more shadow-2xs mt-0.5"
-                      >
-                        <span>+{dayPosts.length - 3} more</span>
-                        <span className="text-[9px] font-normal underline group-hover/more:text-primary-foreground">View all</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               );
@@ -1155,7 +1203,7 @@ export default function ContentPage() {
                     key={post.id}
                     onClick={() => {
                       setSelectedDayViewDate(null);
-                      openEdit(post);
+                      openEdit(post as PostRecord);
                     }}
                     className={cn(
                       "p-3 rounded-xl border transition-all cursor-pointer hover:shadow-sm group flex flex-col sm:flex-row sm:items-center justify-between gap-3",
@@ -1270,7 +1318,7 @@ export default function ContentPage() {
                         className="h-8 text-xs font-medium"
                         onClick={() => {
                           setSelectedDayViewDate(null);
-                          openEdit(post);
+                          openEdit(post as PostRecord);
                         }}
                       >
                         View & Edit
