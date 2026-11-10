@@ -387,9 +387,9 @@ router.patch("/:id", requirePermission("tasks.edit"), asyncHandler(async (req, r
         sanitized.status = "IN_REVIEW";
       }
 
-      // Rule 2: If task has no assignee yet, assign to the updating team member
-      if (!task.assigneeId) {
-        sanitized.assigneeId = requesterId;
+      // Rule 2: Other than manager, no one can assign or unassign team members
+      if (sanitized.assigneeId !== undefined && sanitized.assigneeId !== task.assigneeId) {
+        delete sanitized.assigneeId;
       }
 
       // Rule 3: Strip fields that employees are not allowed to change (e.g. title, priority, project, dates)

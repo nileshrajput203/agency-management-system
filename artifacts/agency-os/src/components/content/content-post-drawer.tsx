@@ -470,12 +470,18 @@ export function ContentPostDrawer({
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Assign Task Directly To</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Assign Task Directly To</Label>
+                {!isManagerOrAdmin && (
+                  <span className="text-[10px] text-muted-foreground italic font-medium">Manager only</span>
+                )}
+              </div>
               <Select
+                disabled={!isManagerOrAdmin}
                 value={draft.assigneeId || "__none__"}
                 onValueChange={(val: string) => setField("assigneeId", val === "__none__" ? "" : val)}
               >
-                <SelectTrigger className="text-xs">
+                <SelectTrigger className={cn("text-xs", !isManagerOrAdmin && "opacity-75 cursor-not-allowed bg-muted/50")}>
                   <SelectValue placeholder="Select team member to assign…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -487,9 +493,15 @@ export function ContentPostDrawer({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">
-                Assigning an employee automatically creates and updates a linked task on their Task Board with deadlines synced directly from this post.
-              </p>
+              {!isManagerOrAdmin ? (
+                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                  Only managers and administrators can assign or unassign team members.
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  Assigning an employee automatically creates and updates a linked task on their Task Board with deadlines synced directly from this post.
+                </p>
+              )}
             </div>
           </div>
 

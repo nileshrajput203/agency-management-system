@@ -760,6 +760,17 @@ router.patch("/:id", requirePermission("content.edit"), asyncHandler(async (req,
     throw createError("Not found", 404);
   }
 
+  // Strict rule: Other than a manager or administrator, no one can assign or unassign team members
+  const isAssigneeChanged =
+    (sanitized.assigneeId !== undefined && sanitized.assigneeId !== existing.assigneeId) ||
+    (sanitized.editorId !== undefined && sanitized.editorId !== existing.editorId) ||
+    (sanitized.videographerId !== undefined && sanitized.videographerId !== existing.videographerId) ||
+    (sanitized.ideationAssignedTo !== undefined && sanitized.ideationAssignedTo !== existing.ideationAssignedTo);
+
+  if (isAssigneeChanged && !isManager) {
+    throw createError("Forbidden: Only managers and administrators can assign or unassign team members", 403);
+  }
+
   if (
     sanitized.scheduledAt !== undefined &&
     sanitized.scheduledAt !== existing.scheduledAt &&

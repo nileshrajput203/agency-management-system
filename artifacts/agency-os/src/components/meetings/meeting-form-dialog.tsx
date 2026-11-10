@@ -228,8 +228,8 @@ export function MeetingFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-w-[calc(100%-2rem)] max-h-[88vh] flex flex-col p-6 gap-0">
+        <DialogHeader className="pb-3 border-b border-border/40 shrink-0">
           <DialogTitle className="flex items-center gap-2">
             {meetingType === "SHOOT" ? (
               <>
@@ -245,7 +245,8 @@ export function MeetingFormDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-1 min-w-0">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 pt-3">
+          <div className="flex-1 overflow-y-auto pr-1 space-y-4 min-w-0">
           <div className="space-y-1.5 min-w-0">
             <Label className="text-xs font-semibold">
               {meetingType === "SHOOT" ? "Shoot Title / Campaign Name *" : "Meeting Title *"}
@@ -629,8 +630,9 @@ export function MeetingFormDialog({
               <p className="text-[11px] text-rose-600">Select at least one active team member to assign this shoot.</p>
             )}
           </div>}
+          </div>
 
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-3 border-t border-border/40 shrink-0 mt-3">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button
               type="submit"

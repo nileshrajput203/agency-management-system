@@ -262,6 +262,10 @@ export default function ContentPage() {
   }
 
   const handleQuickAssign = (postId: string, assigneeId: string) => {
+    if (!isManagerOrAdmin) {
+      toast.error("Only managers and administrators can assign or unassign team members.");
+      return;
+    }
     const targetUser = (users ?? []).find((u: any) => u.id === assigneeId);
     const targetName = targetUser?.name || "Unassigned";
     updateMutation.mutate(
@@ -704,25 +708,34 @@ export default function ContentPage() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
                     {/* Fast Assign Task to Assignee */}
-                    <div className="flex items-center gap-1">
-                      <Select
-                        value={(post as any).assigneeId || "none"}
-                        onValueChange={(val) => handleQuickAssign(post.id, val)}
-                      >
-                        <SelectTrigger className="h-7 text-xs px-2.5 bg-muted/50 border border-primary/20 hover:border-primary rounded-lg font-medium gap-1 min-w-[130px]">
-                          <User className="h-3 w-3 text-primary shrink-0" />
-                          <SelectValue placeholder="Assign task…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">-- Unassigned --</SelectItem>
-                          {(users ?? []).map((u: any) => (
-                            <SelectItem key={u.id} value={u.id}>
-                              {u.name} ({u.systemRole || u.role || "Team"})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {isManagerOrAdmin ? (
+                      <div className="flex items-center gap-1">
+                        <Select
+                          value={(post as any).assigneeId || "none"}
+                          onValueChange={(val) => handleQuickAssign(post.id, val)}
+                        >
+                          <SelectTrigger className="h-7 text-xs px-2.5 bg-muted/50 border border-primary/20 hover:border-primary rounded-lg font-medium gap-1 min-w-[130px]">
+                            <User className="h-3 w-3 text-primary shrink-0" />
+                            <SelectValue placeholder="Assign task…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">-- Unassigned --</SelectItem>
+                            {(users ?? []).map((u: any) => (
+                              <SelectItem key={u.id} value={u.id}>
+                                {u.name} ({u.systemRole || u.role || "Team"})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-2.5 py-1 rounded-lg border border-border/50">
+                        <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="font-medium text-foreground">
+                          {(users ?? []).find((u: any) => u.id === (post as any).assigneeId)?.name || "Unassigned"}
+                        </span>
+                      </div>
+                    )}
 
                     {fileUrl ? (
                       <Button
@@ -1054,48 +1067,59 @@ export default function ContentPage() {
                             )}
                             <span className="truncate flex-1 min-w-0 font-medium leading-none">{p.title ?? p.caption?.slice(0, 20) ?? p.contentType}</span>
 
-                            {/* Clean Compact Assignee Avatar Pill */}
+                            {/* Assignee Indicator: Only managers/admins can reassign */}
                             <div onClick={(e) => e.stopPropagation()} className="shrink-0 relative flex items-center">
-                              {assignedUser ? (
-                                <div
-                                  title={`Assigned to: ${assignedUser.name} (Click to reassign)`}
-                                  className="h-4 min-w-4 px-1 rounded-full bg-primary/20 hover:bg-primary/30 text-primary font-bold text-[9px] flex items-center justify-center shrink-0 border border-primary/30 relative cursor-pointer"
-                                >
-                                  <span>{assigneeInitials}</span>
-                                  <select
-                                    value={(p as any).assigneeId || "none"}
-                                    onChange={(e) => handleQuickAssign(p.id, e.target.value)}
-                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              {isManagerOrAdmin ? (
+                                assignedUser ? (
+                                  <div
                                     title={`Assigned to: ${assignedUser.name} (Click to reassign)`}
+                                    className="h-4 min-w-4 px-1 rounded-full bg-primary/20 hover:bg-primary/30 text-primary font-bold text-[9px] flex items-center justify-center shrink-0 border border-primary/30 relative cursor-pointer"
                                   >
-                                    <option value="none">-- Unassigned --</option>
-                                    {(users ?? []).map((u: any) => (
-                                      <option key={u.id} value={u.id}>
-                                        {u.name} ({u.systemRole || u.role || "Team"})
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
+                                    <span>{assigneeInitials}</span>
+                                    <select
+                                      value={(p as any).assigneeId || "none"}
+                                      onChange={(e) => handleQuickAssign(p.id, e.target.value)}
+                                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                      title={`Assigned to: ${assignedUser.name} (Click to reassign)`}
+                                    >
+                                      <option value="none">-- Unassigned --</option>
+                                      {(users ?? []).map((u: any) => (
+                                        <option key={u.id} value={u.id}>
+                                          {u.name} ({u.systemRole || u.role || "Team"})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                ) : (
+                                  <div
+                                    title="Click to assign team member"
+                                    className="h-4 w-4 rounded-full bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center opacity-0 group-hover/item:opacity-100 relative cursor-pointer transition-opacity"
+                                  >
+                                    <UserPlus className="h-2.5 w-2.5" />
+                                    <select
+                                      value="none"
+                                      onChange={(e) => handleQuickAssign(p.id, e.target.value)}
+                                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                      title="Assign team member"
+                                    >
+                                      <option value="none">-- Assign team member --</option>
+                                      {(users ?? []).map((u: any) => (
+                                        <option key={u.id} value={u.id}>
+                                          {u.name} ({u.systemRole || u.role || "Team"})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                )
                               ) : (
-                                <div
-                                  title="Click to assign team member"
-                                  className="h-4 w-4 rounded-full bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center opacity-0 group-hover/item:opacity-100 relative cursor-pointer transition-opacity"
-                                >
-                                  <UserPlus className="h-2.5 w-2.5" />
-                                  <select
-                                    value="none"
-                                    onChange={(e) => handleQuickAssign(p.id, e.target.value)}
-                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                    title="Assign team member"
+                                assignedUser ? (
+                                  <div
+                                    title={`Assigned to: ${assignedUser.name}`}
+                                    className="h-4 min-w-4 px-1 rounded-full bg-primary/20 text-primary font-bold text-[9px] flex items-center justify-center shrink-0 border border-primary/30 pointer-events-none select-none"
                                   >
-                                    <option value="none">-- Assign team member --</option>
-                                    {(users ?? []).map((u: any) => (
-                                      <option key={u.id} value={u.id}>
-                                        {u.name} ({u.systemRole || u.role || "Team"})
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
+                                    <span>{assigneeInitials}</span>
+                                  </div>
+                                ) : null
                               )}
                             </div>
 
@@ -1291,24 +1315,33 @@ export default function ContentPage() {
 
                     {/* Right: Assignee Select + Download + Open button */}
                     <div className="flex items-center gap-2 shrink-0 self-end sm:self-center" onClick={(e) => e.stopPropagation()}>
-                      {/* Assignee select */}
-                      <Select
-                        value={(post as any).assigneeId || "none"}
-                        onValueChange={(val) => handleQuickAssign(post.id, val)}
-                      >
-                        <SelectTrigger className="h-8 text-xs w-[140px] bg-background/80">
-                          <User className="h-3 w-3 mr-1 text-muted-foreground" />
-                          <SelectValue placeholder="Assignee" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">-- Unassigned --</SelectItem>
-                          {(users ?? []).map((u: any) => (
-                            <SelectItem key={u.id} value={u.id}>
-                              {u.name} ({u.systemRole || u.role || "Team"})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {/* Assignee select: Only manager/admin can change */}
+                      {isManagerOrAdmin ? (
+                        <Select
+                          value={(post as any).assigneeId || "none"}
+                          onValueChange={(val) => handleQuickAssign(post.id, val)}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-[140px] bg-background/80">
+                            <User className="h-3 w-3 mr-1 text-muted-foreground" />
+                            <SelectValue placeholder="Assignee" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">-- Unassigned --</SelectItem>
+                            {(users ?? []).map((u: any) => (
+                              <SelectItem key={u.id} value={u.id}>
+                                {u.name} ({u.systemRole || u.role || "Team"})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/40 px-2.5 py-1.5 rounded-lg border border-border/50">
+                          <User className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="font-medium text-foreground">
+                            {(users ?? []).find((u: any) => u.id === (post as any).assigneeId)?.name || "Unassigned"}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Download attachment */}
                       {pFileUrl && (

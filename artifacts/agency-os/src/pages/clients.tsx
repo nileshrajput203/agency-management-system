@@ -671,15 +671,15 @@ export default function ClientsPage() {
 
       {/* Close or Pause Contract Dialog */}
       <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-w-[calc(100%-2rem)]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg max-w-[calc(100%-2rem)] max-h-[85vh] flex flex-col p-6 gap-0">
+          <DialogHeader className="pb-3 border-b border-border/40 shrink-0">
             <DialogTitle className="flex items-center gap-2 text-base font-semibold">
               <PauseCircle className="h-5 w-5 text-amber-500 shrink-0" />
               <span>Contract Lifecycle: {closeTargetClient?.companyName}</span>
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-1">
+          <div className="flex-1 overflow-y-auto pr-1 py-3 space-y-4">
             <div className="p-3.5 bg-blue-50/70 dark:bg-blue-950/30 rounded-lg border border-blue-200/80 dark:border-blue-900/60 text-xs text-blue-900 dark:text-blue-200">
               <p className="font-semibold mb-1 flex items-center gap-1.5">
                 Preserve All Historical Records
@@ -741,7 +741,7 @@ export default function ClientsPage() {
             </div>
           </div>
 
-          <DialogFooter className="pt-3">
+          <DialogFooter className="pt-3 border-t border-border/40 shrink-0">
             <Button variant="outline" onClick={() => setCloseDialogOpen(false)}>Cancel</Button>
             <Button
               className="bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-xs"

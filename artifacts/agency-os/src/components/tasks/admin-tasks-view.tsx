@@ -778,64 +778,69 @@ export function AdminTasksView() {
                               );
                             })()}
 
-                            <div className="flex items-center justify-between pt-1 border-t border-border/40">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <Badge variant="outline" className={cn("text-[10px] border px-1.5 py-0", pc.className)}>
-                                  {pc.label}
-                                </Badge>
-                                {task.approvalStatus === "MODIFIED" && (
-                                  <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300">
-                                    Modified
+                            <div className="pt-1.5 border-t border-border/40 space-y-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                  <Badge variant="outline" className={cn("text-[10px] border px-1.5 py-0 shrink-0", pc.className)}>
+                                    {pc.label}
                                   </Badge>
-                                )}
-                                {task.status === "IN_REVIEW" && (
-                                  <div className="flex items-center gap-1">
-                                    <Button
-                                      size="sm"
-                                      className="h-5 text-[10px] px-2 py-0 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1 shadow-xs"
-                                      title="Approve task & mark as Done"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        updateMutation.mutate(
-                                          { id: task.id, data: { status: "DONE", approvalStatus: "APPROVED" } as any },
-                                          { onSuccess: () => toast.success("Task approved and marked as Done!") }
-                                        );
-                                      }}
-                                    >
-                                      <CheckCircle2 className="h-2.5 w-2.5" /> Approve
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-5 text-[10px] px-1.5 py-0 border-rose-300 text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/30 font-semibold gap-0.5"
-                                      title="Request revisions / send back to In Progress"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        updateMutation.mutate(
-                                          { id: task.id, data: { status: "IN_PROGRESS" } as any },
-                                          { onSuccess: () => toast.success("Task sent back to In Progress for revisions.") }
-                                        );
-                                      }}
-                                    >
-                                      <RotateCcw className="h-2.5 w-2.5" /> Revisions
-                                    </Button>
-                                  </div>
-                                )}
+                                  {task.approvalStatus === "MODIFIED" && (
+                                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 shrink-0">
+                                      Modified
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex flex-col items-end gap-0.5 shrink-0 text-right">
+                                  {task.dueDate && (
+                                    <div className={cn(
+                                      "flex items-center gap-1 text-[10px]",
+                                      isOverdue ? "text-rose-500 font-semibold" : "text-muted-foreground"
+                                    )}>
+                                      <Calendar className="h-2.5 w-2.5 shrink-0" />
+                                      {formatDateOnly(task.dueDate, "dd MMM")}
+                                    </div>
+                                  )}
+                                  {task.assigneeName && (
+                                    <p className="text-[10px] text-muted-foreground truncate max-w-20 font-medium" title={task.assigneeName}>
+                                      {task.assigneeName}
+                                    </p>
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex flex-col items-end gap-0.5">
-                                {task.dueDate && (
-                                  <div className={cn(
-                                    "flex items-center gap-1 text-[10px]",
-                                    isOverdue ? "text-rose-500 font-semibold" : "text-muted-foreground"
-                                  )}>
-                                    <Calendar className="h-2.5 w-2.5" />
-                                    {formatDateOnly(task.dueDate, "dd MMM")}
-                                  </div>
-                                )}
-                                {task.assigneeName && (
-                                  <p className="text-[10px] text-muted-foreground truncate max-w-20">{task.assigneeName}</p>
-                                )}
-                              </div>
+
+                              {task.status === "IN_REVIEW" && isManager && (
+                                <div className="flex items-center gap-1.5 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                                  <Button
+                                    size="sm"
+                                    className="flex-1 h-6 text-[10px] px-2 py-0 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1 shadow-xs"
+                                    title="Approve task & mark as Done"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateMutation.mutate(
+                                        { id: task.id, data: { status: "DONE", approvalStatus: "APPROVED" } as any },
+                                        { onSuccess: () => toast.success("Task approved and marked as Done!") }
+                                      );
+                                    }}
+                                  >
+                                    <CheckCircle2 className="h-3 w-3" /> Approve
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="flex-1 h-6 text-[10px] px-2 py-0 border-rose-300 text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/30 font-semibold gap-1"
+                                    title="Request revisions / send back to In Progress"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      updateMutation.mutate(
+                                        { id: task.id, data: { status: "IN_PROGRESS" } as any },
+                                        { onSuccess: () => toast.success("Task sent back to In Progress for revisions.") }
+                                      );
+                                    }}
+                                  >
+                                    <RotateCcw className="h-3 w-3" /> Revisions
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
