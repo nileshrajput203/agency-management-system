@@ -671,24 +671,28 @@ export default function ClientsPage() {
 
       {/* Close or Pause Contract Dialog */}
       <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-lg max-w-[calc(100%-2rem)]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PauseCircle className="h-5 w-5 text-amber-500" />
-              Contract Lifecycle: {closeTargetClient?.companyName}
+            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
+              <PauseCircle className="h-5 w-5 text-amber-500 shrink-0" />
+              <span>Contract Lifecycle: {closeTargetClient?.companyName}</span>
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 mt-2">
-            <div className="p-3 bg-blue-50/70 dark:bg-blue-950/20 rounded-xl border border-blue-200 text-xs text-blue-800 dark:text-blue-300">
-              <p className="font-semibold mb-0.5">Preserve All Historical Records</p>
-              <p>Closing or pausing this contract keeps all client invoices, proposals, tasks, and project history 100% intact. You can revive this client with 1 click at any time.</p>
+          <div className="space-y-4 py-1">
+            <div className="p-3.5 bg-blue-50/70 dark:bg-blue-950/30 rounded-lg border border-blue-200/80 dark:border-blue-900/60 text-xs text-blue-900 dark:text-blue-200">
+              <p className="font-semibold mb-1 flex items-center gap-1.5">
+                Preserve All Historical Records
+              </p>
+              <p className="leading-relaxed text-blue-800 dark:text-blue-300">
+                Closing or pausing this contract keeps all client invoices, proposals, tasks, and project history 100% intact. You can revive this client with 1 click at any time.
+              </p>
             </div>
 
             <div className="space-y-1.5">
-              <Label>Action *</Label>
+              <Label className="text-xs font-medium">Action *</Label>
               <Select value={closeAction} onValueChange={(v: "PAUSE" | "CLOSE") => setCloseAction(v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="PAUSE">Pause Contract (Temporary Hold / Seasonal Break)</SelectItem>
                   <SelectItem value="CLOSE">Close Deal / Conclude Contract Term</SelectItem>
@@ -697,9 +701,9 @@ export default function ClientsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Reason *</Label>
+              <Label className="text-xs font-medium">Reason *</Label>
               <Select value={closeReason} onValueChange={setCloseReason}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Budget Freeze">Client Budget Freeze</SelectItem>
                   <SelectItem value="Seasonal Break">Seasonal Break / Festive Off-season</SelectItem>
@@ -713,9 +717,10 @@ export default function ClientsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Target Revival Date (Optional)</Label>
+              <Label className="text-xs font-medium">Target Revival Date (Optional)</Label>
               <Input
                 type="date"
+                className="w-full"
                 value={targetRevivalDate}
                 onChange={e => setTargetRevivalDate(e.target.value)}
               />
@@ -725,9 +730,10 @@ export default function ClientsPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Internal Handover / Accounting Notes</Label>
+              <Label className="text-xs font-medium">Internal Handover / Accounting Notes</Label>
               <Textarea
-                rows={2}
+                rows={3}
+                className="w-full resize-none text-xs"
                 placeholder="e.g. Retainer paused for Q3. Promised to reconnect for Diwali campaign in October."
                 value={contractNotes}
                 onChange={e => setContractNotes(e.target.value)}
@@ -735,10 +741,10 @@ export default function ClientsPage() {
             </div>
           </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className="pt-3">
             <Button variant="outline" onClick={() => setCloseDialogOpen(false)}>Cancel</Button>
             <Button
-              className="bg-amber-600 hover:bg-amber-700 text-white"
+              className="bg-amber-600 hover:bg-amber-700 text-white font-medium shadow-xs"
               onClick={handleCloseContract}
             >
               {closeAction === "PAUSE" ? "Pause Contract" : "Conclude Contract"}

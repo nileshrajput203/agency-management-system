@@ -691,15 +691,15 @@ export default function ClientDetailPage({ id }: { id: string }) {
 
       {/* Log Activity Dialog */}
       <Dialog open={activityDialogOpen} onOpenChange={setActivityDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-lg max-w-[calc(100%-2rem)]">
           <DialogHeader>
             <DialogTitle>Log Activity</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-2">
+          <div className="space-y-4 py-1">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Type</label>
               <Select value={activityType} onValueChange={(v) => setActivityType(v ?? "NOTE")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {ACTIVITY_TYPES.map(t => (
                     <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
@@ -710,6 +710,7 @@ export default function ClientDetailPage({ id }: { id: string }) {
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Title</label>
               <Input
+                className="w-full"
                 value={activityTitle}
                 onChange={e => setActivityTitle(e.target.value)}
                 placeholder="e.g. Follow-up call with John"
@@ -718,6 +719,7 @@ export default function ClientDetailPage({ id }: { id: string }) {
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Description (optional)</label>
               <Textarea
+                className="w-full"
                 value={activityDesc}
                 onChange={e => setActivityDesc(e.target.value)}
                 placeholder="Additional details..."
@@ -725,7 +727,7 @@ export default function ClientDetailPage({ id }: { id: string }) {
               />
             </div>
           </div>
-          <DialogFooter className="mt-4">
+          <DialogFooter className="pt-3">
             <Button variant="outline" onClick={() => setActivityDialogOpen(false)}>Cancel</Button>
             <Button
               onClick={() => addActivityMutation.mutate()}
