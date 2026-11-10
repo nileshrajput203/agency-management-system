@@ -289,9 +289,14 @@ export function generateInvoiceMasterExcel(inv: any): Buffer {
       !placeOfSupply.toLowerCase().includes("maharashtra") &&
       !placeOfSupply.toLowerCase().includes("mh"));
 
+  let rawItems = inv.lineItems;
+  if (typeof rawItems === "string") {
+    try { rawItems = JSON.parse(rawItems); } catch {}
+  }
+
   const items =
-    inv.lineItems && inv.lineItems.length > 0
-      ? inv.lineItems
+    Array.isArray(rawItems) && rawItems.length > 0
+      ? rawItems
       : [
           {
             description: "Digital Marketing & Social Media Management Services",
@@ -316,13 +321,19 @@ export function generateInvoiceMasterExcel(inv: any): Buffer {
   const words = amountToWordsIndian(grossAmount);
   const serialDate = dateToExcelSerial(invDate);
 
+  const dateParts = invDate.split("-").map(Number);
+  const monthAbbrs = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const formattedMasterDate = (dateParts.length === 3 && dateParts[0] && dateParts[1] && dateParts[2])
+    ? `${String(dateParts[2]).padStart(2, "0")}-${monthAbbrs[dateParts[1] - 1]}-${String(dateParts[0]).slice(-2)}`
+    : invDate;
+
   // 1. Invoice Number: B13 & L13
   sheetXml = replaceCell(sheetXml, "B13", "170", "inlineStr", null, `Invoice No:- ${invNumber}`);
   sheetXml = replaceCell(sheetXml, "L13", "170", "str", "B13", `Invoice No:- ${invNumber}`);
 
-  // 2. Date: C14 & M14
-  sheetXml = replaceCell(sheetXml, "C14", "175", "n", null, serialDate);
-  sheetXml = replaceCell(sheetXml, "M14", "175", "str", "C14", `${invDate} 00:00:00`);
+  // 2. Date: C14 & M14 (using formatted inlineStr so Excel never overflows to #####)
+  sheetXml = replaceCell(sheetXml, "C14", "175", "inlineStr", null, formattedMasterDate);
+  sheetXml = replaceCell(sheetXml, "M14", "175", "str", "C14", formattedMasterDate);
 
   // 3. Client Name: B16, F16, L16, P16
   sheetXml = replaceCell(sheetXml, "B16", "184", "inlineStr", null, clientName);

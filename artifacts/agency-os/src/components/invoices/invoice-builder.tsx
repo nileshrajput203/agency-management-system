@@ -107,6 +107,29 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
   const { fields, append, remove } = useFieldArray({ control, name: "lineItems" });
   const watched = watch();
 
+  // Auto-fetch next sequential invoice number for new invoices
+  useEffect(() => {
+    if (editData) return;
+    let isCancelled = false;
+    async function fetchNextNumber() {
+      try {
+        const res = await fetch(`/api/invoices/next-number?type=${invoiceType}`, {
+          headers: authHeaders(),
+        });
+        if (res.ok && !isCancelled) {
+          const data = await res.json();
+          if (data.nextNumber) {
+            setValue("invoiceNumber", data.nextNumber);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch next invoice number", err);
+      }
+    }
+    fetchNextNumber();
+    return () => { isCancelled = true; };
+  }, [editData, invoiceType, setValue]);
+
   const lines = watched.lineItems ?? [];
   const subtotal = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0);
   const totalTax = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0) * (Number(l.taxPercent) || 0) / 100, 0);
@@ -199,7 +222,15 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
               const activeClient = (clients ?? []).find(c => c.id === watched.clientId);
               exportInvoiceToExcel({
                 ...watched,
+                number: watched.invoiceNumber || (editData as any)?.number || undefined,
                 clientName: activeClient?.companyName || (watched as any).clientName,
+                billingAddress: watched.clientAddress || activeClient?.billingAddress,
+                clientCity: watched.clientCity || activeClient?.city,
+                clientState: watched.clientState || activeClient?.state,
+                clientPostalCode: watched.clientPostalCode || activeClient?.postalCode,
+                clientGstin: watched.clientGstin || activeClient?.gstin,
+                placeOfSupply: watched.clientState || activeClient?.state || "Maharashtra",
+                invoiceType,
                 subtotal,
                 taxAmount: totalTax,
                 total: grandTotal,
@@ -218,6 +249,7 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
               const activeClient = (clients ?? []).find(c => c.id === watched.clientId);
               exportInvoiceToCsv({
                 ...watched,
+                number: watched.invoiceNumber || (editData as any)?.number || undefined,
                 clientName: activeClient?.companyName || (watched as any).clientName,
                 subtotal,
                 taxAmount: totalTax,
@@ -228,14 +260,34 @@ export function InvoiceBuilder({ onBack, editData }: { onBack: () => void; editD
           >
             <Download className="h-3.5 w-3.5 text-blue-600" /> CSV
           </Button>
-          {editData && (
-            <Button
-              variant="outline" size="sm" className="gap-1.5"
-              onClick={() => openPrintWindow(buildInvoiceHtml(editData as InvoiceData), `Invoice-${(editData as Record<string,string>).number ?? "draft"}`)}
-            >
-              <Download className="h-3.5 w-3.5" /> PDF
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs text-indigo-700 dark:text-indigo-400 border-indigo-500/30 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+            title="Download / Print Master Invoice PDF"
+            onClick={() => {
+              const activeClient = (clients ?? []).find(c => c.id === watched.clientId);
+              const fullData: any = {
+                ...watched,
+                number: watched.invoiceNumber || (editData as any)?.number || "0003",
+                clientName: activeClient?.companyName || (watched as any).clientName,
+                billingAddress: watched.clientAddress || activeClient?.billingAddress,
+                clientCity: watched.clientCity || activeClient?.city,
+                clientState: watched.clientState || activeClient?.state,
+                clientPostalCode: watched.clientPostalCode || activeClient?.postalCode,
+                clientGstin: watched.clientGstin || activeClient?.gstin,
+                placeOfSupply: watched.clientState || activeClient?.state || "Maharashtra",
+                invoiceType,
+                subtotal,
+                taxAmount: totalTax,
+                total: grandTotal,
+              };
+              openPrintWindow(buildInvoiceHtml(fullData), `Invoice-${watched.invoiceNumber || (editData as any)?.number || "draft"}`);
+            }}
+          >
+            <Download className="h-3.5 w-3.5" /> PDF
+          </Button>
           <Button variant="outline" size="sm" onClick={handleSubmit(async (d) => { (d as any).status = "DRAFT"; await onSubmit(d as BuilderForm); })} disabled={saving}>
             Save Draft
           </Button>

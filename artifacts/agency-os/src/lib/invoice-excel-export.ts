@@ -629,7 +629,10 @@ export async function exportInvoiceToExcel(inv: InvoiceExportData) {
 
   // First try the backend master excel generator (produces 100% byte-for-byte identical output from original 14_Invoice_Format.xlsx)
   try {
-    const token = localStorage.getItem("token") || localStorage.getItem("auth_token");
+    const token =
+      localStorage.getItem("agency_token") ||
+      localStorage.getItem("token") ||
+      localStorage.getItem("auth_token");
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
 

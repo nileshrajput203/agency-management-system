@@ -80,6 +80,33 @@ router.get("/financial-summary", requirePermission("invoices.view"), asyncHandle
   return res.json({ totalRevenue, outstanding, overdue, paidCount, invoiceCount });
 }));
 
+// GET /api/invoices/next-number â€” auto-increment sequential invoice number
+router.get("/next-number", requirePermission("invoices.view"), asyncHandler(async (req, res) => {
+  const type = (req.query.type as string) || "TAX_INVOICE";
+  const isProforma = type === "PROFORMA";
+
+  const rows = await db
+    .select({ number: invoicesTable.number, invoiceType: invoicesTable.invoiceType })
+    .from(invoicesTable)
+    .where(isNull(invoicesTable.deletedAt));
+
+  const nums = rows
+    .filter((r) => (isProforma ? r.invoiceType === "PROFORMA" : r.invoiceType !== "PROFORMA"))
+    .map((r) => r.number)
+    .filter((n): n is string => !!n)
+    .map((n) => {
+      const match = n.match(/\d+/);
+      return match ? parseInt(match[0], 10) : NaN;
+    })
+    .filter((n) => !isNaN(n) && n < 1000); // Filter out anomalies
+
+  const maxNum = nums.length > 0 ? Math.max(...nums) : 3;
+  const nextVal = Math.max(maxNum + 1, 4);
+  const nextNumber = isProforma ? `PI-${String(nextVal).padStart(4, "0")}` : String(nextVal).padStart(4, "0");
+
+  return res.json({ nextNumber });
+}));
+
 router.get("/", requirePermission("invoices.view"), asyncHandler(async (req, res) => {
   const rows = await db
     .select({
@@ -108,8 +135,8 @@ router.get("/", requirePermission("invoices.view"), asyncHandler(async (req, res
       notes: invoicesTable.notes,
       termsAndConditions: invoicesTable.termsAndConditions,
       companyGstin: invoicesTable.companyGstin,
-      clientGstin: invoicesTable.clientGstin,
-      billingAddress: invoicesTable.billingAddress,
+      clientGstin: sql<string>`COALESCE(${invoicesTable.clientGstin}, ${clientsTable.gstin})`,
+      billingAddress: sql<string>`COALESCE(${invoicesTable.billingAddress}, ${clientsTable.billingAddress})`,
       shippingAddress: invoicesTable.shippingAddress,
       bankDetails: invoicesTable.bankDetails,
       logoUrl: invoicesTable.logoUrl,
@@ -121,12 +148,12 @@ router.get("/", requirePermission("invoices.view"), asyncHandler(async (req, res
       businessCity: invoicesTable.businessCity,
       businessPostalCode: invoicesTable.businessPostalCode,
       businessState: invoicesTable.businessState,
-      clientPhone: invoicesTable.clientPhone,
-      clientEmail: invoicesTable.clientEmail,
-      clientPan: invoicesTable.clientPan,
-      clientCity: invoicesTable.clientCity,
-      clientPostalCode: invoicesTable.clientPostalCode,
-      clientState: invoicesTable.clientState,
+      clientPhone: sql<string>`COALESCE(${invoicesTable.clientPhone}, ${clientsTable.phone})`,
+      clientEmail: sql<string>`COALESCE(${invoicesTable.clientEmail}, ${clientsTable.email})`,
+      clientPan: sql<string>`COALESCE(${invoicesTable.clientPan}, ${clientsTable.panNumber})`,
+      clientCity: sql<string>`COALESCE(${invoicesTable.clientCity}, ${clientsTable.city})`,
+      clientPostalCode: sql<string>`COALESCE(${invoicesTable.clientPostalCode}, ${clientsTable.postalCode})`,
+      clientState: sql<string>`COALESCE(${invoicesTable.clientState}, ${clientsTable.state})`,
       gstType: invoicesTable.gstType,
       signatureUrl: invoicesTable.signatureUrl,
       discountType: invoicesTable.discountType,
@@ -162,17 +189,26 @@ router.post("/", requirePermission("invoices.create"), asyncHandler(async (req, 
     }
   }
 
-  if (!sanitized.number) {
-    const existing = await db.select({ number: invoicesTable.number }).from(invoicesTable);
-    const nums = existing
+  // If number is missing or already taken, auto-calculate next sequential number
+  const existingRows = await db
+    .select({ number: invoicesTable.number, invoiceType: invoicesTable.invoiceType })
+    .from(invoicesTable)
+    .where(isNull(invoicesTable.deletedAt));
+
+  const isTaken = sanitized.number && existingRows.some((r) => r.number === sanitized.number);
+
+  if (!sanitized.number || isTaken) {
+    const nums = existingRows
+      .filter((r) => (isProforma ? r.invoiceType === "PROFORMA" : r.invoiceType !== "PROFORMA"))
       .map((r) => r.number)
       .filter((n): n is string => !!n)
       .map((n) => {
         const match = n.match(/\d+/);
         return match ? parseInt(match[0], 10) : NaN;
       })
-      .filter((n) => !isNaN(n));
-    const nextVal = nums.length > 0 ? Math.max(...nums) + 1 : 3;
+      .filter((n) => !isNaN(n) && n < 1000);
+    const maxNum = nums.length > 0 ? Math.max(...nums) : 3;
+    const nextVal = Math.max(maxNum + 1, 4);
     sanitized.number = isProforma ? `PI-${String(nextVal).padStart(4, "0")}` : String(nextVal).padStart(4, "0");
   }
 
@@ -574,15 +610,15 @@ router.get("/:id/excel", requirePermission("invoices.view"), asyncHandler(async 
       notes: invoicesTable.notes,
       termsAndConditions: invoicesTable.termsAndConditions,
       companyGstin: invoicesTable.companyGstin,
-      clientGstin: invoicesTable.clientGstin,
-      billingAddress: invoicesTable.billingAddress,
+      clientGstin: sql<string>`COALESCE(${invoicesTable.clientGstin}, ${clientsTable.gstin})`,
+      billingAddress: sql<string>`COALESCE(${invoicesTable.billingAddress}, ${clientsTable.billingAddress})`,
       shippingAddress: invoicesTable.shippingAddress,
-      clientPhone: invoicesTable.clientPhone,
-      clientEmail: invoicesTable.clientEmail,
-      clientPan: invoicesTable.clientPan,
-      clientCity: invoicesTable.clientCity,
-      clientPostalCode: invoicesTable.clientPostalCode,
-      clientState: invoicesTable.clientState,
+      clientPhone: sql<string>`COALESCE(${invoicesTable.clientPhone}, ${clientsTable.phone})`,
+      clientEmail: sql<string>`COALESCE(${invoicesTable.clientEmail}, ${clientsTable.email})`,
+      clientPan: sql<string>`COALESCE(${invoicesTable.clientPan}, ${clientsTable.panNumber})`,
+      clientCity: sql<string>`COALESCE(${invoicesTable.clientCity}, ${clientsTable.city})`,
+      clientPostalCode: sql<string>`COALESCE(${invoicesTable.clientPostalCode}, ${clientsTable.postalCode})`,
+      clientState: sql<string>`COALESCE(${invoicesTable.clientState}, ${clientsTable.state})`,
       gstType: invoicesTable.gstType,
     })
     .from(invoicesTable)
