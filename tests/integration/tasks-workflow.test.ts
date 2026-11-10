@@ -116,6 +116,56 @@ describe("Tasks Workflow Integration Tests (/api/tasks)", () => {
     expect(res.body.status).toBe("IN_PROGRESS");
   });
 
+  it("Employee can revert task from IN_REVIEW back to IN_PROGRESS if sent by mistake", async () => {
+    // First ensure task is IN_REVIEW
+    await request(app)
+      .patch(`/api/tasks/${testTaskId}`)
+      .set("Authorization", `Bearer ${employeeToken}`)
+      .send({ status: "IN_REVIEW" });
+
+    // Revert back to IN_PROGRESS
+    const res = await request(app)
+      .patch(`/api/tasks/${testTaskId}`)
+      .set("Authorization", `Bearer ${employeeToken}`)
+      .send({
+        status: "IN_PROGRESS",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("IN_PROGRESS");
+  });
+
+  it("Employee can revert task from IN_PROGRESS back to TODO if started by mistake", async () => {
+    const res = await request(app)
+      .patch(`/api/tasks/${testTaskId}`)
+      .set("Authorization", `Bearer ${employeeToken}`)
+      .send({
+        status: "TODO",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("TODO");
+  });
+
+  it("Employee can move task directly from IN_REVIEW back to TODO", async () => {
+    // Set to IN_REVIEW first
+    await request(app)
+      .patch(`/api/tasks/${testTaskId}`)
+      .set("Authorization", `Bearer ${employeeToken}`)
+      .send({ status: "IN_REVIEW" });
+
+    // Revert directly to TODO
+    const res = await request(app)
+      .patch(`/api/tasks/${testTaskId}`)
+      .set("Authorization", `Bearer ${employeeToken}`)
+      .send({
+        status: "TODO",
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("TODO");
+  });
+
   it("Manager can set status to DONE (Approve & Complete)", async () => {
     const res = await request(app)
       .patch(`/api/tasks/${testTaskId}`)
@@ -135,3 +185,4 @@ describe("Tasks Workflow Integration Tests (/api/tasks)", () => {
     }
   });
 });
+

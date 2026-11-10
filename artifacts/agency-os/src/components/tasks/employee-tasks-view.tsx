@@ -23,7 +23,7 @@ import { WriteWithAI } from "@/components/common/WriteWithAI";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import {
   Plus, Trash2, Calendar, CheckSquare, CheckCircle2, Edit3, FileText, EyeOff, Eye,
-  Play, Send, Clock, ArrowRight
+  Play, Send, Clock, ArrowRight, Undo2
 } from "lucide-react";
 import { format, isBefore, parseISO, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -164,6 +164,8 @@ export function EmployeeTasksView() {
           toast.success("Task sent for review! Your manager will review and approve it.");
         } else if (requestedStatus === "IN_PROGRESS") {
           toast.success("Task moved to In Progress!");
+        } else if (requestedStatus === "TODO") {
+          toast.success("Task moved back to To Do!");
         } else {
           toast.success("Task status updated");
         }
@@ -386,19 +388,41 @@ export function EmployeeTasksView() {
                             </Button>
                           )}
                           {task.status === "IN_PROGRESS" && (
-                            <Button
-                              size="sm"
-                              className="h-8 text-xs gap-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-xs"
-                              onClick={() => handleUpdateStatus(task.id, "IN_REVIEW")}
-                              title="Send task for manager review"
-                            >
-                              <Send className="h-3 w-3" /> Send for Review
-                            </Button>
+                            <>
+                              <Button
+                                size="sm"
+                                className="h-8 text-xs gap-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-xs"
+                                onClick={() => handleUpdateStatus(task.id, "IN_REVIEW")}
+                                title="Send task for manager review"
+                              >
+                                <Send className="h-3 w-3" /> Send for Review
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-8 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                                onClick={() => handleUpdateStatus(task.id, "TODO")}
+                                title="Started by mistake? Move back to To Do"
+                              >
+                                <Undo2 className="h-3 w-3" /> To Do
+                              </Button>
+                            </>
                           )}
                           {task.status === "IN_REVIEW" && (
-                            <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 text-[11px] px-2 py-1 font-semibold gap-1">
-                              <Clock className="h-3 w-3" /> In Review
-                            </Badge>
+                            <>
+                              <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 text-[11px] px-2 py-1 font-semibold gap-1">
+                                <Clock className="h-3 w-3" /> In Review
+                              </Badge>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 text-xs gap-1 border-amber-400/50 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/40 font-semibold"
+                                onClick={() => handleUpdateStatus(task.id, "IN_PROGRESS")}
+                                title="Sent for review by mistake? Resume work and edit"
+                              >
+                                <Undo2 className="h-3 w-3" /> Resume Work
+                              </Button>
+                            </>
                           )}
                           <Button
                             size="icon"

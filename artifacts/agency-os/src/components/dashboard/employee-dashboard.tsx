@@ -123,6 +123,8 @@ export function EmployeeDashboard({
         toast.success("Task sent for review! Your manager will review and approve it.");
       } else if (newStatus === "IN_PROGRESS") {
         toast.success("Task moved to In Progress!");
+      } else if (newStatus === "TODO") {
+        toast.success("Task moved back to To Do!");
       } else {
         toast.success("Task updated successfully!");
       }
@@ -526,23 +528,53 @@ export function EmployeeDashboard({
                           </Button>
                         )}
                         {task.status === "IN_PROGRESS" && (
-                          <Button
-                            size="sm"
-                            disabled={isActing}
-                            className="h-6 text-[10px] px-2 gap-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-xs"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUpdateTaskStatus(task.id, "IN_REVIEW");
-                            }}
-                            title="Send task for manager review"
-                          >
-                            <Send className="h-2.5 w-2.5" /> Send for Review
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              disabled={isActing}
+                              className="h-6 text-[10px] px-2 gap-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUpdateTaskStatus(task.id, "IN_REVIEW");
+                              }}
+                              title="Send task for manager review"
+                            >
+                              <Send className="h-2.5 w-2.5" /> Send for Review
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={isActing}
+                              variant="ghost"
+                              className="h-6 text-[10px] px-1.5 gap-0.5 text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUpdateTaskStatus(task.id, "TODO");
+                              }}
+                              title="Started by mistake? Move back to To Do"
+                            >
+                              <Undo2 className="h-2.5 w-2.5" /> To Do
+                            </Button>
+                          </div>
                         )}
                         {task.status === "IN_REVIEW" && (
-                          <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 text-[10px] px-1.5 py-0.5 font-semibold gap-1">
-                            <Clock className="h-2.5 w-2.5" /> In Review
-                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800 text-[10px] px-1.5 py-0.5 font-semibold gap-1">
+                              <Clock className="h-2.5 w-2.5" /> In Review
+                            </Badge>
+                            <Button
+                              size="sm"
+                              disabled={isActing}
+                              variant="outline"
+                              className="h-6 text-[10px] px-1.5 gap-1 border-amber-400/50 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-950/40 font-semibold"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUpdateTaskStatus(task.id, "IN_PROGRESS");
+                              }}
+                              title="Sent for review by mistake? Move back to In Progress"
+                            >
+                              <Undo2 className="h-2.5 w-2.5" /> Resume
+                            </Button>
+                          </div>
                         )}
                         {task.priority && task.priority !== "NORMAL" && (
                           <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0 uppercase font-bold", PRIORITY_COLOR[task.priority] ?? "")}>
